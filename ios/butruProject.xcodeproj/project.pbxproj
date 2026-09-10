@@ -12,6 +12,14 @@
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		E72C6B7FCAB8C1D0DAD4709F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		F00000010000000000000001 /* Arimo-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000001 /* Arimo-Bold.ttf */; };
+		F00000010000000000000002 /* Arimo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000002 /* Arimo-Regular.ttf */; };
+		F00000010000000000000003 /* Inter_18pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000003 /* Inter_18pt-Bold.ttf */; };
+		F00000010000000000000004 /* Inter_18pt-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000004 /* Inter_18pt-SemiBold.ttf */; };
+		F00000010000000000000005 /* Inter_24pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000005 /* Inter_24pt-Bold.ttf */; };
+		F00000010000000000000006 /* Inter_28pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000006 /* Inter_28pt-Bold.ttf */; };
+		F00000010000000000000007 /* Inter_28pt-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000007 /* Inter_28pt-LightItalic.ttf */; };
+		F00000010000000000000008 /* MomoSignature.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000008 /* MomoSignature.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +33,14 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = butruProject/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = butruProject/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F00000020000000000000001 /* Arimo-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Arimo-Bold.ttf"; path = "butruProject/Fonts/Arimo-Bold.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000002 /* Arimo-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Arimo-Regular.ttf"; path = "butruProject/Fonts/Arimo-Regular.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000003 /* Inter_18pt-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Inter_18pt-Bold.ttf"; path = "butruProject/Fonts/Inter_18pt-Bold.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000004 /* Inter_18pt-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Inter_18pt-SemiBold.ttf"; path = "butruProject/Fonts/Inter_18pt-SemiBold.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000005 /* Inter_24pt-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Inter_24pt-Bold.ttf"; path = "butruProject/Fonts/Inter_24pt-Bold.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000006 /* Inter_28pt-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Inter_28pt-Bold.ttf"; path = "butruProject/Fonts/Inter_28pt-Bold.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000007 /* Inter_28pt-LightItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = "Inter_28pt-LightItalic.ttf"; path = "butruProject/Fonts/Inter_28pt-LightItalic.ttf"; sourceTree = "<group>"; };
+		F00000020000000000000008 /* MomoSignature.ttf */ = {isa = PBXFileReference; lastKnownFileType = unknown; name = MomoSignature.ttf; path = butruProject/Fonts/MomoSignature.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +63,7 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				F00000030000000000000001 /* Fonts */,
 			);
 			name = butruProject;
 			sourceTree = "<group>";
@@ -96,6 +113,21 @@
 				5709B34CF0A7D63546082F79 /* Pods-butruProject.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		F00000030000000000000001 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				F00000020000000000000001 /* Arimo-Bold.ttf */,
+				F00000020000000000000002 /* Arimo-Regular.ttf */,
+				F00000020000000000000003 /* Inter_18pt-Bold.ttf */,
+				F00000020000000000000004 /* Inter_18pt-SemiBold.ttf */,
+				F00000020000000000000005 /* Inter_24pt-Bold.ttf */,
+				F00000020000000000000006 /* Inter_28pt-Bold.ttf */,
+				F00000020000000000000007 /* Inter_28pt-LightItalic.ttf */,
+				F00000020000000000000008 /* MomoSignature.ttf */,
+			);
+			name = Fonts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -161,6 +193,14 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				E72C6B7FCAB8C1D0DAD4709F /* PrivacyInfo.xcprivacy in Resources */,
+				F00000010000000000000001 /* Arimo-Bold.ttf in Resources */,
+				F00000010000000000000002 /* Arimo-Regular.ttf in Resources */,
+				F00000010000000000000003 /* Inter_18pt-Bold.ttf in Resources */,
+				F00000010000000000000004 /* Inter_18pt-SemiBold.ttf in Resources */,
+				F00000010000000000000005 /* Inter_24pt-Bold.ttf in Resources */,
+				F00000010000000000000006 /* Inter_28pt-Bold.ttf in Resources */,
+				F00000010000000000000007 /* Inter_28pt-LightItalic.ttf in Resources */,
+				F00000010000000000000008 /* MomoSignature.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

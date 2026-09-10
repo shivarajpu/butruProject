@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -17,26 +18,24 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import {
   Butruname,
-  eyeIcon,
-  emailIcon,
+  emailIconGray,
+  phoneIconPink,
   secureIcon,
   supporIcon,
-  phoneIcon,
   rewardIcon,
-  passwordIcon,
   loginPagaImage,
 } from '../assets/svg';
 import { COLORS } from '../constants/colors';
+import { Callicon } from '../assets/svg/authIcons';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
-const LoginScreen = ({ navigation }: Props) => {
+const OtpScreen = ({ navigation }: Props) => {
   const { width, height } = useWindowDimensions();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
 
   // Screen size categories for responsive layout
   const isTablet = width >= 768;
@@ -53,14 +52,25 @@ const LoginScreen = ({ navigation }: Props) => {
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
-  const handleLogin = () => {
-    console.log('Email:', email);
-    console.log('Password:', password);
+  const handleSendOtp = () => {
+    const trimmed = phoneNumber.trim();
+    if (!trimmed) {
+      Alert.alert('Mobile Number Required', 'Please enter your mobile number.');
+      return;
+    }
+    navigation.navigate('OtpVarify', { phoneNumber: trimmed });
+  };
+
+  const handleVerifyOtp = () => {
+    if (!otpCode.trim()) {
+      Alert.alert('OTP Required', 'Please enter the verification code.');
+      return;
+    }
     navigation.replace('Home');
   };
 
-  const handleOtpTabPress = () => {
-    navigation.navigate('Otp');
+  const handleEmailTabPress = () => {
+    navigation.navigate('Login');
   };
 
   return (
@@ -119,99 +129,91 @@ const LoginScreen = ({ navigation }: Props) => {
             ]}
           >
             <TouchableOpacity
+              style={styles.tabButton}
+              onPress={handleEmailTabPress}
+              activeOpacity={0.7}
+            >
+              <SvgXml xml={emailIconGray} width={18} height={18} />
+              <Text style={styles.tabText}>Email Login</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.tabButton, styles.activeTabButton]}
               activeOpacity={0.9}
             >
-              <SvgXml xml={emailIcon} width={18} height={18} />
-              <Text style={[styles.tabText, styles.activeTabText]}>
-                Email Login
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.tabButton}
-              onPress={handleOtpTabPress}
-              activeOpacity={0.7}
-            >
-              <SvgXml xml={phoneIcon} width={18} height={18} />
-              <Text style={styles.tabText}>
-                OTP Login
-              </Text>
+              <SvgXml xml={phoneIconPink} width={18} height={18} />
+              <Text style={[styles.tabText, styles.activeTabText]}>OTP Login</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Form Inputs */}
+          {/* Form Content */}
           <View style={styles.formContainer}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-              <View style={styles.inputWrapper}>
-                <View style={styles.inputIcon}>
-                  <SvgXml xml={emailIcon} width={18} height={18} />
+            {!isOtpSent ? (
+              <>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+                  <View style={styles.inputWrapper}>
+                    <View style={styles.inputIcon}>
+                      <SvgXml xml={Callicon} width={23} height={25} />
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="+91 9876543210"
+                      placeholderTextColor="#A0A0A0"
+                      value={phoneNumber}
+                      onChangeText={setPhoneNumber}
+                      keyboardType="phone-pad"
+                      autoCapitalize="none"
+                      maxLength={15}
+                    />
+                  </View>
                 </View>
-                <TextInput
-                  style={styles.input}
-                  placeholder="youremail@gmail.com"
-                  placeholderTextColor="#A0A0A0"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
 
-            <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputWrapper}>
-                <View style={styles.inputIcon}>
-                  <SvgXml xml={passwordIcon} width={18} height={18} />
-                </View>
-                <TextInput
-                  style={styles.input}
-                  placeholder="********"
-                  placeholderTextColor="#A0A0A0"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                />
+                {/* Send OTP Button */}
                 <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  activeOpacity={0.7}
+                  style={styles.submitButton}
+                  onPress={handleSendOtp}
+                  activeOpacity={0.8}
                 >
-                  <SvgXml xml={eyeIcon} width={18} height={18} />
+                  <Text style={styles.submitButtonText}>Send OTP</Text>
                 </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Remember Me & Forgot Password */}
-            <View style={styles.optionsRow}>
-              <TouchableOpacity
-                style={styles.rememberMeContainer}
-                onPress={() => setRememberMe(!rememberMe)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+              </>
+            ) : (
+              <>
+                <View style={styles.fieldGroup}>
+                  <View style={styles.otpHeaderRow}>
+                    <Text style={styles.inputLabel}>ENTER 4-DIGIT OTP</Text>
+                    <TouchableOpacity onPress={() => setIsOtpSent(false)}>
+                      <Text style={styles.changeNumberText}>Edit Number</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inputWrapper}>
+                    <View style={styles.inputIcon}>
+                      <SvgXml xml={phoneIconPink} width={18} height={18} />
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter verification code"
+                      placeholderTextColor="#A0A0A0"
+                      value={otpCode}
+                      onChangeText={setOtpCode}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                    />
+                  </View>
                 </View>
-                <Text style={styles.rememberText}>Remember me</Text>
-              </TouchableOpacity>
 
-              <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleLogin}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitButtonText}>Sign In</Text>
-            </TouchableOpacity>
+                {/* Verify Button */}
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handleVerifyOtp}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.submitButtonText}>Verify & Sign In</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             {/* Sign Up Link */}
             <View style={styles.signUpRow}>
@@ -297,7 +299,8 @@ const styles = StyleSheet.create({
   },
   logoSvg: {
     marginBottom: 16,
-    marginTop: 15,
+        marginTop: 15,
+
   },
   logoText: {
     fontSize: 28,
@@ -371,7 +374,18 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+  otpHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  changeNumberText: {
+    fontSize: 12,
+    color: '#B8255F',
+    fontWeight: '600',
   },
   inputLabel: {
     fontSize: 11,
@@ -395,44 +409,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#333',
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#B8255F',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  checkboxChecked: {
-    backgroundColor: '#B8255F',
-  },
-  checkmark: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  rememberText: {
-    fontSize: 13,
-    color: '#444',
-  },
-  forgotPasswordText: {
-    fontSize: 13,
-    color: '#B8255F',
-    fontWeight: '600',
   },
   submitButton: {
     backgroundColor: '#B8255F',
@@ -502,4 +478,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default OtpScreen;

@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -26,48 +27,75 @@ import {
   passwordIcon,
   loginPagaImage,
 } from '../assets/svg';
+import { Callicon } from '../assets/svg/authIcons';
+import { userProfileIcon } from '../assets/svg/authIcons';
 import { COLORS } from '../constants/colors';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
-const LoginScreen = ({ navigation }: Props) => {
+const SignUpScreen = ({ navigation }: Props) => {
   const { width, height } = useWindowDimensions();
 
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(true);
 
-  // Screen size categories for responsive layout
+  // Responsive layout
   const isTablet = width >= 768;
   const isSmallDevice = height < 700;
 
-  // Responsive illustration size maintaining original 187x221 aspect ratio
   const svgWidth = Math.min(width * 0.52, 220);
   const svgHeight = svgWidth * (221 / 187);
 
-  // Responsive logo size maintaining original 133x55 aspect ratio
   const logoWidth = Math.min(width * 0.32, 133);
   const logoHeight = logoWidth * (55 / 133);
 
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
-  const handleLogin = () => {
-    console.log('Email:', email);
-    console.log('Password:', password);
-    navigation.replace('Home');
+  const handleCreateAccount = () => {
+    if (!name.trim()) {
+      Alert.alert('Name Required', 'Please enter your name.');
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address.');
+      return;
+    }
+    if (!mobile.trim()) {
+      Alert.alert('Mobile Required', 'Please enter your mobile number.');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Password Required', 'Please enter a password.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Password Mismatch', 'Passwords do not match.');
+      return;
+    }
+    if (!agreedToTerms) {
+      Alert.alert('Terms Required', 'Please agree to the Terms and Conditions.');
+      return;
+    }
+    // Navigate to OTP verification after sign-up
+    navigation.navigate('OtpVarify', { phoneNumber: `+91 ${mobile}` });
   };
 
-  const handleOtpTabPress = () => {
-    navigation.navigate('Otp');
+  const handleSignIn = () => {
+    navigation.navigate('Login');
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Top Absolute SVG Illustration - Edge to Edge */}
+      {/* Top Illustration */}
       <View pointerEvents="none" style={styles.topImagePosition}>
         <SvgXml xml={loginPagaImage} width={svgWidth} height={svgHeight} />
       </View>
@@ -86,7 +114,7 @@ const LoginScreen = ({ navigation }: Props) => {
           bounces={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Section */}
+          {/* Header */}
           <View
             style={[
               styles.headerContainer,
@@ -105,43 +133,36 @@ const LoginScreen = ({ navigation }: Props) => {
                 <Text style={styles.logoText}>BuTRu</Text>
               )}
               <View style={styles.titleWrapper}>
-                <Text style={styles.titleText}>Welcome Back!</Text>
-                <Text style={styles.subtitleText}>Sign in to shop kids' fashion.</Text>
+                <Text style={styles.titleText}>Sign Up</Text>
+                <Text style={styles.subtitleText}>
+                  Join us for adorable kids' fashion &amp; more.
+                </Text>
               </View>
             </View>
           </View>
 
-          {/* Tab Switcher */}
-          <View
-            style={[
-              styles.tabContainer,
-              isSmallDevice ? styles.tabSmall : styles.tabNormal,
-            ]}
-          >
-            <TouchableOpacity
-              style={[styles.tabButton, styles.activeTabButton]}
-              activeOpacity={0.9}
-            >
-              <SvgXml xml={emailIcon} width={18} height={18} />
-              <Text style={[styles.tabText, styles.activeTabText]}>
-                Email Login
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.tabButton}
-              onPress={handleOtpTabPress}
-              activeOpacity={0.7}
-            >
-              <SvgXml xml={phoneIcon} width={18} height={18} />
-              <Text style={styles.tabText}>
-                OTP Login
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Form Inputs */}
+          {/* Form */}
           <View style={styles.formContainer}>
+            {/* Your Name */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.inputLabel}>YOUR NAME</Text>
+              <View style={styles.inputWrapper}>
+                <View style={styles.inputIcon}>
+                  <SvgXml xml={userProfileIcon} width={18} height={18} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="John Deo"
+                  placeholderTextColor="#A0A0A0"
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            {/* Email Address */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
               <View style={styles.inputWrapper}>
@@ -161,6 +182,26 @@ const LoginScreen = ({ navigation }: Props) => {
               </View>
             </View>
 
+            {/* Mobile Number */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+              <View style={styles.inputWrapper}>
+                <View style={styles.inputIcon}>
+                  <SvgXml xml={Callicon} width={23} height={25} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="+91 9876543210"
+                  placeholderTextColor="#A0A0A0"
+                  value={mobile}
+                  onChangeText={setMobile}
+                  keyboardType="phone-pad"
+                  maxLength={15}
+                />
+              </View>
+            </View>
+
+            {/* Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>PASSWORD</Text>
               <View style={styles.inputWrapper}>
@@ -169,7 +210,7 @@ const LoginScreen = ({ navigation }: Props) => {
                 </View>
                 <TextInput
                   style={styles.input}
-                  placeholder="********"
+                  placeholder="••••••••"
                   placeholderTextColor="#A0A0A0"
                   value={password}
                   onChangeText={setPassword}
@@ -186,38 +227,63 @@ const LoginScreen = ({ navigation }: Props) => {
               </View>
             </View>
 
-            {/* Remember Me & Forgot Password */}
-            <View style={styles.optionsRow}>
-              <TouchableOpacity
-                style={styles.rememberMeContainer}
-                onPress={() => setRememberMe(!rememberMe)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+            {/* Confirm Password */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+              <View style={styles.inputWrapper}>
+                <View style={styles.inputIcon}>
+                  <SvgXml xml={passwordIcon} width={18} height={18} />
                 </View>
-                <Text style={styles.rememberText}>Remember me</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  placeholder="••••••••"
+                  placeholderTextColor="#A0A0A0"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  activeOpacity={0.7}
+                >
+                  <SvgXml xml={eyeIcon} width={18} height={18} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Submit Button */}
+            {/* Terms and Conditions */}
             <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleLogin}
+              style={styles.termsRow}
+              onPress={() => setAgreedToTerms(!agreedToTerms)}
               activeOpacity={0.8}
             >
-              <Text style={styles.submitButtonText}>Sign In</Text>
+              <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+                {agreedToTerms && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.termsText}>
+                I agree to the{' '}
+                <Text style={styles.termsLink}>Terms and Conditions</Text>
+                {' '}and{' '}
+                <Text style={styles.termsLink}>Privacy Policy</Text>
+              </Text>
             </TouchableOpacity>
 
-            {/* Sign Up Link */}
-            <View style={styles.signUpRow}>
-              <Text style={styles.signUpText}>Don't have an account? </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('SignUp')}>
-                <Text style={styles.signUpLink}>Sign Up</Text>
+            {/* Create Account Button */}
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleCreateAccount}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>Create Account</Text>
+            </TouchableOpacity>
+
+            {/* Sign In Link */}
+            <View style={styles.signInRow}>
+              <Text style={styles.signInText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={handleSignIn} activeOpacity={0.7}>
+                <Text style={styles.signInLink}>Sign In</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -309,7 +375,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   titleText: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#111',
     fontFamily: Platform.select({
@@ -320,58 +386,16 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   subtitleText: {
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#666',
     marginTop: 4,
-    fontFamily: 'Inter_28pt-LightItalic',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 30,
-    padding: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  tabSmall: {
-    marginTop: 18,
-    marginBottom: 14,
-  },
-  tabNormal: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-  },
-  activeTabButton: {
-    backgroundColor: '#FFF',
-    borderBottomWidth: 2,
-    borderBottomColor: '#B8255F',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#B8255F',
-    fontWeight: 'bold',
   },
   formContainer: {
     width: '100%',
+    marginTop: 20,
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   inputLabel: {
     fontSize: 11,
@@ -396,50 +420,50 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
-  optionsRow: {
+  // Terms
+  termsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    alignItems: 'flex-start',
     marginBottom: 20,
-  },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 4,
   },
   checkbox: {
     width: 18,
     height: 18,
     borderRadius: 4,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#B8255F',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 10,
+    marginTop: 1,
+    flexShrink: 0,
   },
   checkboxChecked: {
     backgroundColor: '#B8255F',
   },
   checkmark: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
   },
-  rememberText: {
-    fontSize: 13,
+  termsText: {
+    fontSize: 12.5,
     color: '#444',
+    flex: 1,
+    lineHeight: 18,
   },
-  forgotPasswordText: {
-    fontSize: 13,
+  termsLink: {
     color: '#B8255F',
-    fontWeight: '600',
+    fontWeight: '700',
   },
+  // Submit
   submitButton: {
     backgroundColor: '#B8255F',
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 52,
     paddingVertical: 14,
     marginBottom: 16,
     elevation: 1,
@@ -452,21 +476,24 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
+    letterSpacing: 0.3,
   },
-  signUpRow: {
+  // Sign In link
+  signInRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  signUpText: {
+  signInText: {
     fontSize: 13,
     color: '#666',
   },
-  signUpLink: {
+  signInLink: {
     fontSize: 13,
     color: '#B8255F',
     fontWeight: 'bold',
   },
+  // Footer
   footerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -476,7 +503,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   footerNormal: {
-    marginTop: 20,
+    marginTop: 16,
   },
   featureItem: {
     alignItems: 'center',
@@ -502,4 +529,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LoginScreen;
+export default SignUpScreen;

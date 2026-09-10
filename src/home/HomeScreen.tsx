@@ -1,19 +1,15 @@
 import React from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
+import { View, StyleSheet } from 'react-native';
+import MainTabNavigator from '../navigation/MainTabNavigator';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
-
-const HomeScreen = ({ navigation }: Props) => {
+/**
+ * HomeScreen acts as the main container after login.
+ * It renders the bottom tab navigator (Home, Category, Wishlist, Account).
+ */
+const HomeScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome!</Text>
-      <Text style={styles.subtitle}>You are successfully logged in.</Text>
-      <Button
-        title="Logout"
-        onPress={() => navigation.replace('Login')}
-      />
+      <MainTabNavigator />
     </View>
   );
 };
@@ -21,19 +17,7 @@ const HomeScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 20,
-    color: 'gray',
+    backgroundColor: "#FEDDE5",
   },
 });
 

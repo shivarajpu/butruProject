@@ -1,3 +1,16 @@
 export const COLORS = {
-    backgroundColor :'#F9F3F4'
+  backgroundColor: '#F9F3F4',
+  primary: '#C0185A',
+  primaryLight: '#FCE8F0',
+  white: '#FFFFFF',
+  black: '#1A1A1A',
+  gray: '#8A8A8A',
+  grayLight: '#F5F5F5',
+  grayBorder: '#E8E8E8',
+  orange: '#FF6B35',
+  green: '#2ECC71',
+  red: '#E74C3C',
+  star: '#FFB800',
+  tabInactive: '#999999',
+  tabActive: '#C0185A',
 };
