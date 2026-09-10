@@ -35,23 +35,19 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const { width, height } = useWindowDimensions();
 
   // ─── Responsive scale helpers ───────────────────────────────────────────────
-  // Base design is 390pt wide (iPhone 14)
   const BASE_WIDTH = 390;
   const scale = (size: number) => (width / BASE_WIDTH) * size;
-  const vs = (size: number) => (height / 844) * size;   // vertical scale
+  const vs = (size: number) => (height / 844) * size;
 
   const isTablet = width >= 768;
   const isSmall  = height < 700;
 
-  // Illustration: maintain 187×221 aspect ratio, fills ~52% of screen width
   const svgW = Math.min(width * 0.52, isTablet ? 320 : 220);
   const svgH = svgW * (221 / 187);
 
-  // Logo: 133×55 aspect ratio
   const logoW = Math.min(width * 0.34, isTablet ? 180 : 133);
   const logoH = logoW * (55 / 133);
 
-  // OTP box: 6 boxes with equal spacing — each box = (contentWidth - 5 gaps) / 6
   const HORIZONTAL_PAD = scale(20);
   const contentWidth   = width - HORIZONTAL_PAD * 2;
   const BOX_GAP        = scale(8);
@@ -59,13 +55,14 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const BOX_RADIUS     = scale(12);
   const BOX_FONT       = scale(22);
 
-  // Dynamic top padding for status bar on Android
   const topPad =
     vs(isSmall ? 20 : 28) +
     (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
   // ─── State ───────────────────────────────────────────────────────────────────
-  const phoneNumber = route?.params?.phoneNumber ?? '+91 9876543210';
+  // Get email/phone passed from Login or SignUp screen
+  const emailAddress = route?.params?.email || route?.params?.phoneNumber || 'john12334@example.com';
+  
   const [otp, setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [timer, setTimer]       = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
@@ -135,7 +132,6 @@ const OtpVarify = ({ navigation, route }: Props) => {
         backgroundColor: active ? '#FFFFFF' : '#FAE4EE',
         borderWidth:     active ? 1.8 : 0,
         borderColor:     active ? '#B8255F' : 'transparent',
-        // remove any default outline / underline on Android
         includeFontPadding: false,
       },
     ];
@@ -146,7 +142,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.backgroundColor} />
 
-      {/* ── Top illustration (absolute, behind content) ── */}
+      {/* ── Top illustration ── */}
       <View pointerEvents="none" style={styles.topIllustration}>
         <SvgXml xml={loginPagaImage} width={svgW} height={svgH} />
       </View>
@@ -175,23 +171,27 @@ const OtpVarify = ({ navigation, route }: Props) => {
                 xml={Butruname}
                 width={logoW}
                 height={logoH}
-                style={{ marginBottom: scale(14) , marginTop: scale(32)}}
+                style={{ marginBottom: scale(14), marginTop: scale(32) }}
               />
             ) : (
               <Text style={[styles.logoFallback, { fontSize: scale(28) }]}>BuTRu</Text>
             )}
 
-            {/* Title + subtitle + phone row */}
-            <View style={{ marginTop: vs(28), paddingRight: '35%' }}>
+            {/* Title + Subtitle */}
+            <View style={{ marginTop: vs(28), paddingRight: '15%' }}>
               <Text style={[styles.title, { fontSize: scale(24) }]}>Verify OTP</Text>
 
-              <Text style={[styles.subtitle, { fontSize: scale(13.5), marginTop: vs(5) }]}>
-                Enter the 6-digit code send to
+              {/* Green Bold OTP Sent Text */}
+             
+
+              <Text style={[styles.subtitle, { fontSize: scale(13), marginTop: vs(4) }]}>
+                Enter the 6-digit code sent to your email
               </Text>
 
-              <View style={styles.phoneRow}>
-                <Text style={[styles.phoneNumber, { fontSize: scale(14.5) }]}>
-                  {phoneNumber}
+              {/* Email Row with Edit Pencil */}
+              <View style={styles.emailRow}>
+                <Text style={[styles.emailText, { fontSize: scale(14) }]}>
+                  {emailAddress}
                 </Text>
                 <TouchableOpacity
                   onPress={() => navigation.goBack()}
@@ -237,6 +237,8 @@ const OtpVarify = ({ navigation, route }: Props) => {
               </Text>
             </TouchableOpacity>
 
+             
+
             {canResend ? (
               <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
                 <Text style={[styles.resendBtn, { fontSize: scale(12.5) }]}>Resend</Text>
@@ -250,6 +252,10 @@ const OtpVarify = ({ navigation, route }: Props) => {
               </Text>
             )}
           </View>
+
+          <Text style={[styles.otpSentText, { fontSize: scale(13.5), marginTop: vs(-8) , marginVertical:vs(15) }]}>
+                OTP sent to {emailAddress}
+              </Text>
 
           {/* ── VERIFY BUTTON ── */}
           <TouchableOpacity
@@ -303,7 +309,6 @@ const OtpVarify = ({ navigation, route }: Props) => {
             ))}
           </View>
 
-          {/* bottom breathing room */}
           <View style={{ height: vs(20) }} />
 
         </ScrollView>
@@ -312,7 +317,6 @@ const OtpVarify = ({ navigation, route }: Props) => {
   );
 };
 
-// ─── Static styles (non-responsive values only) ──────────────────────────────
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -353,17 +357,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     lineHeight: 30,
   },
+  otpSentText: {
+    color: '#2E7D32',
+    fontWeight: 'bold',
+  },
   subtitle: {
     color: '#666666',
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  phoneRow: {
+  emailRow: {
     flexDirection:  'row',
     alignItems:     'center',
     gap:            8,
-    marginTop:      4,
+    marginTop:      6,
   },
-  phoneNumber: {
+  emailText: {
     color:      '#B8255F',
     fontWeight: '700',
   },

@@ -10,10 +10,13 @@ import {
   useWindowDimensions,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
 import {
   Butruname,
@@ -30,33 +33,128 @@ import { COLORS } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
+type LoginResponse = {
+  success: boolean;
+  message?: string;
+  token?: string;
+  requiresEmailVerification?: boolean;
+  data?: {
+    name?: string;
+    email?: string;
+  };
+};
+
+type FieldErrors = {
+  email?: string;
+  password?: string;
+};
+
+const LOGIN_ENDPOINT = '/api/auth/login';
+
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const getEmailError = (value: string) => {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return 'Email address is required.';
+  }
+
+  if (!isValidEmail(normalizedValue)) {
+    return 'Enter a valid email address.';
+  }
+
+  return undefined;
+};
+
+const getPasswordError = (value: string) =>
+  value.trim() ? undefined : 'Password is required.';
+
 const LoginScreen = ({ navigation }: Props) => {
   const { width, height } = useWindowDimensions();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Screen size categories for responsive layout
+  // Custom Error Modal States
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
   const isTablet = width >= 768;
   const isSmallDevice = height < 700;
 
-  // Responsive illustration size maintaining original 187x221 aspect ratio
   const svgWidth = Math.min(width * 0.52, 220);
   const svgHeight = svgWidth * (221 / 187);
 
-  // Responsive logo size maintaining original 133x55 aspect ratio
   const logoWidth = Math.min(width * 0.32, 133);
   const logoHeight = logoWidth * (55 / 133);
 
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
-  const handleLogin = () => {
-    console.log('Email:', email);
-    console.log('Password:', password);
-    navigation.replace('Home');
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+
+    if (fieldErrors.email) {
+      setFieldErrors(previous => ({ ...previous, email: undefined }));
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+
+    if (fieldErrors.password) {
+      setFieldErrors(previous => ({ ...previous, password: undefined }));
+    }
+  };
+
+  const validateForm = () => {
+    const errors: FieldErrors = {
+      email: getEmailError(email),
+      password: getPasswordError(password),
+    };
+
+    setFieldErrors(errors);
+    return !errors.email && !errors.password;
+  };
+
+  const showErrorModal = (message: string) => {
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
+  const handleLogin = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await apiService.post<LoginResponse>(LOGIN_ENDPOINT, {
+        email: email.trim().toLowerCase(),
+        password: password,
+      });
+
+      if (!response.success) {
+        showErrorModal(response.message || 'Invalid email or password.');
+        return;
+      }
+
+      // 🟢 Login Successful: Bina popup dikhaye direct Otp Screen navigate karein
+      navigation.navigate('OtpVarify', { email : email.trim().toLowerCase() });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid credentials. Please try again.';
+      showErrorModal(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOtpTabPress = () => {
@@ -67,7 +165,7 @@ const LoginScreen = ({ navigation }: Props) => {
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Top Absolute SVG Illustration - Edge to Edge */}
+      {/* Top Absolute SVG Illustration */}
       <View pointerEvents="none" style={styles.topImagePosition}>
         <SvgXml xml={loginPagaImage} width={svgWidth} height={svgHeight} />
       </View>
@@ -143,8 +241,13 @@ const LoginScreen = ({ navigation }: Props) => {
           {/* Form Inputs */}
           <View style={styles.formContainer}>
             <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-              <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>EMAIL ADDRESS *</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.email && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={emailIcon} width={18} height={18} />
                 </View>
@@ -153,17 +256,32 @@ const LoginScreen = ({ navigation }: Props) => {
                   placeholder="youremail@gmail.com"
                   placeholderTextColor="#A0A0A0"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={handleEmailChange}
+                  onBlur={() =>
+                    setFieldErrors(previous => ({
+                      ...previous,
+                      email: getEmailError(email),
+                    }))
+                  }
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Email address"
                 />
               </View>
+              {fieldErrors.email && (
+                <Text style={styles.errorText}>{fieldErrors.email}</Text>
+              )}
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>PASSWORD *</Text>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.password && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={passwordIcon} width={18} height={18} />
                 </View>
@@ -172,9 +290,16 @@ const LoginScreen = ({ navigation }: Props) => {
                   placeholder="********"
                   placeholderTextColor="#A0A0A0"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={handlePasswordChange}
+                  onBlur={() =>
+                    setFieldErrors(previous => ({
+                      ...previous,
+                      password: getPasswordError(password),
+                    }))
+                  }
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
+                  accessibilityLabel="Password"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
@@ -184,6 +309,9 @@ const LoginScreen = ({ navigation }: Props) => {
                   <SvgXml xml={eyeIcon} width={18} height={18} />
                 </TouchableOpacity>
               </View>
+              {fieldErrors.password && (
+                <Text style={styles.errorText}>{fieldErrors.password}</Text>
+              )}
             </View>
 
             {/* Remember Me & Forgot Password */}
@@ -206,11 +334,17 @@ const LoginScreen = ({ navigation }: Props) => {
 
             {/* Submit Button */}
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
               onPress={handleLogin}
               activeOpacity={0.8}
+              disabled={isSubmitting}
+              accessibilityRole="button"
             >
-              <Text style={styles.submitButtonText}>Sign In</Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
 
             {/* Sign Up Link */}
@@ -252,6 +386,34 @@ const LoginScreen = ({ navigation }: Props) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Custom Error Modal (Red Cross Icon) */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {/* 🔴 Red Cross Badge Icon */}
+            <View style={styles.modalBadgeError}>
+              <Text style={styles.modalBadgeTextError}>✕</Text>
+            </View>
+
+            <Text style={styles.modalTitle}>Login Failed</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+
+            <TouchableOpacity
+              style={styles.modalButtonError}
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -388,6 +550,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 48,
   },
+  inputWrapperError: {
+    borderWidth: 1,
+    borderColor: '#D93025',
+    backgroundColor: '#FFF7F7',
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -395,6 +562,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#333',
+  },
+  errorText: {
+    color: '#D93025',
+    fontSize: 11,
+    marginTop: 4,
+    marginLeft: 4,
   },
   optionsRow: {
     flexDirection: 'row',
@@ -448,6 +621,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
+  submitButtonDisabled: {
+    opacity: 0.65,
+  },
   submitButtonText: {
     color: '#FFF',
     fontSize: 16,
@@ -498,6 +674,71 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 10,
     color: '#888',
+    fontWeight: 'bold',
+  },
+
+  /* Custom Red Error Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  modalBadgeError: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FCE8E6',
+    borderWidth: 2,
+    borderColor: '#D93025',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalBadgeTextError: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#D93025',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 13.5,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalButtonError: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: '#B8255F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });

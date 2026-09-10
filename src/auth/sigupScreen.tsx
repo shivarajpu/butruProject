@@ -10,11 +10,13 @@ import {
   useWindowDimensions,
   Platform,
   KeyboardAvoidingView,
-  Alert,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
 import {
   Butruname,
@@ -22,20 +24,42 @@ import {
   emailIcon,
   secureIcon,
   supporIcon,
-  phoneIcon,
   rewardIcon,
   passwordIcon,
   loginPagaImage,
 } from '../assets/svg';
-import { Callicon } from '../assets/svg/authIcons';
-import { userProfileIcon } from '../assets/svg/authIcons';
+import { Callicon, userProfileIcon } from '../assets/svg/authIcons';
 import { COLORS } from '../constants/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
+type RegisterResponse = {
+  success: boolean;
+  message?: string;
+  data?: any;
+};
+
+type FieldErrors = {
+  name?: string;
+  email?: string;
+  mobile?: string;
+  password?: string;
+  confirmPassword?: string;
+  terms?: string;
+};
+
+const REGISTER_ENDPOINT = '/api/auth/register';
+
+const isValidEmail = (value: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const isValidPhone = (value: string) =>
+  /^[0-9]{10}$/.test(value.trim());
+
 const SignUpScreen = ({ navigation }: Props) => {
   const { width, height } = useWindowDimensions();
 
+  // Form States
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
@@ -43,7 +67,15 @@ const SignUpScreen = ({ navigation }: Props) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  // Validation & API States
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Red Cross Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
 
   // Responsive layout
   const isTablet = width >= 768;
@@ -58,33 +90,82 @@ const SignUpScreen = ({ navigation }: Props) => {
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
-  const handleCreateAccount = () => {
+  const validateForm = () => {
+    const errors: FieldErrors = {};
+
     if (!name.trim()) {
-      Alert.alert('Name Required', 'Please enter your name.');
-      return;
+      errors.name = 'Your name is required.';
     }
+
     if (!email.trim()) {
-      Alert.alert('Email Required', 'Please enter your email address.');
-      return;
+      errors.email = 'Email address is required.';
+    } else if (!isValidEmail(email.trim())) {
+      errors.email = 'Enter a valid email address.';
     }
+
     if (!mobile.trim()) {
-      Alert.alert('Mobile Required', 'Please enter your mobile number.');
-      return;
+      errors.mobile = 'Mobile number is required.';
+    } else if (!isValidPhone(mobile.trim())) {
+      errors.mobile = 'Enter a valid 10-digit mobile number.';
     }
+
     if (!password.trim()) {
-      Alert.alert('Password Required', 'Please enter a password.');
-      return;
+      errors.password = 'Password is required.';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters.';
     }
-    if (password !== confirmPassword) {
-      Alert.alert('Password Mismatch', 'Passwords do not match.');
-      return;
+
+    if (!confirmPassword.trim()) {
+      errors.confirmPassword = 'Please confirm your password.';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match.';
     }
+
     if (!agreedToTerms) {
-      Alert.alert('Terms Required', 'Please agree to the Terms and Conditions.');
+      errors.terms = 'Please agree to the Terms and Conditions.';
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const showErrorModal = (message: string) => {
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+
+  const handleCreateAccount = async () => {
+    if (!validateForm()) {
       return;
     }
-    // Navigate to OTP verification after sign-up
-    navigation.navigate('OtpVarify', { phoneNumber: `+91 ${mobile}` });
+
+    setIsSubmitting(true);
+
+    // API Payload
+    const payload = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: mobile.trim(),
+      password: password,
+    };
+
+    try {
+      const response = await apiService.post<RegisterResponse>(REGISTER_ENDPOINT, payload);
+
+      if (!response.success) {
+        showErrorModal(response.message || 'Registration failed. Please try again.');
+        return;
+      }
+
+      // 🟢 Directly Navigate to OTP Verification Screen on Success
+      navigation.navigate('OtpVarify', { email: `${email.trim()}` });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid credentials. Please try again.';
+      showErrorModal(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSignIn = () => {
@@ -146,7 +227,12 @@ const SignUpScreen = ({ navigation }: Props) => {
             {/* Your Name */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>YOUR NAME</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.name && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={userProfileIcon} width={18} height={18} />
                 </View>
@@ -155,17 +241,26 @@ const SignUpScreen = ({ navigation }: Props) => {
                   placeholder="John Deo"
                   placeholderTextColor="#A0A0A0"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(val) => {
+                    setName(val);
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
+                  }}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
               </View>
+              {fieldErrors.name && <Text style={styles.errorText}>{fieldErrors.name}</Text>}
             </View>
 
             {/* Email Address */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.email && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={emailIcon} width={18} height={18} />
                 </View>
@@ -174,37 +269,55 @@ const SignUpScreen = ({ navigation }: Props) => {
                   placeholder="youremail@gmail.com"
                   placeholderTextColor="#A0A0A0"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(val) => {
+                    setEmail(val);
+                    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
               </View>
+              {fieldErrors.email && <Text style={styles.errorText}>{fieldErrors.email}</Text>}
             </View>
 
             {/* Mobile Number */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.mobile && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={Callicon} width={23} height={25} />
                 </View>
                 <TextInput
                   style={styles.input}
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
                   placeholderTextColor="#A0A0A0"
                   value={mobile}
-                  onChangeText={setMobile}
+                  onChangeText={(val) => {
+                    setMobile(val);
+                    if (fieldErrors.mobile) setFieldErrors((prev) => ({ ...prev, mobile: undefined }));
+                  }}
                   keyboardType="phone-pad"
-                  maxLength={15}
+                  maxLength={10}
                 />
               </View>
+              {fieldErrors.mobile && <Text style={styles.errorText}>{fieldErrors.mobile}</Text>}
             </View>
 
             {/* Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.password && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={passwordIcon} width={18} height={18} />
                 </View>
@@ -213,7 +326,10 @@ const SignUpScreen = ({ navigation }: Props) => {
                   placeholder="••••••••"
                   placeholderTextColor="#A0A0A0"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
@@ -225,12 +341,18 @@ const SignUpScreen = ({ navigation }: Props) => {
                   <SvgXml xml={eyeIcon} width={18} height={18} />
                 </TouchableOpacity>
               </View>
+              {fieldErrors.password && <Text style={styles.errorText}>{fieldErrors.password}</Text>}
             </View>
 
             {/* Confirm Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
-              <View style={styles.inputWrapper}>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  fieldErrors.confirmPassword && styles.inputWrapperError,
+                ]}
+              >
                 <View style={styles.inputIcon}>
                   <SvgXml xml={passwordIcon} width={18} height={18} />
                 </View>
@@ -239,7 +361,11 @@ const SignUpScreen = ({ navigation }: Props) => {
                   placeholder="••••••••"
                   placeholderTextColor="#A0A0A0"
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(val) => {
+                    setConfirmPassword(val);
+                    if (fieldErrors.confirmPassword)
+                      setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                  }}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                 />
@@ -251,12 +377,18 @@ const SignUpScreen = ({ navigation }: Props) => {
                   <SvgXml xml={eyeIcon} width={18} height={18} />
                 </TouchableOpacity>
               </View>
+              {fieldErrors.confirmPassword && (
+                <Text style={styles.errorText}>{fieldErrors.confirmPassword}</Text>
+              )}
             </View>
 
             {/* Terms and Conditions */}
             <TouchableOpacity
               style={styles.termsRow}
-              onPress={() => setAgreedToTerms(!agreedToTerms)}
+              onPress={() => {
+                setAgreedToTerms(!agreedToTerms);
+                if (fieldErrors.terms) setFieldErrors((prev) => ({ ...prev, terms: undefined }));
+              }}
               activeOpacity={0.8}
             >
               <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
@@ -269,14 +401,24 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <Text style={styles.termsLink}>Privacy Policy</Text>
               </Text>
             </TouchableOpacity>
+            {fieldErrors.terms && (
+              <Text style={[styles.errorText, { marginTop: -14, marginBottom: 14 }]}>
+                {fieldErrors.terms}
+              </Text>
+            )}
 
             {/* Create Account Button */}
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
               onPress={handleCreateAccount}
               activeOpacity={0.8}
+              disabled={isSubmitting}
             >
-              <Text style={styles.submitButtonText}>Create Account</Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.submitButtonText}>Create Account</Text>
+              )}
             </TouchableOpacity>
 
             {/* Sign In Link */}
@@ -318,6 +460,33 @@ const SignUpScreen = ({ navigation }: Props) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Red Cross Icon Error Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalBadgeError}>
+              <Text style={styles.modalBadgeTextError}>✕</Text>
+            </View>
+
+            <Text style={styles.modalTitle}>Registration Failed</Text>
+            <Text style={styles.modalMessage}>{modalMessage}</Text>
+
+            <TouchableOpacity
+              style={styles.modalButtonError}
+              onPress={() => setModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -412,6 +581,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 48,
   },
+  inputWrapperError: {
+    borderWidth: 1,
+    borderColor: '#D93025',
+    backgroundColor: '#FFF7F7',
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -419,6 +593,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#333',
+  },
+  errorText: {
+    color: '#D93025',
+    fontSize: 11,
+    marginTop: 4,
+    marginLeft: 4,
   },
   // Terms
   termsRow: {
@@ -471,6 +651,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
+  },
+  submitButtonDisabled: {
+    opacity: 0.65,
   },
   submitButtonText: {
     color: '#FFF',
@@ -525,6 +708,71 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 10,
     color: '#888',
+    fontWeight: 'bold',
+  },
+
+  /* Custom Red Error Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  modalBadgeError: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FCE8E6',
+    borderWidth: 2,
+    borderColor: '#D93025',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalBadgeTextError: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#D93025',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 13.5,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalButtonError: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 25,
+    backgroundColor: '#B8255F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    color: '#FFF',
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
