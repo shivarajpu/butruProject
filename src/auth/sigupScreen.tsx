@@ -29,7 +29,8 @@ import {
   loginPagaImage,
 } from '../assets/svg';
 import { Callicon, userProfileIcon } from '../assets/svg/authIcons';
-import { COLORS } from '../constants/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
@@ -57,6 +58,8 @@ const isValidPhone = (value: string) =>
   /^[0-9]{10}$/.test(value.trim());
 
 const SignUpScreen = ({ navigation }: Props) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width, height } = useWindowDimensions();
 
   // Form States
@@ -174,7 +177,7 @@ const SignUpScreen = ({ navigation }: Props) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
 
       {/* Top Illustration */}
       <View pointerEvents="none" style={styles.topImagePosition}>
@@ -239,7 +242,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="John Deo"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={theme.colors.textMuted}
                   value={name}
                   onChangeText={(val) => {
                     setName(val);
@@ -267,7 +270,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="youremail@gmail.com"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={theme.colors.textMuted}
                   value={email}
                   onChangeText={(val) => {
                     setEmail(val);
@@ -296,7 +299,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="9876543210"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={theme.colors.textMuted}
                   value={mobile}
                   onChangeText={(val) => {
                     setMobile(val);
@@ -324,7 +327,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={theme.colors.textMuted}
                   value={password}
                   onChangeText={(val) => {
                     setPassword(val);
@@ -359,7 +362,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={theme.colors.textMuted}
                   value={confirmPassword}
                   onChangeText={(val) => {
                     setConfirmPassword(val);
@@ -415,7 +418,7 @@ const SignUpScreen = ({ navigation }: Props) => {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator color={theme.colors.textOnPrimary} />
               ) : (
                 <Text style={styles.submitButtonText}>Create Account</Text>
               )}
@@ -491,10 +494,13 @@ const SignUpScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundColor,
+    backgroundColor: colors.surface,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -537,7 +543,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#B8255F',
+    color: colors.primary,
     marginBottom: 8,
   },
   titleWrapper: {
@@ -546,17 +552,13 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#111',
-    fontFamily: Platform.select({
-      ios: 'Inter28pt-Bold',
-      android: 'Inter_28pt-Bold',
-      default: 'Inter_28pt-Bold',
-    }),
+    color: colors.text,
+    fontFamily: fontFamily.heading,
     letterSpacing: -0.3,
   },
   subtitleText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   formContainer: {
@@ -569,22 +571,22 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.textMuted,
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.primaryLight,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 48,
   },
   inputWrapperError: {
     borderWidth: 1,
-    borderColor: '#D93025',
-    backgroundColor: '#FFF7F7',
+    borderColor: colors.error,
+    backgroundColor: colors.surfaceVariant,
   },
   inputIcon: {
     marginRight: 10,
@@ -592,10 +594,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: colors.text,
   },
   errorText: {
-    color: '#D93025',
+    color: colors.error,
     fontSize: 11,
     marginTop: 4,
     marginLeft: 4,
@@ -612,7 +614,7 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: '#B8255F',
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -620,26 +622,26 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   checkboxChecked: {
-    backgroundColor: '#B8255F',
+    backgroundColor: colors.primary,
   },
   checkmark: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 11,
     fontWeight: 'bold',
   },
   termsText: {
     fontSize: 12.5,
-    color: '#444',
+    color: colors.text,
     flex: 1,
     lineHeight: 18,
   },
   termsLink: {
-    color: '#B8255F',
+    color: colors.primary,
     fontWeight: '700',
   },
   // Submit
   submitButton: {
-    backgroundColor: '#B8255F',
+    backgroundColor: colors.primary,
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
@@ -647,7 +649,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 16,
     elevation: 1,
-    shadowColor: '#B8255F',
+    shadowColor: colors.primary,
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -656,7 +658,7 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
   submitButtonText: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 0.3,
@@ -669,11 +671,11 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
   },
   signInLink: {
     fontSize: 13,
-    color: '#B8255F',
+    color: colors.primary,
     fontWeight: 'bold',
   },
   // Footer
@@ -695,26 +697,26 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
   featureText: {
     fontSize: 10,
-    color: '#888',
+    color: colors.textMuted,
     fontWeight: 'bold',
   },
 
   /* Custom Red Error Modal Styles */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -722,12 +724,12 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.15,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -736,9 +738,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FCE8E6',
+    backgroundColor: colors.surfaceVariant,
     borderWidth: 2,
-    borderColor: '#D93025',
+    borderColor: colors.error,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -746,18 +748,18 @@ const styles = StyleSheet.create({
   modalBadgeTextError: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#D93025',
+    color: colors.error,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111',
+    color: colors.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   modalMessage: {
     fontSize: 13.5,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -766,15 +768,16 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 12,
     borderRadius: 25,
-    backgroundColor: '#B8255F',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalButtonText: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 14,
     fontWeight: 'bold',
   },
-});
+  });
+};
 
 export default SignUpScreen;

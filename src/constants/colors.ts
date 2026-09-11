@@ -1,16 +1,19 @@
-export const COLORS = {
-  backgroundColor: '#F9F3F4',
-  primary: '#C0185A',
-  primaryLight: '#FCE8F0',
-  white: '#FFFFFF',
-  black: '#1A1A1A',
-  gray: '#8A8A8A',
-  grayLight: '#F5F5F5',
-  grayBorder: '#E8E8E8',
-  orange: '#FF6B35',
-  green: '#2ECC71',
-  red: '#E74C3C',
-  star: '#FFB800',
-  tabInactive: '#999999',
-  tabActive: '#C0185A',
-};
+/**
+ * COLORS — Backward-compatibility shim.
+ *
+ * This file re-exports the light palette from app_config so that any files
+ * not yet migrated to useAppTheme() continue to compile without changes.
+ *
+ * Migration path:
+ *   Old:  import { COLORS } from '../constants/colors';
+ *         style={{ color: COLORS.primary }}
+ *
+ *   New:  const theme = useAppTheme();
+ *         style={{ color: theme.colors.primary }}
+ *
+ * Once all screens are migrated to useAppTheme(), this shim can be deleted.
+ */
+
+import APP_CONFIG from '../config/app_config';
+
+export const COLORS = APP_CONFIG.colors.light;

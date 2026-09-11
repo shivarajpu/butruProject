@@ -16,8 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
+
 import {
   Butruname,
   eyeIcon,
@@ -29,7 +31,9 @@ import {
   passwordIcon,
   loginPagaImage,
 } from '../assets/svg';
-import { COLORS } from '../constants/colors';
+
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -71,7 +75,26 @@ const getEmailError = (value: string) => {
 const getPasswordError = (value: string) =>
   value.trim() ? undefined : 'Password is required.';
 
+/**
+ * Theme based StyleSheet Factory
+ *
+ * Same pattern as HomeTab:
+ * - Theme is received from useAppTheme()
+ * - All normal UI colors come from theme
+ * - No COLORS import
+ */
+
 const LoginScreen = ({ navigation }: Props) => {
+  /**
+   * Get theme exactly like HomeTab.
+   */
+  const theme = useAppTheme();
+
+  /**
+   * Create styles after getting theme.
+   */
+  const styles = createStyles(theme);
+
   const { width, height } = useWindowDimensions();
 
   const [email, setEmail] = useState('');
@@ -95,13 +118,17 @@ const LoginScreen = ({ navigation }: Props) => {
   const logoHeight = logoWidth * (55 / 133);
 
   const dynamicTopPadding =
-    height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
+    height * 0.05 +
+    (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
 
     if (fieldErrors.email) {
-      setFieldErrors(previous => ({ ...previous, email: undefined }));
+      setFieldErrors(previous => ({
+        ...previous,
+        email: undefined,
+      }));
     }
   };
 
@@ -109,7 +136,10 @@ const LoginScreen = ({ navigation }: Props) => {
     setPassword(value);
 
     if (fieldErrors.password) {
-      setFieldErrors(previous => ({ ...previous, password: undefined }));
+      setFieldErrors(previous => ({
+        ...previous,
+        password: undefined,
+      }));
     }
   };
 
@@ -120,6 +150,7 @@ const LoginScreen = ({ navigation }: Props) => {
     };
 
     setFieldErrors(errors);
+
     return !errors.email && !errors.password;
   };
 
@@ -136,21 +167,31 @@ const LoginScreen = ({ navigation }: Props) => {
     setIsSubmitting(true);
 
     try {
-      const response = await apiService.post<LoginResponse>(LOGIN_ENDPOINT, {
-        email: email.trim().toLowerCase(),
-        password: password,
-      });
+      const response = await apiService.post<LoginResponse>(
+        LOGIN_ENDPOINT,
+        {
+          email: email.trim().toLowerCase(),
+          password: password,
+        },
+      );
 
       if (!response.success) {
-        showErrorModal(response.message || 'Invalid email or password.');
+        showErrorModal(
+          response.message || 'Invalid email or password.',
+        );
         return;
       }
 
-      // 🟢 Login Successful: Bina popup dikhaye direct Otp Screen navigate karein
-      navigation.navigate('OtpVarify', { email : email.trim().toLowerCase() });
+      // Login successful -> OTP verification screen
+      navigation.navigate('OtpVarify', {
+        email: email.trim().toLowerCase(),
+      });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Invalid credentials. Please try again.';
+        error instanceof Error
+          ? error.message
+          : 'Invalid credentials. Please try again.';
+
       showErrorModal(message);
     } finally {
       setIsSubmitting(false);
@@ -162,12 +203,22 @@ const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['left', 'right', 'bottom']}
+    >
       <StatusBar barStyle="dark-content" />
 
       {/* Top Absolute SVG Illustration */}
-      <View pointerEvents="none" style={styles.topImagePosition}>
-        <SvgXml xml={loginPagaImage} width={svgWidth} height={svgHeight} />
+      <View
+        pointerEvents="none"
+        style={styles.topImagePosition}
+      >
+        <SvgXml
+          xml={loginPagaImage}
+          width={svgWidth}
+          height={svgHeight}
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -178,7 +229,9 @@ const LoginScreen = ({ navigation }: Props) => {
           contentContainerStyle={[
             styles.scrollContent,
             isTablet && styles.tabletContent,
-            { paddingTop: dynamicTopPadding },
+            {
+              paddingTop: dynamicTopPadding,
+            },
           ]}
           showsVerticalScrollIndicator={false}
           bounces={false}
@@ -188,7 +241,9 @@ const LoginScreen = ({ navigation }: Props) => {
           <View
             style={[
               styles.headerContainer,
-              isSmallDevice ? styles.headerSmall : styles.headerNormal,
+              isSmallDevice
+                ? styles.headerSmall
+                : styles.headerNormal,
             ]}
           >
             <View style={styles.brandTextContainer}>
@@ -202,9 +257,15 @@ const LoginScreen = ({ navigation }: Props) => {
               ) : (
                 <Text style={styles.logoText}>BuTRu</Text>
               )}
+
               <View style={styles.titleWrapper}>
-                <Text style={styles.titleText}>Welcome Back!</Text>
-                <Text style={styles.subtitleText}>Sign in to shop kids' fashion.</Text>
+                <Text style={styles.titleText}>
+                  Welcome Back!
+                </Text>
+
+                <Text style={styles.subtitleText}>
+                  Sign in to shop kids' fashion.
+                </Text>
               </View>
             </View>
           </View>
@@ -213,15 +274,30 @@ const LoginScreen = ({ navigation }: Props) => {
           <View
             style={[
               styles.tabContainer,
-              isSmallDevice ? styles.tabSmall : styles.tabNormal,
+              isSmallDevice
+                ? styles.tabSmall
+                : styles.tabNormal,
             ]}
           >
             <TouchableOpacity
-              style={[styles.tabButton, styles.activeTabButton]}
+              style={[
+                styles.tabButton,
+                styles.activeTabButton,
+              ]}
               activeOpacity={0.9}
             >
-              <SvgXml xml={emailIcon} width={18} height={18} />
-              <Text style={[styles.tabText, styles.activeTabText]}>
+              <SvgXml
+                xml={emailIcon}
+                width={18}
+                height={18}
+              />
+
+              <Text
+                style={[
+                  styles.tabText,
+                  styles.activeTabText,
+                ]}
+              >
                 Email Login
               </Text>
             </TouchableOpacity>
@@ -231,7 +307,12 @@ const LoginScreen = ({ navigation }: Props) => {
               onPress={handleOtpTabPress}
               activeOpacity={0.7}
             >
-              <SvgXml xml={phoneIcon} width={18} height={18} />
+              <SvgXml
+                xml={phoneIcon}
+                width={18}
+                height={18}
+              />
+
               <Text style={styles.tabText}>
                 OTP Login
               </Text>
@@ -240,21 +321,33 @@ const LoginScreen = ({ navigation }: Props) => {
 
           {/* Form Inputs */}
           <View style={styles.formContainer}>
+            {/* Email */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>EMAIL ADDRESS *</Text>
+              <Text style={styles.inputLabel}>
+                EMAIL ADDRESS *
+              </Text>
+
               <View
                 style={[
                   styles.inputWrapper,
-                  fieldErrors.email && styles.inputWrapperError,
+                  fieldErrors.email &&
+                    styles.inputWrapperError,
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={emailIcon} width={18} height={18} />
+                  <SvgXml
+                    xml={emailIcon}
+                    width={18}
+                    height={18}
+                  />
                 </View>
+
                 <TextInput
                   style={styles.input}
                   placeholder="youremail@gmail.com"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={
+                    theme.colors.textMuted
+                  }
                   value={email}
                   onChangeText={handleEmailChange}
                   onBlur={() =>
@@ -269,48 +362,79 @@ const LoginScreen = ({ navigation }: Props) => {
                   accessibilityLabel="Email address"
                 />
               </View>
+
               {fieldErrors.email && (
-                <Text style={styles.errorText}>{fieldErrors.email}</Text>
+                <Text style={styles.errorText}>
+                  {fieldErrors.email}
+                </Text>
               )}
             </View>
 
+            {/* Password */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.inputLabel}>PASSWORD *</Text>
+              <Text style={styles.inputLabel}>
+                PASSWORD *
+              </Text>
+
               <View
                 style={[
                   styles.inputWrapper,
-                  fieldErrors.password && styles.inputWrapperError,
+                  fieldErrors.password &&
+                    styles.inputWrapperError,
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={passwordIcon} width={18} height={18} />
+                  <SvgXml
+                    xml={passwordIcon}
+                    width={18}
+                    height={18}
+                  />
                 </View>
+
                 <TextInput
                   style={styles.input}
                   placeholder="********"
-                  placeholderTextColor="#A0A0A0"
+                  placeholderTextColor={
+                    theme.colors.textMuted
+                  }
                   value={password}
                   onChangeText={handlePasswordChange}
                   onBlur={() =>
                     setFieldErrors(previous => ({
                       ...previous,
-                      password: getPasswordError(password),
+                      password:
+                        getPasswordError(password),
                     }))
                   }
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   accessibilityLabel="Password"
                 />
+
                 <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() =>
+                    setShowPassword(!showPassword)
+                  }
+                  hitSlop={{
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10,
+                  }}
                   activeOpacity={0.7}
                 >
-                  <SvgXml xml={eyeIcon} width={18} height={18} />
+                  <SvgXml
+                    xml={eyeIcon}
+                    width={18}
+                    height={18}
+                  />
                 </TouchableOpacity>
               </View>
+
               {fieldErrors.password && (
-                <Text style={styles.errorText}>{fieldErrors.password}</Text>
+                <Text style={styles.errorText}>
+                  {fieldErrors.password}
+                </Text>
               )}
             </View>
 
@@ -318,40 +442,77 @@ const LoginScreen = ({ navigation }: Props) => {
             <View style={styles.optionsRow}>
               <TouchableOpacity
                 style={styles.rememberMeContainer}
-                onPress={() => setRememberMe(!rememberMe)}
+                onPress={() =>
+                  setRememberMe(!rememberMe)
+                }
                 activeOpacity={0.8}
               >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Text style={styles.checkmark}>✓</Text>}
+                <View
+                  style={[
+                    styles.checkbox,
+                    rememberMe &&
+                      styles.checkboxChecked,
+                  ]}
+                >
+                  {rememberMe && (
+                    <Text style={styles.checkmark}>
+                      ✓
+                    </Text>
+                  )}
                 </View>
-                <Text style={styles.rememberText}>Remember me</Text>
+
+                <Text style={styles.rememberText}>
+                  Remember me
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity activeOpacity={0.7}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                <Text
+                  style={styles.forgotPasswordText}
+                >
+                  Forgot Password?
+                </Text>
               </TouchableOpacity>
             </View>
 
             {/* Submit Button */}
             <TouchableOpacity
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                isSubmitting &&
+                  styles.submitButtonDisabled,
+              ]}
               onPress={handleLogin}
               activeOpacity={0.8}
               disabled={isSubmitting}
               accessibilityRole="button"
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator
+                  color={theme.colors.textOnPrimary}
+                />
               ) : (
-                <Text style={styles.submitButtonText}>Sign In</Text>
+                <Text style={styles.submitButtonText}>
+                  Sign In
+                </Text>
               )}
             </TouchableOpacity>
 
             {/* Sign Up Link */}
             <View style={styles.signUpRow}>
-              <Text style={styles.signUpText}>Don't have an account? </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('SignUp')}>
-                <Text style={styles.signUpLink}>Sign Up</Text>
+              <Text style={styles.signUpText}>
+                Don't have an account?{' '}
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate('SignUp')
+                }
+              >
+                <Text style={styles.signUpLink}>
+                  Sign Up
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -360,56 +521,92 @@ const LoginScreen = ({ navigation }: Props) => {
           <View
             style={[
               styles.footerContainer,
-              isSmallDevice ? styles.footerSmall : styles.footerNormal,
+              isSmallDevice
+                ? styles.footerSmall
+                : styles.footerNormal,
             ]}
           >
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={secureIcon} width={22} height={22} />
+                <SvgXml
+                  xml={secureIcon}
+                  width={22}
+                  height={22}
+                />
               </View>
-              <Text style={styles.featureText}>SECURE</Text>
+
+              <Text style={styles.featureText}>
+                SECURE
+              </Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={rewardIcon} width={22} height={22} />
+                <SvgXml
+                  xml={rewardIcon}
+                  width={22}
+                  height={22}
+                />
               </View>
-              <Text style={styles.featureText}>REWARDS</Text>
+
+              <Text style={styles.featureText}>
+                REWARDS
+              </Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={supporIcon} width={22} height={22} />
+                <SvgXml
+                  xml={supporIcon}
+                  width={22}
+                  height={22}
+                />
               </View>
-              <Text style={styles.featureText}>SUPPORT</Text>
+
+              <Text style={styles.featureText}>
+                SUPPORT
+              </Text>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Custom Error Modal (Red Cross Icon) */}
+      {/* Custom Error Modal */}
       <Modal
         visible={modalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() =>
+          setModalVisible(false)
+        }
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            {/* 🔴 Red Cross Badge Icon */}
+            {/* Error Badge */}
             <View style={styles.modalBadgeError}>
-              <Text style={styles.modalBadgeTextError}>✕</Text>
+              <Text style={styles.modalBadgeTextError}>
+                ✕
+              </Text>
             </View>
 
-            <Text style={styles.modalTitle}>Login Failed</Text>
-            <Text style={styles.modalMessage}>{modalMessage}</Text>
+            <Text style={styles.modalTitle}>
+              Login Failed
+            </Text>
+
+            <Text style={styles.modalMessage}>
+              {modalMessage}
+            </Text>
 
             <TouchableOpacity
               style={styles.modalButtonError}
-              onPress={() => setModalVisible(false)}
+              onPress={() =>
+                setModalVisible(false)
+              }
               activeOpacity={0.8}
             >
-              <Text style={styles.modalButtonText}>Try Again</Text>
+              <Text style={styles.modalButtonText}>
+                Try Again
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -418,329 +615,402 @@ const LoginScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundColor,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  topImagePosition: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    zIndex: 0,
-  },
-  scrollContent: {
-    paddingHorizontal: '5%',
-    paddingBottom: 24,
-    flexGrow: 1,
-    width: '100%',
-  },
-  tabletContent: {
-    maxWidth: 440,
-    alignSelf: 'center',
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerSmall: {
-    marginTop: 48,
-  },
-  headerNormal: {
-    marginTop: 75,
-  },
-  brandTextContainer: {
-    flex: 1,
-    paddingRight: '35%',
-  },
-  logoSvg: {
-    marginBottom: 16,
-    marginTop: 15,
-  },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#B8255F',
-    marginBottom: 8,
-  },
-  titleWrapper: {
-    marginTop: 20,
-  },
-  titleText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111',
-    fontFamily: Platform.select({
-      ios: 'Inter28pt-Bold',
-      android: 'Inter_28pt-Bold',
-      default: 'Inter_28pt-Bold',
-    }),
-    letterSpacing: -0.3,
-  },
-  subtitleText: {
-    fontSize: 13.5,
-    color: '#666',
-    marginTop: 4,
-    fontFamily: 'Inter_28pt-LightItalic',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 30,
-    padding: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  tabSmall: {
-    marginTop: 18,
-    marginBottom: 14,
-  },
-  tabNormal: {
-    marginTop: 24,
-    marginBottom: 20,
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-  },
-  activeTabButton: {
-    backgroundColor: '#FFF',
-    borderBottomWidth: 2,
-    borderBottomColor: '#B8255F',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#B8255F',
-    fontWeight: 'bold',
-  },
-  formContainer: {
-    width: '100%',
-  },
-  fieldGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#A0A0A0',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF0F5',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 48,
-  },
-  inputWrapperError: {
-    borderWidth: 1,
-    borderColor: '#D93025',
-    backgroundColor: '#FFF7F7',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-  },
-  errorText: {
-    color: '#D93025',
-    fontSize: 11,
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#B8255F',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  checkboxChecked: {
-    backgroundColor: '#B8255F',
-  },
-  checkmark: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  rememberText: {
-    fontSize: 13,
-    color: '#444',
-  },
-  forgotPasswordText: {
-    fontSize: 13,
-    color: '#B8255F',
-    fontWeight: '600',
-  },
-  submitButton: {
-    backgroundColor: '#B8255F',
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-    paddingVertical: 14,
-    marginBottom: 16,
-    elevation: 1,
-    shadowColor: '#B8255F',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  submitButtonDisabled: {
-    opacity: 0.65,
-  },
-  submitButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  signUpRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  signUpText: {
-    fontSize: 13,
-    color: '#666',
-  },
-  signUpLink: {
-    fontSize: 13,
-    color: '#B8255F',
-    fontWeight: 'bold',
-  },
-  footerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-  },
-  footerSmall: {
-    marginTop: 10,
-  },
-  footerNormal: {
-    marginTop: 20,
-  },
-  featureItem: {
-    alignItems: 'center',
-  },
-  featureIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  featureText: {
-    fontSize: 10,
-    color: '#888',
-    fontWeight: 'bold',
-  },
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
 
-  /* Custom Red Error Modal Styles */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  modalBadgeError: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FCE8E6',
-    borderWidth: 2,
-    borderColor: '#D93025',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  modalBadgeTextError: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#D93025',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalMessage: {
-    fontSize: 13.5,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  modalButtonError: {
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 25,
-    backgroundColor: '#B8255F',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalButtonText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-});
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+
+    topImagePosition: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      zIndex: 0,
+    },
+
+    scrollContent: {
+      paddingHorizontal: '5%',
+      paddingBottom: 24,
+      flexGrow: 1,
+      width: '100%',
+    },
+
+    tabletContent: {
+      maxWidth: 440,
+      alignSelf: 'center',
+    },
+
+    headerContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+
+    headerSmall: {
+      marginTop: 48,
+    },
+
+    headerNormal: {
+      marginTop: 75,
+    },
+
+    brandTextContainer: {
+      flex: 1,
+      paddingRight: '35%',
+    },
+
+    logoSvg: {
+      marginBottom: 16,
+      marginTop: 15,
+    },
+
+    logoText: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: 8,
+    },
+
+    titleWrapper: {
+      marginTop: 20,
+    },
+
+    titleText: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+      fontFamily: Platform.select({
+        ios: 'Inter28pt-Bold',
+        android: 'Inter_28pt-Bold',
+        default: 'Inter_28pt-Bold',
+      }),
+      letterSpacing: -0.3,
+    },
+
+    subtitleText: {
+      fontSize: 13.5,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontFamily: 'Inter_28pt-LightItalic',
+    },
+
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 30,
+      padding: 4,
+      elevation: 2,
+      shadowColor: colors.text,
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+    },
+
+    tabSmall: {
+      marginTop: 18,
+      marginBottom: 14,
+    },
+
+    tabNormal: {
+      marginTop: 24,
+      marginBottom: 20,
+    },
+
+    tabButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 25,
+      gap: 8,
+    },
+
+    activeTabButton: {
+      backgroundColor: colors.surface,
+      borderBottomWidth: 2,
+      borderBottomColor: colors.primary,
+    },
+
+    tabText: {
+      fontSize: 14,
+      color: colors.textMuted,
+      fontWeight: '500',
+    },
+
+    activeTabText: {
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+
+    formContainer: {
+      width: '100%',
+    },
+
+    fieldGroup: {
+      marginBottom: 16,
+    },
+
+    inputLabel: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: colors.textMuted,
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+
+    inputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primaryLight,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      height: 48,
+    },
+
+    inputWrapperError: {
+      borderWidth: 1,
+      borderColor: '#D93025',
+      backgroundColor: '#FFF7F7',
+    },
+
+    inputIcon: {
+      marginRight: 10,
+    },
+
+    input: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.text,
+    },
+
+    errorText: {
+      color: '#D93025',
+      fontSize: 11,
+      marginTop: 4,
+      marginLeft: 4,
+    },
+
+    optionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 4,
+      marginBottom: 20,
+    },
+
+    rememberMeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+
+    checkbox: {
+      width: 18,
+      height: 18,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
+    },
+
+    checkboxChecked: {
+      backgroundColor: colors.primary,
+    },
+
+    checkmark: {
+      color: colors.textOnPrimary,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+
+    rememberText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+
+    forgotPasswordText: {
+      fontSize: 13,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+
+    submitButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 48,
+      paddingVertical: 14,
+      marginBottom: 16,
+      elevation: 1,
+      shadowColor: colors.primary,
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+    },
+
+    submitButtonDisabled: {
+      opacity: 0.65,
+    },
+
+    submitButtonText: {
+      color: colors.textOnPrimary,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+
+    signUpRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginBottom: 20,
+    },
+
+    signUpText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+
+    signUpLink: {
+      fontSize: 13,
+      color: colors.primary,
+      fontWeight: 'bold',
+    },
+
+    footerContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: 10,
+    },
+
+    footerSmall: {
+      marginTop: 10,
+    },
+
+    footerNormal: {
+      marginTop: 20,
+    },
+
+    featureItem: {
+      alignItems: 'center',
+    },
+
+    featureIconBg: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+      elevation: 2,
+      shadowColor: colors.text,
+      shadowOpacity: 0.05,
+      shadowRadius: 5,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+    },
+
+    featureText: {
+      fontSize: 10,
+      color: colors.textMuted,
+      fontWeight: 'bold',
+    },
+
+    /* Custom Error Modal */
+
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+    },
+
+    modalCard: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 24,
+      alignItems: 'center',
+      elevation: 5,
+      shadowColor: colors.text,
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+    },
+
+    modalBadgeError: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#FCE8E6',
+      borderWidth: 2,
+      borderColor: '#D93025',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+
+    modalBadgeTextError: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: '#D93025',
+    },
+
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+
+    modalMessage: {
+      fontSize: 13.5,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 20,
+    },
+
+    modalButtonError: {
+      width: '100%',
+      paddingVertical: 12,
+      borderRadius: 25,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    modalButtonText: {
+      color: colors.textOnPrimary,
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+  });
+};
+
 
 export default LoginScreen;
+

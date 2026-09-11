@@ -1,5 +1,6 @@
 import { BASE_URL } from '@env';
 import { navigationRef } from '../navigation/rootNavigation';
+import APP_CONFIG from '../config/app_config';
 
 type RequestHeaders = Record<string, string>;
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -20,13 +21,19 @@ export const handleUnauthorized = () => {
   }
 };
 
+/**
+ * All store-tenant headers are now sourced from app_config.ts.
+ * To white-label for a new client, change api.* in app_config.ts.
+ */
 const getHeaders = (token?: string, isFormData = false): RequestHeaders => {
+  const { api } = APP_CONFIG;
+
   const headers: RequestHeaders = {
     Accept: 'application/json',
-    'x-store-slug': 'butru-store',
-    'x-store-domain': 'butru.in',
-    'x-forwarded-host': 'butru.in',
-    'x-store-id': '6a20248bf77d663ca797ce90', // Agar storeId ki requirement ho
+    'x-store-slug': api.storeSlug,
+    'x-store-domain': api.storeDomain,
+    'x-forwarded-host': api.storeDomain,
+    'x-store-id': api.storeId,
   };
 
   if (!isFormData) {
@@ -44,7 +51,7 @@ export const getFullUrl = (endpoint: string): string => {
   const base = (BASE_URL || '').replace(/\/+$/, '');
   const path = `/${(endpoint || '').replace(/^\/+/, '')}`;
 
-  return `${base}${path}`.replace(/([^:]\/)\/+/g, '$1');
+  return `${base}${path}`.replace(/([^:/])\/+/g, '$1/');
 };
 
 const getErrorMessage = (data: unknown, status: number): string => {
@@ -66,13 +73,13 @@ const parseResponse = async <T>(response: Response): Promise<T> => {
     ? await response.json()
     : await response.text();
 
-  // 400 ya 401 response mein agar structured JSON object aaya hai, toh usko throw mat karo, return karo
   if (!response.ok && typeof data === 'string') {
     throw new Error(`Request failed with status ${response.status}`);
   }
 
   return data as T;
 };
+
 const request = async <T>(
   endpoint: string,
   options: RequestOptions,

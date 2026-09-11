@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -25,12 +24,16 @@ import {
   rewardIcon,
   loginPagaImage,
 } from '../assets/svg';
-import { COLORS } from '../constants/colors';
 import { Callicon } from '../assets/svg/authIcons';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
+import AppInput from '../components/AppInput';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
 const OtpScreen = ({ navigation }: Props) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width, height } = useWindowDimensions();
 
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -152,21 +155,17 @@ const OtpScreen = ({ navigation }: Props) => {
               <>
                 <View style={styles.fieldGroup}>
                   <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
-                  <View style={styles.inputWrapper}>
-                    <View style={styles.inputIcon}>
-                      <SvgXml xml={Callicon} width={23} height={25} />
-                    </View>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="+91 9876543210"
-                      placeholderTextColor="#A0A0A0"
-                      value={phoneNumber}
-                      onChangeText={setPhoneNumber}
-                      keyboardType="phone-pad"
-                      autoCapitalize="none"
-                      maxLength={15}
-                    />
-                  </View>
+                  <AppInput
+                    containerStyle={styles.inputContainer}
+                    inputContainerStyle={styles.inputWrapper}
+                    leftIcon={<SvgXml xml={Callicon} width={23} height={25} />}
+                    placeholder="+91 9876543210"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    maxLength={15}
+                  />
                 </View>
 
                 {/* Send OTP Button */}
@@ -187,21 +186,17 @@ const OtpScreen = ({ navigation }: Props) => {
                       <Text style={styles.changeNumberText}>Edit Number</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={styles.inputWrapper}>
-                    <View style={styles.inputIcon}>
-                      <SvgXml xml={phoneIconPink} width={18} height={18} />
-                    </View>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter verification code"
-                      placeholderTextColor="#A0A0A0"
-                      value={otpCode}
-                      onChangeText={setOtpCode}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      autoFocus
-                    />
-                  </View>
+                  <AppInput
+                    containerStyle={styles.inputContainer}
+                    inputContainerStyle={styles.inputWrapper}
+                    leftIcon={<SvgXml xml={phoneIconPink} width={18} height={18} />}
+                    placeholder="Enter verification code"
+                    value={otpCode}
+                    onChangeText={setOtpCode}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoFocus
+                  />
                 </View>
 
                 {/* Verify Button */}
@@ -258,10 +253,13 @@ const OtpScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
+
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.backgroundColor,
+    backgroundColor: colors.surface,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -305,7 +303,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#B8255F',
+    color: colors.primary,
     marginBottom: 8,
   },
   titleWrapper: {
@@ -314,27 +312,23 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111',
-    fontFamily: Platform.select({
-      ios: 'Inter28pt-Bold',
-      android: 'Inter_28pt-Bold',
-      default: 'Inter_28pt-Bold',
-    }),
+    color: colors.text,
+    fontFamily: fontFamily.heading,
     letterSpacing: -0.3,
   },
   subtitleText: {
     fontSize: 13.5,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 4,
     fontFamily: 'Inter_28pt-LightItalic',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     borderRadius: 30,
     padding: 4,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
@@ -357,17 +351,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   activeTabButton: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 2,
-    borderBottomColor: '#B8255F',
+    borderBottomColor: colors.primary,
   },
   tabText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textMuted,
     fontWeight: '500',
   },
   activeTabText: {
-    color: '#B8255F',
+    color: colors.primary,
     fontWeight: 'bold',
   },
   formContainer: {
@@ -375,6 +369,9 @@ const styles = StyleSheet.create({
   },
   fieldGroup: {
     marginBottom: 18,
+  },
+  inputContainer: {
+    marginBottom: 0,
   },
   otpHeaderRow: {
     flexDirection: 'row',
@@ -384,20 +381,20 @@ const styles = StyleSheet.create({
   },
   changeNumberText: {
     fontSize: 12,
-    color: '#B8255F',
+    color: colors.primary,
     fontWeight: '600',
   },
   inputLabel: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#A0A0A0',
+    color: colors.textMuted,
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.primaryLight,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 48,
@@ -408,10 +405,10 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: colors.text,
   },
   submitButton: {
-    backgroundColor: '#B8255F',
+    backgroundColor: colors.primary,
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
@@ -419,13 +416,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 16,
     elevation: 1,
-    shadowColor: '#B8255F',
+    shadowColor: colors.primary,
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
   submitButtonText: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -436,11 +433,11 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
   },
   signUpLink: {
     fontSize: 13,
-    color: '#B8255F',
+    color: colors.primary,
     fontWeight: 'bold',
   },
   footerContainer: {
@@ -461,21 +458,22 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
   featureText: {
     fontSize: 10,
-    color: '#888',
+    color: colors.textMuted,
     fontWeight: 'bold',
   },
-});
+  });
+};
 
 export default OtpScreen;

@@ -12,10 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { COLORS } from '../constants/colors';
-import { FONTS } from '../constants/fonts';
 import { useNavigation } from '@react-navigation/native';
 import { ARROW_BACK_ICON, BAG_SVG, CHEVRON_DOWN_SVG } from '../assets/svg';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
+import AppButton from '../components/AppButton';
+import AppCard from '../components/AppCard';
+import AppIconButton from '../components/AppIconButton';
 
 const LOCATION_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
 const HEART_PINK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
@@ -72,6 +75,8 @@ const INITIAL_ITEMS = [
 ];
 
 const WishlistScreen = () => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const [items, setItems] = useState(INITIAL_ITEMS);
 
@@ -105,9 +110,12 @@ const WishlistScreen = () => {
         {/* ── Top Header ── */}
         <View style={styles.headerContainer}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={handleBackPress}>
-              <SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />
-            </TouchableOpacity>
+            <AppIconButton
+              style={styles.headerBtn}
+              icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+              accessibilityLabel="Go back"
+              onPress={handleBackPress}
+            />
 
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>Wishlist</Text>
@@ -137,8 +145,10 @@ const WishlistScreen = () => {
               const imgH = cardW * 1.05;
 
               return (
-                <View
+                <AppCard
                   key={item.id}
+                  elevated={false}
+                  borderRadius={12}
                   style={[styles.wishCard, { width: cardW, marginBottom: gap }]}>
                   
                   {/* Image Container (Non-clickable) */}
@@ -191,17 +201,15 @@ const WishlistScreen = () => {
                     </ScrollView>
 
                     {/* Navigation only triggered here */}
-                    <TouchableOpacity
+                    <AppButton
                       style={styles.addToCartBtn}
-                      activeOpacity={0.85}
-                      onPress={() => handleAddToCart(item)}>
-                      <SvgXml
-                        xml={`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 2L3 6V20C3 20.5304 3.21071 21.0391 3.58579 21.4142C3.96086 21.7893 4.46957 22 5 22H19C19.5304 22 20.0391 21.7893 20.4142 21.4142C20.7893 21.0391 21 20.5304 21 20V6L18 2H6Z" stroke="#FFFFFF" stroke-width="2"/><path d="M3 6H21" stroke="#FFFFFF" stroke-width="2"/></svg>`}
-                      />
-                      <Text style={styles.addToCartText}>Add to Cart</Text>
-                    </TouchableOpacity>
+                      textStyle={styles.addToCartText}
+                      size="sm"
+                      label="Add to Cart"
+                      onPress={() => handleAddToCart(item)}
+                    />
                   </View>
-                </View>
+                </AppCard>
               );
             })}
           </View>
@@ -211,16 +219,17 @@ const WishlistScreen = () => {
   );
 };
 
-const PRIMARY_COLOR = '#B8235A';
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
 
-const styles = StyleSheet.create({
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -229,7 +238,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.divider,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -240,7 +249,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
@@ -254,8 +263,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontFamily: FONTS.inter28Bold,
-    color: '#1A1A1A',
+    fontFamily: fontFamily.heading,
+    color: colors.text,
   },
   deliveryRow: {
     flexDirection: 'row',
@@ -264,8 +273,8 @@ const styles = StyleSheet.create({
   },
   deliveryText: {
     fontSize: 12,
-    color: '#767575',
-    fontFamily: FONTS.poppinsMedium,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
   },
   grid: {
     flexDirection: 'row',
@@ -273,23 +282,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   wishCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#EFEFEF',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   tagBadge: {
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: '#2A233D',
+    backgroundColor: colors.text,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   tagText: {
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
     fontSize: 9,
     fontWeight: '600',
   },
@@ -297,14 +306,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.1,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -314,8 +323,8 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 13,
-    fontFamily: FONTS.inter18SemiBold,
-    color: '#1A1A1A',
+    fontFamily: fontFamily.bold,
+    color: colors.text,
     marginBottom: 4,
   },
   priceRow: {
@@ -326,17 +335,17 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 14,
-    fontFamily: FONTS.inter28Bold,
-    color: PRIMARY_COLOR,
+    fontFamily: fontFamily.heading,
+    color: colors.primary,
   },
   originalPrice: {
     fontSize: 11,
-    color: '#999999',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   discountText: {
     fontSize: 9,
-    color: '#00875A',
+    color: colors.discount,
     fontWeight: '700',
   },
   ratingRow: {
@@ -346,13 +355,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   starText: {
-    color: '#FFB800',
+    color: colors.star,
     fontSize: 11,
     letterSpacing: 1,
   },
   reviewCount: {
     fontSize: 10,
-    color: '#888888',
+    color: colors.textMuted,
   },
   sizeContainer: {
     flexDirection: 'row',
@@ -361,17 +370,17 @@ const styles = StyleSheet.create({
   },
   sizeChip: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: colors.border,
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
   sizeText: {
     fontSize: 9,
-    color: '#555555',
+    color: colors.textSecondary,
   },
   addToCartBtn: {
-    backgroundColor: PRIMARY_COLOR,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 8,
     flexDirection: 'row',
@@ -380,10 +389,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addToCartText: {
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
     fontSize: 12,
-    fontFamily: FONTS.inter18SemiBold,
+    fontFamily: fontFamily.bold,
   },
-});
+  });
+};
 
 export default WishlistScreen;

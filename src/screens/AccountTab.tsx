@@ -14,14 +14,18 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { BAG_SVG  , BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, CHEVRON_DOWN_SVG, LOCATION_PIN_SVG} from '../assets/svg';
-import { FONTS } from '../constants/fonts';
 import { useNavigation } from '@react-navigation/native'; // 1. Hook import karein
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
+import AppIconButton from '../components/AppIconButton';
 
 // ─── Pure SVG Icons ────────────────────────────────────────────────────────────
 
 // ─── Component Implementation ──────────────────────────────────────────────────
 
 const AccountTab = () => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -43,9 +47,12 @@ const AccountTab = () => {
       {/* App Header */}
       <View style={styles.headerContainer}>
                <View style={styles.headerLeft}>
-                 <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7} onPress={() => handleBackPress()}>
-                   <SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />
-                 </TouchableOpacity>
+                 <AppIconButton
+                   style={styles.headerBtn}
+                   icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                   accessibilityLabel="Go back"
+                   onPress={handleBackPress}
+                 />
      
                  <View style={styles.headerTitleContainer}>
                    <Text style={styles.headerTitle}>Account Setting</Text>
@@ -163,8 +170,8 @@ const AccountTab = () => {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: '#E5E5EA', true: '#E8006F' }}
-              thumbColor="#FFFFFF"
+              trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+              thumbColor={theme.colors.textOnPrimary}
             />
           </View>
         </View>
@@ -253,17 +260,20 @@ const AccountTab = () => {
 
 // ─── Stylesheet ────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
+
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAF7F7',
+    backgroundColor: colors.backgroundColor,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    backgroundColor: '#FAF7F7',
+    backgroundColor: colors.backgroundColor,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -272,7 +282,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.divider,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -283,7 +293,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex:999,
@@ -299,12 +309,12 @@ const styles = StyleSheet.create({
   },
   deliveryText: {
     fontSize: 12,
-    color: '#767575',
-    fontFamily: FONTS.poppinsMedium,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
   },
   dropdownArrow: {
     fontSize: 10,
-    color: '#666666',
+    color: colors.textSecondary,
     marginLeft: 2,
   },
   headerTitleContainer: {
@@ -312,8 +322,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontFamily: FONTS.inter28Bold,
-    color: '#1A1A1A',
+    fontFamily: fontFamily.heading,
+    color: colors.text,
   },
  
   scrollContent: {
@@ -334,18 +344,18 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   avatarImg: {
-    backgroundColor: '#E1E1E1',
+    backgroundColor: colors.surfaceVariant,
   },
   editBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#E8006F',
+    backgroundColor: colors.primary,
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -355,11 +365,11 @@ const styles = StyleSheet.create({
   userNameText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   userEmailText: {
     fontSize: 12,
-    color: '#8E8E93',
+    color: colors.textMuted,
   },
 
   /* My Orders Row */
@@ -372,7 +382,7 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   viewAllBtn: {
     flexDirection: 'row',
@@ -382,12 +392,12 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#E8006F',
+    color: colors.primary,
   },
 
   /* Single Option Box */
   trackOrderCard: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.primaryLight,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -399,7 +409,7 @@ const styles = StyleSheet.create({
 
   /* Grouped Options Container */
   groupedCard: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.primaryLight,
     borderRadius: 18,
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -421,21 +431,22 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#FDE6ED',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionTitle: {
     fontSize: 14,
-    color: '#1A1A1A',
+    color: colors.text,
     fontWeight: '500',
-    fontFamily: "Poppins-Bold",
+    fontFamily: fontFamily.bold,
   },
   optionSubtitle: {
     fontSize: 11,
-    color: '#8E8E93',
+    color: colors.textMuted,
     marginTop: 2,
   },
-});
+  });
+};
 
 export default AccountTab;

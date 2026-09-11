@@ -24,7 +24,8 @@ import {
   loginPagaImage,
 } from '../assets/svg';
 import { editPencilIcon, lockGreenIcon } from '../assets/svg/authIcons';
-import { COLORS } from '../constants/colors';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 
@@ -32,6 +33,8 @@ const OTP_LENGTH = 6;
 const RESEND_SECONDS = 45;
 
 const OtpVarify = ({ navigation, route }: Props) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { width, height } = useWindowDimensions();
 
   // ─── Responsive scale helpers ───────────────────────────────────────────────
@@ -127,11 +130,11 @@ const OtpVarify = ({ navigation, route }: Props) => {
         borderRadius:    BOX_RADIUS,
         fontSize:        BOX_FONT,
         fontWeight:      '700' as const,
-        color:           '#B8255F',
+        color:           theme.colors.primary,
         textAlign:       'center' as const,
-        backgroundColor: active ? '#FFFFFF' : '#FAE4EE',
+        backgroundColor: active ? theme.colors.surface : theme.colors.primaryLight,
         borderWidth:     active ? 1.8 : 0,
-        borderColor:     active ? '#B8255F' : 'transparent',
+        borderColor:     active ? theme.colors.primary : 'transparent',
         includeFontPadding: false,
       },
     ];
@@ -140,7 +143,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.backgroundColor} />
+      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
 
       {/* ── Top illustration ── */}
       <View pointerEvents="none" style={styles.topIllustration}>
@@ -317,10 +320,13 @@ const OtpVarify = ({ navigation, route }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
+
+  return StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: COLORS.backgroundColor,
+    backgroundColor: colors.surface,
   },
   flex: { flex: 1 },
   topIllustration: {
@@ -344,25 +350,21 @@ const styles = StyleSheet.create({
   },
   logoFallback: {
     fontWeight: 'bold',
-    color: '#B8255F',
+    color: colors.primary,
   },
   title: {
     fontWeight: '800',
-    color: '#111111',
-    fontFamily: Platform.select({
-      ios:     'Inter28pt-Bold',
-      android: 'Inter_28pt-Bold',
-      default: 'Inter_28pt-Bold',
-    }),
+    color: colors.text,
+    fontFamily: fontFamily.heading,
     letterSpacing: -0.3,
     lineHeight: 30,
   },
   otpSentText: {
-    color: '#2E7D32',
+    color: colors.success,
     fontWeight: 'bold',
   },
   subtitle: {
-    color: '#666666',
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   emailRow: {
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
     marginTop:      6,
   },
   emailText: {
-    color:      '#B8255F',
+    color:      colors.primary,
     fontWeight: '700',
   },
 
@@ -390,36 +392,36 @@ const styles = StyleSheet.create({
     alignItems:     'center',
   },
   resendLeft: {
-    color: '#888888',
+    color: colors.textMuted,
   },
   resendLeftDisabled: {
-    color: '#BBBBBB',
+    color: colors.border,
   },
   timerLabel: {
-    color: '#888888',
+    color: colors.textMuted,
   },
   timerValue: {
-    color:      '#B8255F',
+    color:      colors.primary,
     fontWeight: '700',
   },
   resendBtn: {
-    color:      '#B8255F',
+    color:      colors.primary,
     fontWeight: '700',
   },
 
   // Verify button
   verifyBtn: {
-    backgroundColor: '#B8255F',
+    backgroundColor: colors.primary,
     alignItems:      'center',
     justifyContent:  'center',
-    shadowColor:     '#B8255F',
+    shadowColor:     colors.primary,
     shadowOpacity:   0.30,
     shadowRadius:    8,
     shadowOffset:    { width: 0, height: 4 },
     elevation:       3,
   },
   verifyBtnText: {
-    color:       '#FFFFFF',
+    color:       colors.textOnPrimary,
     fontWeight:  'bold',
     letterSpacing: 0.4,
   },
@@ -432,7 +434,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   secNoteText: {
-    color: '#666666',
+    color: colors.textSecondary,
   },
 
   // Footer
@@ -444,20 +446,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   featureCircle: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems:      'center',
     justifyContent:  'center',
-    shadowColor:     '#000000',
+    shadowColor:     colors.text,
     shadowOpacity:   0.06,
     shadowRadius:    6,
     shadowOffset:    { width: 0, height: 2 },
     elevation:       2,
   },
   featureLabel: {
-    color:       '#888888',
+    color:       colors.textMuted,
     fontWeight:  'bold',
     letterSpacing: 0.5,
   },
-});
+  });
+};
 
 export default OtpVarify;

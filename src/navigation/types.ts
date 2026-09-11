@@ -1,7 +1,7 @@
 export type RootStackParamList = {
   Login: undefined;
   Otp: undefined;
-  OtpVarify: { phoneNumber?: string } | undefined;
+  OtpVarify: { phoneNumber?: string; email?: string } | undefined;
   SignUp: undefined;
   Home: undefined;
 ProductDetails: { product: any };

@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { FONTS } from '../constants/fonts';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
+import AppIconButton from '../components/AppIconButton';
 import {
   Butruname,
   STAR_FILLED_SVG,
@@ -26,8 +28,6 @@ import {
   ARROW_BACK_ICON,
 } from '../assets/svg';
 import { useNavigation } from '@react-navigation/native';
-
-const PRIMARY_PINK = '#B12B5B';
 
 // Custom SVGs
 const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.65685 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
@@ -128,6 +128,8 @@ interface ProductDetailsProps {
 }
 
 const RelatedProductCard = ({ item, onSelect }: { item: any; onSelect: (prod: any) => void }) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const [isLiked, setIsLiked] = useState(false);
 
   return (
@@ -169,6 +171,8 @@ const RelatedProductCard = ({ item, onSelect }: { item: any; onSelect: (prod: an
 };
 
 const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const product = route?.params?.product || {
     name: 'Stylish Western Frock for Baby Girls',
     price: 299,
@@ -216,12 +220,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeftGroup}>
-            <TouchableOpacity
+            <AppIconButton
               style={styles.headerIconBtn}
+              icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+              accessibilityLabel="Go back"
               onPress={() => navigation?.goBack()}
-              activeOpacity={0.7}>
-              <SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />
-            </TouchableOpacity>
+            />
 
             <TouchableOpacity
               style={styles.locationWrapper}
@@ -463,11 +467,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       activeOpacity={0.8}>
                       <View style={styles.addressHeaderRow}>
                         <View style={styles.addressTypeBadge}>
-                          <SvgXml xml={getHomeIconSvg(PRIMARY_PINK)} />
+                          <SvgXml xml={getHomeIconSvg(theme.colors.primary)} />
                           <Text
                             style={[
                               styles.addressTypeText,
-                              selectedAddressId !== '1' && { color: '#333' },
+                              selectedAddressId !== '1' && { color: theme.colors.text },
                             ]}>
                             Home
                           </Text>
@@ -496,11 +500,13 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       activeOpacity={0.8}>
                       <View style={styles.addressHeaderRow}>
                         <View style={styles.addressTypeBadge}>
-                          <SvgXml xml={getWorkIconSvg('#666')} />
+                          <SvgXml xml={getWorkIconSvg(theme.colors.textSecondary)} />
                           <Text
                             style={[
                               styles.addressTypeText,
-                              selectedAddressId === '2' ? { color: PRIMARY_PINK } : { color: '#333' },
+                              selectedAddressId === '2'
+                                ? { color: theme.colors.primary }
+                                : { color: theme.colors.text },
                             ]}>
                             Work
                           </Text>
@@ -562,7 +568,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                         { type: 'Other', getIcon: getOtherLocationSvg },
                       ].map(item => {
                         const isSel = selectedAddressType === item.type;
-                        const iconColor = isSel ? PRIMARY_PINK : '#666666';
+                        const iconColor = isSel ? theme.colors.primary : theme.colors.textSecondary;
 
                         return (
                           <TouchableOpacity
@@ -596,7 +602,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       <TextInput
                         style={styles.formInputWithIcon}
                         placeholder="Enter full name"
-                        placeholderTextColor="#AAA"
+                        placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
 
@@ -607,7 +613,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                         style={styles.formInputWithIcon}
                         placeholder="Enter mobile number"
                         keyboardType="phone-pad"
-                        placeholderTextColor="#AAA"
+                        placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
 
@@ -619,7 +625,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                           style={styles.formInputWithIcon}
                           placeholder="Enter 6-digit pincode"
                           keyboardType="number-pad"
-                          placeholderTextColor="#AAA"
+                          placeholderTextColor={theme.colors.textMuted}
                         />
                       </View>
                       <TouchableOpacity style={styles.pinCheckBtn}>
@@ -633,7 +639,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       <TextInput
                         style={styles.formInputWithIcon}
                         placeholder="House No., Building, Street, Area"
-                        placeholderTextColor="#AAA"
+                        placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
 
@@ -643,7 +649,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       <TextInput
                         style={styles.formInputWithIcon}
                         placeholder="Enter landmark"
-                        placeholderTextColor="#AAA"
+                        placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
 
@@ -655,7 +661,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                           <TextInput
                             style={styles.formInputWithIcon}
                             placeholder="Enter city"
-                            placeholderTextColor="#AAA"
+                            placeholderTextColor={theme.colors.textMuted}
                           />
                         </View>
                       </View>
@@ -666,7 +672,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                           <TextInput
                             style={[styles.formInputWithIcon, { paddingLeft: 12 }]}
                             placeholder="Select state"
-                            placeholderTextColor="#AAA"
+                            placeholderTextColor={theme.colors.textMuted}
                           />
                           <SvgXml
                             xml={CHEVRON_DOWN_SVG}
@@ -711,14 +717,17 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppTheme) => {
+  const { colors } = theme;
+
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
   },
 
   /* Header */
@@ -729,7 +738,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.divider,
   },
   headerLeftGroup: {
     flexDirection: 'row',
@@ -745,7 +754,7 @@ const styles = StyleSheet.create({
      width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex:999,
@@ -760,7 +769,7 @@ const styles = StyleSheet.create({
   logoFallback: {
     fontSize: 16,
     fontWeight: '700',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
   locationRow: {
     flexDirection: 'row',
@@ -770,7 +779,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 11,
-    color: '#666666',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
 
@@ -789,11 +798,11 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   thumbBoxSelected: {
-    borderColor: PRIMARY_PINK,
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   thumbImage: {
@@ -818,19 +827,19 @@ const styles = StyleSheet.create({
   },
   reviewText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   titleText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: colors.text,
     marginVertical: 8,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#888888',
+    color: colors.textMuted,
     letterSpacing: 0.5,
     marginTop: 10,
     marginBottom: 8,
@@ -844,20 +853,20 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FAFAFA',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
   },
   sizeChipSelected: {
-    borderColor: PRIMARY_PINK,
-    backgroundColor: '#FFF0F5',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   sizeChipText: {
     fontSize: 12,
-    color: '#444444',
+    color: colors.text,
     fontWeight: '500',
   },
   sizeChipTextSelected: {
-    color: PRIMARY_PINK,
+    color: colors.primary,
     fontWeight: '700',
   },
   priceContainer: {
@@ -869,27 +878,27 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   mainPrice: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   mrpText: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   discountBadge: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: colors.success,
     marginLeft: 4,
   },
   taxText: {
     fontSize: 11,
-    color: '#888',
+    color: colors.textMuted,
     marginTop: 2,
   },
   actionBtnRow: {
@@ -902,20 +911,20 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: PRIMARY_PINK,
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buyNowBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
   addCartBtn: {
     flex: 1,
     height: 44,
     borderRadius: 8,
-    backgroundColor: PRIMARY_PINK,
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -924,17 +933,17 @@ const styles = StyleSheet.create({
   addCartBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
   },
 
   /* Delivery Card */
   deliveryCard: {
     marginTop: 20,
     padding: 14,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: colors.surfaceVariant,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: colors.divider,
   },
   deliveryHeader: {
     flexDirection: 'row',
@@ -945,7 +954,7 @@ const styles = StyleSheet.create({
   deliveryTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   pincodeBtn: {
     paddingVertical: 4,
@@ -954,7 +963,7 @@ const styles = StyleSheet.create({
   pincodeBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
   deliveryFeatureRow: {
     flexDirection: 'row',
@@ -964,18 +973,18 @@ const styles = StyleSheet.create({
   },
   deliveryFeatureText: {
     fontSize: 12,
-    color: '#555555',
+    color: colors.textSecondary,
   },
   boldText: {
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
 
   /* Accordions */
   accordionContainer: {
     marginTop: 20,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: colors.divider,
     borderRadius: 10,
     padding: 14,
   },
@@ -988,38 +997,38 @@ const styles = StyleSheet.create({
   accordionTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#333333',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   accordionContent: {
     fontSize: 12,
-    color: '#666666',
+    color: colors.textSecondary,
     marginTop: 8,
     lineHeight: 18,
   },
   divider: {
     height: 1,
-    backgroundColor: '#EEEEEE',
+    backgroundColor: colors.divider,
     marginVertical: 10,
   },
 
   /* Love Banner */
   loveBanner: {
     marginTop: 20,
-    backgroundColor: '#FFF5F8',
+    backgroundColor: colors.primaryLight,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   loveScriptText: {
     fontSize: 12,
-    color: PRIMARY_PINK,
+    color: colors.primary,
     fontStyle: 'italic',
   },
   loveBrandText: {
     fontSize: 18,
     fontWeight: '800',
-    color: PRIMARY_PINK,
+    color: colors.primary,
     marginBottom: 12,
   },
   loveFeaturesRow: {
@@ -1033,12 +1042,12 @@ const styles = StyleSheet.create({
   loveFeatureTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#333333',
+    color: colors.text,
     textAlign: 'center',
   },
   loveFeatureSub: {
     fontSize: 10,
-    color: '#777777',
+    color: colors.textSecondary,
     marginTop: 2,
   },
 
@@ -1052,11 +1061,11 @@ const styles = StyleSheet.create({
   relatedTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   relatedSubTitle: {
     fontSize: 12,
-    color: '#777777',
+    color: colors.textSecondary,
   },
   relatedCard: {
     width: 140,
@@ -1068,14 +1077,14 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   tagBadge: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: colors.overlay,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     alignSelf: 'flex-start',
   },
   tagText: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
     fontSize: 9,
     fontWeight: '600',
   },
@@ -1083,14 +1092,14 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-end',
   },
   relatedName: {
     fontSize: 12,
-    color: '#333',
+    color: colors.text,
     marginTop: 6,
     fontWeight: '500',
   },
@@ -1103,35 +1112,35 @@ const styles = StyleSheet.create({
   relatedPrice: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   originalPrice: {
     fontSize: 10,
-    color: '#999',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   relatedBtn: {
     marginTop: 6,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: PRIMARY_PINK,
+    borderColor: colors.primary,
     borderRadius: 6,
     alignItems: 'center',
   },
   relatedBtnText: {
     fontSize: 11,
     fontWeight: '600',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
 
   /* Modal Base */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 16,
@@ -1141,7 +1150,7 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: colors.shimmer,
     borderRadius: 2,
     alignSelf: 'center',
     marginVertical: 10,
@@ -1155,23 +1164,23 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   modalSubTitle: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 2,
   },
   closeBtn: {
     padding: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOpacity: 0.1,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -1182,13 +1191,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FAFAFA',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
     marginBottom: 12,
   },
   selectedAddressCard: {
-    borderColor: PRIMARY_PINK,
-    backgroundColor: '#FFF0F5',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   addressHeaderRow: {
     flexDirection: 'row',
@@ -1203,10 +1212,10 @@ const styles = StyleSheet.create({
   addressTypeText: {
     fontSize: 13,
     fontWeight: '700',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
   defaultBadge: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.surfaceVariant,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1215,14 +1224,14 @@ const styles = StyleSheet.create({
   defaultText: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#2E7D32',
+    color: colors.success,
   },
   radioOuter: {
     width: 16,
     height: 16,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: PRIMARY_PINK,
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1230,23 +1239,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: PRIMARY_PINK,
+    backgroundColor: colors.primary,
   },
   addressDetailsText: {
     fontSize: 12,
-    color: '#555555',
+    color: colors.textSecondary,
     marginTop: 6,
     lineHeight: 16,
   },
   addressPhoneText: {
     fontSize: 11,
-    color: '#888888',
+    color: colors.textMuted,
     marginTop: 4,
   },
   otherAddressTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#888888',
+    color: colors.textMuted,
     marginVertical: 8,
   },
   addNewAddressBtn: {
@@ -1254,21 +1263,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: PRIMARY_PINK,
+    borderColor: colors.primary,
     alignItems: 'center',
     marginTop: 4,
   },
   addNewAddressText: {
     fontSize: 13,
     fontWeight: '700',
-    color: PRIMARY_PINK,
+    color: colors.primary,
   },
 
   /* Add Address Form Inputs */
   fieldLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#444444',
+    color: colors.text,
     marginTop: 10,
     marginBottom: 4,
   },
@@ -1286,12 +1295,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FAFAFA',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
   },
   typeChipSelected: {
-    borderColor: PRIMARY_PINK,
-    backgroundColor: '#FDF2F766',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   typeChipContent: {
     flexDirection: 'row',
@@ -1300,11 +1309,11 @@ const styles = StyleSheet.create({
   },
   typeChipText: {
     fontSize: 12,
-    color: '#555',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   typeChipTextSelected: {
-    color: PRIMARY_PINK,
+    color: colors.primary,
     fontWeight: '700',
   },
   chipCheckBadge: {
@@ -1314,9 +1323,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
     borderRadius: 8,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.surfaceVariant,
   },
   inputLeftIcon: {
     marginLeft: 10,
@@ -1326,7 +1335,7 @@ const styles = StyleSheet.create({
     height: 40,
     paddingHorizontal: 8,
     fontSize: 12,
-    color: '#1A1A1A',
+    color: colors.text,
   },
   pinRow: {
     flexDirection: 'row',
@@ -1334,19 +1343,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pinCheckBtn: {
-    backgroundColor: '#FDF2F766',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
     height: 40,
     borderRadius: 16,
     justifyContent: 'center',
-        borderColor:'#BE185D',
+        borderColor: colors.primary,
         borderWidth:1
 
   },
   pinCheckText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#BE185D',
+    color: colors.primary,
   },
   defaultCheckboxRow: {
     flexDirection: 'row',
@@ -1359,20 +1368,20 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: '#CCC',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxBoxSelected: {
-    borderColor: '#2E7D32',
-    backgroundColor: '#E8F5E9',
+    borderColor: colors.success,
+    backgroundColor: colors.surfaceVariant,
   },
   defaultCheckboxLabel: {
     fontSize: 12,
-    color: '#555',
+    color: colors.textSecondary,
   },
   saveBtn: {
-    backgroundColor: PRIMARY_PINK,
+    backgroundColor: colors.primary,
     height: 44,
     borderRadius: 8,
     alignItems: 'center',
@@ -1383,8 +1392,9 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.textOnPrimary,
   },
-});
+  });
+};
 
 export default ProductDetailsScreen;
