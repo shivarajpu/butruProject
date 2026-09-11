@@ -9,6 +9,8 @@
  *   <MenuDrawer
  *     visible={open}
  *     onClose={() => setOpen(false)}
+ *     onSelect={name => handleMenuItem(name)}
+ *     activeCategory="Home"
  *     logoWidth={90}
  *     logoHeight={36}
  *   />
@@ -46,15 +48,15 @@ import {
 // ─── Drawer Menu Config ────────────────────────────────────────────────────────
 
 export const DRAWER_ITEMS = [
-  { id: '1', name: 'Home', icon: HOME_ACTIVE_SVG, active: true },
-  { id: '2', name: 'Clothing', icon: CLOTHING_SVG, active: false },
-  { id: '3', name: 'Shoes', icon: SHOES_SVG, active: false },
-  { id: '4', name: 'Accessories', icon: ACCESSORIES_SVG, active: false },
-  { id: '5', name: 'Toys', icon: TOYS_SVG, active: false },
-  { id: '6', name: 'Wishlist', icon: WISHLIST_SVG, active: false },
-  { id: '7', name: 'My Orders', icon: ORDERS_SVG, active: false },
-  { id: '8', name: 'Account', icon: ACCOUNT_SVG, active: false },
-  { id: '9', name: 'Help & Support', icon: HELP_SVG, active: false },
+  { id: '1', name: 'Home', icon: HOME_ACTIVE_SVG },
+  { id: '2', name: 'Clothing', icon: CLOTHING_SVG },
+  { id: '3', name: 'Shoes', icon: SHOES_SVG },
+  { id: '4', name: 'Accessories', icon: ACCESSORIES_SVG },
+  { id: '5', name: 'Toys', icon: TOYS_SVG },
+  { id: '6', name: 'Wishlist', icon: WISHLIST_SVG },
+  { id: '7', name: 'My Orders', icon: ORDERS_SVG },
+  { id: '8', name: 'Account', icon: ACCOUNT_SVG },
+  { id: '9', name: 'Help & Support', icon: HELP_SVG },
 ];
 
 // ─── StyleSheet Factory ────────────────────────────────────────────────────────
@@ -153,6 +155,8 @@ const createStyles = (theme: AppTheme) => {
 interface MenuDrawerProps {
   visible: boolean;
   onClose: () => void;
+  onSelect: (name: string) => void;
+  activeCategory: string;
   logoWidth: number;
   logoHeight: number;
 }
@@ -160,12 +164,19 @@ interface MenuDrawerProps {
 const MenuDrawer: React.FC<MenuDrawerProps> = ({
   visible,
   onClose,
+  onSelect,
+  activeCategory,
   logoWidth,
   logoHeight,
 }) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
+
+  const handleItemPress = (name: string) => {
+    onSelect(name);
+    onClose();
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -193,11 +204,18 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
               {DRAWER_ITEMS.map(item => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.drawerItem, item.active && styles.drawerItemActive]}
+                  style={[
+                    styles.drawerItem,
+                    item.name === activeCategory && styles.drawerItemActive,
+                  ]}
                   activeOpacity={0.7}
-                  onPress={onClose}>
+                  onPress={() => handleItemPress(item.name)}>
                   <SvgXml xml={item.icon} width={21} height={21} />
-                  <Text style={[styles.drawerItemText, item.active && styles.drawerItemTextActive]}>
+                  <Text
+                    style={[
+                      styles.drawerItemText,
+                      item.name === activeCategory && styles.drawerItemTextActive,
+                    ]}>
                     {item.name}
                   </Text>
                 </TouchableOpacity>

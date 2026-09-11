@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
   Platform,
   StatusBar,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import MenuDrawer from '../components/MenuDrawer';
+import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
 import {
   MENU_SVG,
@@ -28,10 +30,19 @@ import {
   BELL_SVG,
   BAG_SVG,
   SEARCH_SVG,
+  BOX_ICON_SVG,
 } from '../assets/svg';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/types';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList, TabParamList } from '../navigation/types';
+
+/** HomeTab sits inside the bottom tabs, itself nested in the root stack. */
+type HomeTabNavigation = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'HomeTab'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -56,33 +67,6 @@ const COLLECTIONS = [
   },
 ];
 
-const PRODUCTS = [
-  {
-    id: '1',
-    name: 'Stylish Western Frock....',
-    price: 299,
-    originalPrice: 588,
-    discount: 30,
-    rating: 4.5,
-    reviews: 53,
-    tag: 'New Arrival',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    image: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?auto=format&fit=crop&q=80&w=500',
-  },
-  {
-    id: '2',
-    name: 'Stylish Western Frock',
-    price: 299,
-    originalPrice: 588,
-    discount: 30,
-    rating: 4.5,
-    reviews: 53,
-    tag: 'New Arrival',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    image: 'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?auto=format&fit=crop&q=80&w=500',
-  },
-];
-
 const BANNER_SLIDES = [
   {
     id: '1',
@@ -95,6 +79,77 @@ const BANNER_SLIDES = [
     image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&q=80&w=1000',
   },
 ];
+
+// ─── Product Types & API Config ───────────────────────────────────────────────
+
+const PRODUCTS_ENDPOINT = '/api/storefront/products';
+
+/** Singleton product shape consumed by the ProductCard UI. */
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number;
+  discount: number;
+  rating: number;
+  reviews: number;
+  tag: string;
+  sizes: string[];
+  image: string;
+}
+
+interface ProductSku {
+  size: string;
+  sellingPrice: number;
+  mrp: number;
+}
+
+interface ApiProduct {
+  _id: string;
+  name: string;
+  price: number;
+  rating: number;
+  reviewCount: number;
+  tag?: string;
+  isNewArrival?: boolean;
+  isPopular?: boolean;
+  images?: string[];
+  skus?: ProductSku[];
+}
+
+interface ProductsApiResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  data: ApiProduct[];
+}
+
+/** Maps API product -> Product shape used by the product grid UI. */
+const mapApiProduct = (item: ApiProduct): Product => {
+  const sku = item.skus?.[0];
+  const price = sku?.sellingPrice ?? item.price ?? 0;
+  const originalPrice = sku?.mrp ?? price;
+
+  return {
+    id: item._id,
+    name: item.name,
+    price,
+    originalPrice,
+    discount:
+      originalPrice > price
+        ? Math.round(((originalPrice - price) / originalPrice) * 100)
+        : 0,
+    rating: item.rating ?? 0,
+    reviews: item.reviewCount ?? 0,
+    tag:
+      item.tag ||
+      (item.isNewArrival ? 'New Arrival' : item.isPopular ? 'Best Seller' : ''),
+    sizes: [...new Set((item.skus ?? []).map(skuEntry => skuEntry.size))],
+    image: item.images?.[0] ?? '',
+  };
+};
 
 // ─── StyleSheet Factory ────────────────────────────────────────────────────────
 // Called inside each component AFTER reading the theme. This pattern
@@ -345,6 +400,11 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 10,
       color: colors.textMuted,
     },
+    starRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 1,
+    },
     sizeContainer: {
       flexDirection: 'row',
       gap: 4,
@@ -384,18 +444,78 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 11,
       fontWeight: '700',
     },
+    // State feedback
+    centerBox: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 60,
+      paddingHorizontal: 20,
+    },
+    loader: {
+      paddingVertical: 60,
+    },
+    emptyIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 16,
+    },
+    emptyIconText: {
+      fontSize: 28,
+      color: colors.primary,
+    },
+    emptyTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+      fontFamily: fontFamily.bold,
+      marginBottom: 6,
+    },
+    emptyMessage: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      fontFamily: fontFamily.regular,
+      maxWidth: 260,
+    },
+    retryBtn: {
+      marginTop: 18,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 22,
+      paddingVertical: 9,
+      borderRadius: 20,
+    },
+    retryBtnText: {
+      color: colors.textOnPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
   });
 };
 
 // ─── StarRating Component ──────────────────────────────────────────────────────
 
-const StarRating = ({ rating }: { rating: number }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-    {[1, 2, 3, 4, 5].map(s => (
-      <SvgXml key={s} xml={STAR_FILLED_SVG} width={10} height={10} />
-    ))}
-  </View>
-);
+const StarRating = ({ rating }: { rating: number }) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.starRow}>
+      {[1, 2, 3, 4, 5].map(index => (
+        <SvgXml
+          key={index}
+          xml={STAR_FILLED_SVG}
+          width={10}
+          height={10}
+          style={index <= Math.round(rating) ? undefined : { opacity: 0.25 }}
+        />
+      ))}
+    </View>
+  );
+};
 
 // ─── BannerSlider Component ────────────────────────────────────────────────────
 
@@ -436,7 +556,7 @@ const ProductCard = ({
   cardWidth,
   onAddToCart,
 }: {
-  item: (typeof PRODUCTS)[0];
+  item: Product;
   cardWidth: number;
   onAddToCart: () => void;
 }) => {
@@ -516,9 +636,13 @@ const HomeTab = () => {
   const styles = createStyles(theme);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeCategory, setActiveCategory] = useState('Home');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<HomeTabNavigation>();
   const isTablet = width >= 768;
   const hPad = width * 0.04;
   const logoWidth = Math.min(width * 0.22, 90);
@@ -526,8 +650,55 @@ const HomeTab = () => {
   const collectionCardW = Math.min(width * 0.3, 120);
   const productCardW = (width - hPad * 2 - 12) / 2;
 
+  const fetchProducts = async (category: string) => {
+    setLoading(true);
+    setError('');
+    setProducts([]);
+
+    try {
+      const params =
+        category === 'Home'
+          ? 'isVisible=true&limit=20&page=1'
+          : `isVisible=true&limit=20&page=1&category=${encodeURIComponent(category)}`;
+
+      const response = await apiService.get<ProductsApiResponse>(
+        `${PRODUCTS_ENDPOINT}?${params}`,
+      );
+
+      setProducts((response.data ?? []).map(mapApiProduct));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts(activeCategory);
+  }, [activeCategory]);
+
+  const handleMenuItemSelect = (name: string) => {
+    switch (name) {
+      case 'Wishlist':
+        navigation.navigate('WishlistTab');
+        break;
+      case 'My Orders':
+        navigation.navigate('CartScreen');
+        break;
+      case 'Account':
+        navigation.navigate('AccountTab');
+        break;
+      case 'Help & Support':
+        // Help & Support page is not built yet. Nothing to do for now.
+        break;
+      default:
+        // Product categories (Home, Clothing, Shoes, Accessories, Toys...)
+        setActiveCategory(name);
+    }
+  };
+
   const handleProductPress = (productItem: any) => {
-    navigation?.push('ProductDetails', { product: productItem });
+    navigation.navigate('ProductDetails', { product: productItem });
   };
 
   return (
@@ -611,23 +782,61 @@ const HomeTab = () => {
 
         {/* Section Header */}
         <View style={[styles.sectionHeader, { paddingHorizontal: hPad }]}>
-          <Text style={styles.sectionTitle}>Premium Fashion for Kids</Text>
+          <Text style={styles.sectionTitle}>
+            {activeCategory === 'Home'
+              ? 'Premium Fashion for Kids'
+              : `${activeCategory} Collection`}
+          </Text>
           <TouchableOpacity activeOpacity={0.7}>
             <Text style={styles.showAll}>Show all</Text>
           </TouchableOpacity>
         </View>
 
         {/* Product Grid */}
-        <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
-          {PRODUCTS.map(item => (
-            <ProductCard
-              key={item.id}
-              item={item}
-              cardWidth={productCardW}
-              onAddToCart={() => handleProductPress(item)}
-            />
-          ))}
-        </View>
+        {loading ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator color={theme.colors.primary} size="large" />
+          </View>
+        ) : error ? (
+          <View style={styles.centerBox}>
+            <View style={styles.emptyIcon}>
+              <Text style={styles.emptyIconText}>!</Text>
+            </View>
+            <Text style={styles.emptyTitle}>Oops!</Text>
+            <Text style={styles.emptyMessage}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              activeOpacity={0.8}
+              onPress={() => fetchProducts(activeCategory)}>
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : products.length === 0 ? (
+          <View style={styles.centerBox}>
+            <View style={styles.emptyIcon}>
+              <SvgXml xml={BOX_ICON_SVG} width={30} height={30} />
+            </View>
+            <Text style={styles.emptyTitle}>No products found</Text>
+            <Text style={styles.emptyMessage}>
+              {activeCategory === 'Home'
+                ? 'We are updating our catalog. Please check back soon!'
+                : `No items available in "${
+                    activeCategory
+                  }" right now. Try another category.`}
+            </Text>
+          </View>
+        ) : (
+          <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
+            {products.map(item => (
+              <ProductCard
+                key={item.id}
+                item={item}
+                cardWidth={productCardW}
+                onAddToCart={() => handleProductPress(item)}
+              />
+            ))}
+          </View>
+        )}
 
         <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
@@ -636,6 +845,8 @@ const HomeTab = () => {
       <MenuDrawer
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
+        onSelect={handleMenuItemSelect}
+        activeCategory={activeCategory}
         logoWidth={logoWidth}
         logoHeight={logoHeight}
       />
