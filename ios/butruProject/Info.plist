@@ -9,9 +9,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>butruProject</string>
 	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
+	<string>Butru</string>
 	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<string>com.butruproject</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -34,13 +34,9 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>please alllow location</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
-
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-
 	<key>UIAppFonts</key>
 	<array>
 		<string>Arimo-Bold.ttf</string>
@@ -54,7 +50,8 @@
 		<string>Poppins-Medium.ttf</string>
 		<string>Poppins-Bold.ttf</string>
 	</array>
-
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
