@@ -7,9 +7,9 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>butruProject</string>
-	<key>CFBundleExecutable</key>
 	<string>Butru</string>
+	<key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.butruproject</string>
 	<key>CFBundleInfoDictionaryVersion</key>
