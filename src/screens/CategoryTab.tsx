@@ -21,7 +21,8 @@ import AppInput from '../components/AppInput';
 import type { AppTheme } from '../theme/types';
 
 // Asset Imports
-import { ARROW_BACK_ICON, BAG_SVG } from '../assets/svg';
+import { ARROW_BACK_ICON } from '../assets/svg';
+import BagIconButton from '../components/BagIconButton';
 
 // Dynamic SVGs Factory
 const getSearchIconSvg = (color: string) => 
@@ -324,9 +325,7 @@ const CategoryTab = () => {
             <Text style={styles.headerTitle}>Product Categories</Text>
           </View>
 
-          <TouchableOpacity style={styles.headerBtn} activeOpacity={0.7}>
-            <SvgXml xml={BAG_SVG} width={22} height={22} />
-          </TouchableOpacity>
+          <BagIconButton />
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>

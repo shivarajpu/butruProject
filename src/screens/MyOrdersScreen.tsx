@@ -36,6 +36,12 @@ const filterIcon = (color: string) =>
 const boxIcon = (color: string) =>
   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
+const crossIcon = (color: string) =>
+  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const crossCircleIcon = (color: string) =>
+  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="${color}"/><path d="M8 8l8 8M16 8l-8 8" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 const checkCircleIcon = (color: string) =>
   `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="${color}"/><path d="M8 12l3 3 5-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -297,7 +303,14 @@ const createStyles = (theme: AppTheme) => {
       fontFamily: fontFamily.regular,
     },
     priceAlignEnd: { alignItems: 'flex-end' },
-    innerProductRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+    innerProductRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      backgroundColor: '#FFF8DE',
+      marginHorizontal: -14,
+    },
     innerProductCard: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -718,8 +731,143 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '700',
       fontFamily: fontFamily.bold,
     },
+    /* Modal Base Overlay */
+modalOverlay1: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'flex-end',
+},
+modalHandle1: {
+  width: 40,
+  height: 4,
+  borderRadius: 2,
+  backgroundColor: '#E5E7EB',
+  alignSelf: 'center',
+  marginBottom: 16,
+},
+
+/* Cancel Modal Specific Styles */
+cancelModalSheet: {
+  backgroundColor: '#FFFFFF',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  paddingHorizontal: 20,
+  paddingBottom: 28,
+  paddingTop: 10,
+},
+cancelModalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+cancelModalTitle: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: '#111827',
+},
+cancelModalSubtitle: {
+  fontSize: 13,
+  color: '#6B7280',
+  marginTop: 2,
+},
+closeBtnCircle: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: '#F3F4F6',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+dropdownContainer: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 16,
+  overflow: 'hidden',
+  marginBottom: 20,
+  backgroundColor: '#F9FAFB',
+},
+dropdownHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+  backgroundColor: '#FFFFFF',
+},
+dropdownHeaderText: {
+  fontSize: 14,
+  color: '#4B5563',
+},
+dropdownList: {
+  maxHeight: 220,
+  backgroundColor: '#F3F4F6',
+  paddingHorizontal: 8,
+},
+reasonItem: {
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  borderRadius: 8,
+},
+selectedReasonItem: {
+  backgroundColor: '#E5E7EB',
+},
+reasonText: {
+  fontSize: 13,
+  color: '#4B5563',
+},
+selectedReasonText: {
+  fontWeight: '600',
+  color: '#111827',
+},
+cancelModalActions: {
+  flexDirection: 'row',
+  gap: 12,
+},
+keepOrderBtn: {
+  flex: 1,
+  height: 48,
+  borderRadius: 24,
+  borderWidth: 1,
+  borderColor: '#374151',
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#FFFFFF',
+},
+keepOrderBtnText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#111827',
+},
+confirmCancelBtn: {
+  flex: 1,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: colors.error,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+confirmCancelBtnText: {
+  fontSize: 14,
+  fontWeight: '700',
+  color: '#FFFFFF',
+},
   });
 };
+
+
+const CHEVRON_DOWN_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const CANCEL_REASONS = [
+  'Ordered by mistake',
+  'Changed my mind',
+  'Found a better price',
+  'Delivery is taking too long',
+  'Shipping cost is too high',
+  'Payment issue',
+  'Ordered wrong size or variant',
+];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -727,7 +875,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MyOrders'>;
 
 const MyOrdersScreen = ({ navigation }: Props) => {
   const theme = useAppTheme();
-  const { colors } = theme;
+  const { colors, fontFamily } = theme;
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -736,13 +884,15 @@ const MyOrdersScreen = ({ navigation }: Props) => {
   const [currentScreen, setCurrentScreen] = useState<'LIST' | 'TRACK' | 'DETAILS'>('LIST');
   const [selectedProduct, setSelectedProduct] = useState<ProductItem>(MOCK_ORDER.items[0]);
   const [detailsFrom, setDetailsFrom] = useState<'TRACK' | 'LIST'>('TRACK');
-
+const [orderStatus, setOrderStatus] = useState<'PLACED' | 'CANCELLED'>('PLACED');
   // Modal State
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('All statuses');
   const [selectedTime, setSelectedTime] = useState('Anytime');
   const [activeTab, setActiveTab] = useState('All');
-
+const [cancelModalVisible, setCancelModalVisible] = useState(false);
+const [isDropdownOpen, setIsDropdownOpen] = useState(true);
+const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const handleProductSelect = (product: ProductItem, from: 'TRACK' | 'LIST') => {
     setSelectedProduct(product);
     setDetailsFrom(from);
@@ -761,6 +911,15 @@ const MyOrdersScreen = ({ navigation }: Props) => {
     }
   };
 
+  const handleConfirmCancel = () => {
+  setOrderStatus('CANCELLED');
+  setActiveTab('Cancelled'); // Direct 'Cancelled' tab par navigate hoga
+  setCancelModalVisible(false);
+  setCurrentScreen('LIST');
+};
+
+const isCancelled = orderStatus === 'CANCELLED';
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
@@ -776,7 +935,7 @@ const MyOrdersScreen = ({ navigation }: Props) => {
           </Text>
           <Text style={styles.headerSubtitle}>Track orders & purchases.</Text>
         </View>
-        <TouchableOpacity style={styles.bagBtn} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.bagBtn} activeOpacity={0.7} onPress={()=> navigation.navigate("CartScreen")}>
           <SvgXml xml={bagIcon(colors.text)} width={19} height={21} />
         </TouchableOpacity>
       </View>
@@ -838,16 +997,36 @@ const MyOrdersScreen = ({ navigation }: Props) => {
             <View style={styles.orderCardHeader}>
               <View style={styles.orderHeaderRow}>
                 <View style={styles.statusBadgeRow}>
-                  <View style={[styles.orderStatusIconBox ,{backgroundColor:colors.primary}]}>
-                    <SvgXml xml={boxIcon(colors.surface)} width={20} height={20} />
+                  <View
+                    style={[
+                      styles.orderStatusIconBox,
+                      { backgroundColor: isCancelled ? colors.error : colors.success },
+                    ]}>
+                    <SvgXml
+                      xml={isCancelled ? crossIcon(colors.surface) : boxIcon(colors.surface)}
+                      width={20}
+                      height={20}
+                    />
                   </View>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>ORDER PLACED</Text>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: (isCancelled ? colors.error : colors.success) + '1A' },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        { color: isCancelled ? colors.error : colors.success },
+                      ]}>
+                      {isCancelled ? 'CANCELLED' : 'ORDER PLACED'}
+                    </Text>
                   </View>
                 </View>
                 <SvgXml xml={chevRight(colors.textMuted)} />
               </View>
-              <Text style={styles.orderDate}>Placed on 14 Sept 2026</Text>
+              <Text style={styles.orderDate}>
+                {isCancelled ? 'Cancelled on 14 Sept 2026' : 'Placed on 14 Sept 2026'}
+              </Text>
             </View>
 
             <View style={styles.orderSubHeader}>
@@ -912,12 +1091,24 @@ const MyOrdersScreen = ({ navigation }: Props) => {
           showsVerticalScrollIndicator={false}>
           <View style={styles.pinkHeaderBox}>
             <View style={styles.orderInfoRow}>
-              <View style={[styles.orderStatusIconBox ,{width:40 , height:40 ,borderRadius:20}]}>
-                <SvgXml xml={boxIcon(colors.primary)} width={25} height={25} />
+              <View
+                style={[
+                  styles.orderStatusIconBox,
+                  { width: 40, height: 40, borderRadius: 20, backgroundColor: isCancelled ? colors.error : colors.success },
+                ]}>
+                <SvgXml
+                  xml={isCancelled ? crossIcon(colors.surface) : boxIcon(colors.surface)}
+                  width={25}
+                  height={25}
+                />
               </View>
               <View style={{ marginLeft: 10, flex: 1 }}>
                 <Text style={styles.orderIdText}>Order {MOCK_ORDER.orderId}</Text>
-                <Text style={styles.orderDate}>Placed on September 14, 2026 • 2 Items</Text>
+                <Text style={styles.orderDate}>
+                  {isCancelled
+                    ? 'Cancelled on September 14, 2026 • 2 Items'
+                    : 'Placed on September 14, 2026 • 2 Items'}
+                </Text>
               </View>
             </View>
             <View style={{borderWidth:0.5,borderColor:'#F8D2DD' , marginTop:12}}/>
@@ -926,37 +1117,67 @@ const MyOrdersScreen = ({ navigation }: Props) => {
                 <Text style={styles.metricLabel}>Total Amount</Text>
                 <Text style={styles.totalAmountText}>₹{MOCK_ORDER.totalAmount}</Text>
               </View>
-              <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
+              {!isCancelled && (
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  activeOpacity={0.7}
+                  onPress={() => setCancelModalVisible(true)}>
+                  <Text style={styles.cancelBtnText}>Cancel Order</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
           {/* Timeline Section */}
           <View style={styles.timelineContainer}>
-            {[
-              { title: 'Order Placed', time: 'September 14, 2026\n10:43 AM', status: 'Completed', active: true, icon: checkIcon(colors.textOnPrimary) },
-              { title: 'Processing', time: 'September 14, 2026\n2:30 PM', status: 'In Progress', active: false, icon: gearIcon(colors.textMuted) },
-              { title: 'Shipped', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
-              { title: 'Out For Delivery', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: truckIcon(colors.textMuted) },
-              { title: 'Delivered', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
-            ].map((step, idx, arr) => (
-              <View key={idx} style={styles.timelineRow}>
+            {isCancelled ? (
+              <View style={styles.timelineRow}>
                 <View style={styles.timelineNodeCol}>
-                  <View style={[styles.timelineNode, step.active && styles.timelineNodeActive]}>
-                    <SvgXml xml={step.icon} />
+                  <View style={[styles.timelineNode, { backgroundColor: colors.error }]}>
+                    <SvgXml xml={crossIcon(colors.surface)} />
                   </View>
-                  {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
                 </View>
-
                 <View style={styles.timelineContent}>
-                  <Text style={styles.timelineTitle}>{step.title}</Text>
-                  <Text style={styles.timelineTime}>{step.time}</Text>
+                  <Text style={styles.timelineTitle}>Order Cancelled</Text>
+                  <Text style={styles.timelineTime}>September 14, 2026{'\n'}Cancelled</Text>
                 </View>
-
-                <Text style={[styles.statusTag, step.active && styles.statusTagActive]}>{step.status}</Text>
+                <Text
+                  style={[
+                    styles.statusTag,
+                    { color: colors.error, backgroundColor: colors.error + '1A', fontFamily: fontFamily.bold },
+                  ]}>
+                  Cancelled
+                </Text>
               </View>
-            ))}
+            ) : (
+              [
+                { title: 'Order Placed', time: 'September 14, 2026\n10:43 AM', status: 'Completed', active: true, icon: checkIcon(colors.textOnPrimary) },
+                { title: 'Processing', time: 'September 14, 2026\n2:30 PM', status: 'In Progress', active: false, icon: gearIcon(colors.textMuted) },
+                { title: 'Shipped', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
+                { title: 'Out For Delivery', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: truckIcon(colors.textMuted) },
+                { title: 'Delivered', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
+              ].map((step, idx, arr) => (
+                <View key={idx} style={styles.timelineRow}>
+                  <View style={styles.timelineNodeCol}>
+                    <View
+                      style={[
+                        styles.timelineNode,
+                        step.active && { backgroundColor: colors.success },
+                      ]}>
+                      <SvgXml xml={step.icon} />
+                    </View>
+                    {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
+                  </View>
+
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineTitle}>{step.title}</Text>
+                    <Text style={styles.timelineTime}>{step.time}</Text>
+                  </View>
+
+                  <Text style={[styles.statusTag, step.active && styles.statusTagActive, step.active && { color: colors.success, backgroundColor: colors.success + '1A', fontFamily: fontFamily.bold }]}>{step.status}</Text>
+                </View>
+              ))
+            )}
           </View>
 
           <View style={styles.infoNoteBox}>
@@ -996,12 +1217,24 @@ const MyOrdersScreen = ({ navigation }: Props) => {
           showsVerticalScrollIndicator={false}>
           <View style={styles.pinkHeaderBox}>
             <View style={styles.orderInfoRow}>
-              <View style={styles.orderStatusIconBox}>
-                <SvgXml xml={boxIcon(colors.primary)} width={20} height={20} />
+              <View
+                style={[
+                  styles.orderStatusIconBox,
+                  { backgroundColor: isCancelled ? colors.error : colors.success },
+                ]}>
+                <SvgXml
+                  xml={isCancelled ? crossIcon(colors.surface) : boxIcon(colors.surface)}
+                  width={20}
+                  height={20}
+                />
               </View>
               <View style={{ marginLeft: 10 }}>
                 <Text style={styles.orderIdText}>Order {MOCK_ORDER.orderId}</Text>
-                <Text style={styles.orderDate}>Placed on September 14, 2026 • 2 Items</Text>
+                <Text style={styles.orderDate}>
+                  {isCancelled
+                    ? 'Cancelled on September 14, 2026 • 2 Items'
+                    : 'Placed on September 14, 2026 • 2 Items'}
+                </Text>
               </View>
             </View>
           </View>
@@ -1010,10 +1243,22 @@ const MyOrdersScreen = ({ navigation }: Props) => {
           <Text style={styles.sectionHeading}>Order Timeline</Text>
 
           <View style={styles.selectedTimelineRow}>
-            <SvgXml xml={checkCircleIcon(colors.success)} />
+            <SvgXml
+              xml={isCancelled ? crossCircleIcon(colors.error) : checkCircleIcon(colors.success)}
+            />
             <View style={{ marginLeft: 8 }}>
-              <Text style={styles.selectedTimelineTitle}>Order Placed</Text>
-              <Text style={styles.selectedTimelineTime}>September 14, 2026 • 10:43 AM</Text>
+              <Text
+                style={[
+                  styles.selectedTimelineTitle,
+                  isCancelled && { color: colors.error },
+                ]}>
+                {isCancelled ? 'Order Cancelled' : 'Order Placed'}
+              </Text>
+              <Text style={styles.selectedTimelineTime}>
+                {isCancelled
+                  ? 'September 14, 2026 • 12:15 PM'
+                  : 'September 14, 2026 • 10:43 AM'}
+              </Text>
             </View>
           </View>
 
@@ -1163,6 +1408,89 @@ const MyOrdersScreen = ({ navigation }: Props) => {
           </View>
         </View>
       </Modal>
+      {/* CANCEL ORDER BOTTOM SHEET MODAL */}
+<Modal
+  visible={cancelModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setCancelModalVisible(false)}>
+  <View style={styles.modalOverlay1}>
+    <View style={styles.cancelModalSheet}>
+      <View style={styles.modalHandle1} />
+
+      {/* Modal Header */}
+      <View style={styles.cancelModalHeader}>
+        <View>
+          <Text style={styles.cancelModalTitle}>Cancel Order</Text>
+          <Text style={styles.cancelModalSubtitle}>Why are you cancelling this order?</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.closeBtnCircle}
+          onPress={() => setCancelModalVisible(false)}>
+          <SvgXml xml={CLOSE_SVG} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Dropdown Container */}
+      <View style={styles.dropdownContainer}>
+        <TouchableOpacity
+          style={styles.dropdownHeader}
+          activeOpacity={0.7}
+          onPress={() => setIsDropdownOpen(!isDropdownOpen)}>
+          <Text style={styles.dropdownHeaderText}>
+            {selectedReason || 'Choose a reason'}
+          </Text>
+          <SvgXml
+            xml={CHEVRON_DOWN_SVG}
+            style={isDropdownOpen && { transform: [{ rotate: '180deg' }] }}
+          />
+        </TouchableOpacity>
+
+        {isDropdownOpen && (
+          <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+            {CANCEL_REASONS.map(reason => (
+              <TouchableOpacity
+                key={reason}
+                style={[
+                  styles.reasonItem,
+                  selectedReason === reason && styles.selectedReasonItem,
+                ]}
+                onPress={() => {
+                  setSelectedReason(reason);
+                  setIsDropdownOpen(false);
+                }}>
+                <Text
+                  style={[
+                    styles.reasonText,
+                    selectedReason === reason && styles.selectedReasonText,
+                  ]}>
+                  {reason}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.cancelModalActions}>
+        <TouchableOpacity
+          style={styles.keepOrderBtn}
+          activeOpacity={0.7}
+          onPress={() => setCancelModalVisible(false)}>
+          <Text style={styles.keepOrderBtnText}>Keep Order</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.confirmCancelBtn}
+          activeOpacity={0.8}
+          onPress={handleConfirmCancel}>
+          <Text style={styles.confirmCancelBtnText}>Confirm Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
     </SafeAreaView>
   );
 };

@@ -15,6 +15,10 @@ export type RootStackParamList = {
         title?: string;
       }
     | undefined;
+  Terms: undefined;
+  ShippingPolicy: undefined;
+  ReturnsRefunds: undefined;
+  PrivacyPolicy: undefined;
 };
 
 export type TabParamList = {

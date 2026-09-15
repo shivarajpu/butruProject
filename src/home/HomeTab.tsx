@@ -29,9 +29,10 @@ import {
   CHEVRON_DOWN_SVG,
   BELL_SVG,
   BAG_SVG,
-  SEARCH_SVG,
+SEARCH_SVG,
   BOX_ICON_SVG,
 } from '../assets/svg';
+import BagIconButton from '../components/BagIconButton';
 import { useNavigation } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -737,12 +738,10 @@ const HomeTab = () => {
 
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
-              <SvgXml xml={BELL_SVG} width={22} height={22} />
+              <SvgXml xml={BELL_SVG} width={25} height={25} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
-              <SvgXml xml={BAG_SVG} width={22} height={22} />
-            </TouchableOpacity>
+            <BagIconButton />
           </View>
         </View>
 
