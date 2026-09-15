@@ -28,12 +28,15 @@ import { Callicon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import AppInput from '../components/AppInput';
+import { useDispatch } from 'react-redux';
+import { login } from '../store/slices/authSlice';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
 const OtpScreen = ({ navigation }: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const dispatch = useDispatch();
   const { width, height } = useWindowDimensions();
 
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -69,6 +72,7 @@ const OtpScreen = ({ navigation }: Props) => {
       Alert.alert('OTP Required', 'Please enter the verification code.');
       return;
     }
+    dispatch(login({ phone: phoneNumber.trim() }));
     navigation.replace('Home');
   };
 

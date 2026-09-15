@@ -13,11 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { BAG_SVG  , BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, CHEVRON_DOWN_SVG, LOCATION_PIN_SVG} from '../assets/svg';
+import { BAG_SVG  , BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, CHEVRON_DOWN_SVG, LOCATION_PIN_SVG, cameraicon} from '../assets/svg';
 import { useNavigation } from '@react-navigation/native'; // 1. Hook import karein
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import AppIconButton from '../components/AppIconButton';
+import { useDispatch } from 'react-redux';
+import { logout } from '../store/slices/authSlice';
 
 // ─── Pure SVG Icons ────────────────────────────────────────────────────────────
 
@@ -33,12 +35,20 @@ const AccountTab = () => {
   const isTablet = width >= 768;
   const hPad = Math.max(width * 0.04, 16);
   const avatarSize = Math.min(width * 0.16, 68);
-  const navigation = useNavigation(); 
+  const navigation = useNavigation<any>(); 
+  const dispatch = useDispatch();
 
   const handleBackPress = () => {
     if (navigation.canGoBack()) {
       navigation.goBack(); 
     }
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigation
+      .getParent()
+      ?.reset({ index: 0, routes: [{ name: 'Login' as never }] });
   };
 
   return (
@@ -78,7 +88,7 @@ const AccountTab = () => {
         ]}>
         
         {/* User Profile Info Header */}
-        <TouchableOpacity style={styles.profileHeaderCard} activeOpacity={0.8}>
+        <View style={styles.profileHeaderCard} >
           <View style={styles.profileLeft}>
             <View style={{ position: 'relative' }}>
               <Image
@@ -91,7 +101,7 @@ const AccountTab = () => {
                 ]}
               />
               <View style={styles.editBadge}>
-                <SvgXml xml={EDIT_PENCIL_SVG} width={9} height={9} />
+                <SvgXml xml={cameraicon} width={12} height={12} />
               </View>
             </View>
 
@@ -101,26 +111,31 @@ const AccountTab = () => {
             </View>
           </View>
 
-          <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-        </TouchableOpacity>
+        </View>
 
         {/* Section: My Orders Header */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionHeading}>My Orders</Text>
-          <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.viewAllBtn}
+            activeOpacity={0.7}
+            onPress={() => navigation.getParent()?.navigate('MyOrders' as never)}>
             <Text style={styles.viewAllText}>View All</Text>
             <SvgXml xml={CHEVRON_RIGHT_PINK_SVG} width={12} height={12} />
           </TouchableOpacity>
         </View>
 
         {/* Track Orders Sub-Card */}
-        <TouchableOpacity style={styles.trackOrderCard} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.trackOrderCard}
+          activeOpacity={0.8}
+          onPress={() => navigation.getParent()?.navigate('MyOrders' as never)}>
           <View style={styles.optionRowLeft}>
             <View style={styles.iconBoxPink}>
               <SvgXml xml={BOX_ICON_SVG} width={18} height={18} />
             </View>
             <View>
-              <Text style={styles.optionTitle}>Track your orders</Text>
+              <Text style={styles.optionTitle}>My Orders</Text>
               <Text style={styles.optionSubtitle}>View delivery status & history</Text>
             </View>
           </View>
@@ -221,7 +236,10 @@ const AccountTab = () => {
 
         {/* Section: Support & Logout Block */}
         <View style={[styles.groupedCard, { marginBottom: 30 }]}>
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.optionItem}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('HelpSupport')}>
             <View style={styles.optionRowLeft}>
               <View style={styles.iconBoxPink}>
                 <SvgXml xml={HELP_QUESTION_SVG} width={18} height={18} />
@@ -241,7 +259,10 @@ const AccountTab = () => {
             <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.optionItem, { borderBottomWidth: 0 }]} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={[styles.optionItem, { borderBottomWidth: 0 }]}
+            activeOpacity={0.7}
+            onPress={handleLogout}>
             <View style={styles.optionRowLeft}>
               <View style={styles.iconBoxPink}>
                 <SvgXml xml={LOGOUT_ICON_SVG} width={18} height={18} />
@@ -266,7 +287,7 @@ const createStyles = (theme: AppTheme) => {
   return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.backgroundColor,
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',
@@ -328,6 +349,7 @@ const createStyles = (theme: AppTheme) => {
  
   scrollContent: {
     paddingTop: 8,
+    backgroundColor:colors.backgroundColor,
   },
 
   /* Top User Banner */
@@ -335,22 +357,25 @@ const createStyles = (theme: AppTheme) => {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderRadius:15,
     paddingVertical: 12,
     marginBottom: 16,
+    backgroundColor:'#B12B5B'
   },
   profileLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 20,
   },
   avatarImg: {
     backgroundColor: colors.surfaceVariant,
+    left:10
   },
   editBadge: {
     position: 'absolute',
     bottom: 0,
-    right: 0,
-    backgroundColor: colors.primary,
+    right: -15,
+    backgroundColor: colors.surface,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -365,11 +390,11 @@ const createStyles = (theme: AppTheme) => {
   userNameText: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text,
+    color: colors.surface,
   },
   userEmailText: {
     fontSize: 12,
-    color: colors.textMuted,
+    color: colors.surface,
   },
 
   /* My Orders Row */
@@ -431,7 +456,7 @@ const createStyles = (theme: AppTheme) => {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: "#FADFE8",
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -25,6 +25,7 @@ export function buildTheme(
     logoUrl: config.logoUrl,
     mode,
     api: config.api,
+    support: config.support,
   };
 }
 

@@ -683,13 +683,13 @@ const HomeTab = () => {
         navigation.navigate('WishlistTab');
         break;
       case 'My Orders':
-        navigation.navigate('CartScreen');
+        navigation.navigate('MyOrders');
         break;
       case 'Account':
         navigation.navigate('AccountTab');
         break;
       case 'Help & Support':
-        // Help & Support page is not built yet. Nothing to do for now.
+        navigation.navigate('HelpSupport');
         break;
       default:
         // Product categories (Home, Clothing, Shoes, Accessories, Toys...)

@@ -26,6 +26,8 @@ import {
 import { editPencilIcon, lockGreenIcon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import { useDispatch } from 'react-redux';
+import { login } from '../store/slices/authSlice';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 
@@ -35,6 +37,7 @@ const RESEND_SECONDS = 45;
 const OtpVarify = ({ navigation, route }: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const dispatch = useDispatch();
   const { width, height } = useWindowDimensions();
 
   // ─── Responsive scale helpers ───────────────────────────────────────────────
@@ -112,6 +115,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
       Alert.alert('Incomplete OTP', 'Please enter the complete 6-digit code.');
       return;
     }
+    dispatch(login({ email: emailAddress }));
     navigation.replace('Home');
   };
 

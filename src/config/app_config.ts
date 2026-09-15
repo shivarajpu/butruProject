@@ -36,9 +36,13 @@ const APP_CONFIG: AppConfig = {
   colors: {
     light: {
       // Core brand
-      primary: '#C0185A',
+      primary: '#B12B5B',
       primaryLight: '#FCE8F0',
       secondary: '#FF6B35',
+      hrsbacroundc:"#F8FAFC",
+      hiconbackround :"#FBCFE8B2",
+      hisemibackound:"#FFF9FC",
+      helptextprcolor:"#64748B",
 
       // Surfaces
       background: '#FEDDE5',
@@ -86,6 +90,7 @@ const APP_CONFIG: AppConfig = {
       backgroundColor: '#0D0D0D', // alias — backward compat for unmigrated screens
       surface: '#1C1C1E',
       surfaceVariant: '#2C2C2E',
+      coupanBackroun: '#3A0F22',
 
       // Text
       text: '#F2F2F7',
@@ -123,6 +128,17 @@ const APP_CONFIG: AppConfig = {
     storeSlug: 'butru-store',
     storeDomain: 'butru.in',
     storeId: '6a20248bf77d663ca797ce90',
+  },
+
+  // ── Support / Help & Support ─────────────────────────────────────────────────
+  support: {
+    phone: '8128013130',
+    email: 'hellobutru@gmail.com',
+    responseTime: '2-4 HRS',
+    companyName: 'BUTRU',
+    address: 'J-811/9F, STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308',
+    mapQuery: 'STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308',
+    supportEndpoint: '/api/support', // POST { name, email, message }
   },
 };
 

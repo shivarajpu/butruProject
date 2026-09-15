@@ -10,7 +10,10 @@ export interface ColorPalette {
   primary: string;
   primaryLight: string;
   secondary: string;
-
+  hrsbacroundc:string,
+  hiconbackround:string,
+  hisemibackound:string,
+  helptextprcolor:string
   // Surfaces
   background: string;
   /** @alias background — kept for backward compat with pre-migration screens */
@@ -64,6 +67,18 @@ export interface ApiConfig {
   storeId: string;
 }
 
+// ── Support / Help & Support Config ───────────────────────────────────────────
+
+export interface SupportConfig {
+  phone: string;
+  email: string;
+  responseTime: string;
+  companyName: string;
+  address: string;
+  mapQuery: string;
+  supportEndpoint?: string;
+}
+
 // ── App Config (shape of app_config.ts) ──────────────────────────────────────
 
 export type ColorMode = 'light' | 'dark' | 'system';
@@ -78,6 +93,7 @@ export interface AppConfig {
     dark: ColorPalette;
   };
   api: ApiConfig;
+  support: SupportConfig;
 }
 
 // ── Resolved App Theme (what components actually use) ─────────────────────────
@@ -89,4 +105,5 @@ export interface AppTheme {
   logoUrl: string | null;
   mode: 'light' | 'dark';
   api: ApiConfig;
+  support: SupportConfig;
 }
