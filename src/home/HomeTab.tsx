@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,8 +33,8 @@ SEARCH_SVG,
   BOX_ICON_SVG,
 } from '../assets/svg';
 import BagIconButton from '../components/BagIconButton';
-import { useNavigation } from '@react-navigation/native';
-import type { CompositeNavigationProp } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
+import type { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
@@ -68,22 +68,34 @@ const COLLECTIONS = [
   },
 ];
 
-const BANNER_SLIDES = [
-  {
-    id: '1',
-    offerText: 'STARTING @ ₹99',
-    image: 'https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?auto=format&fit=crop&q=80&w=1000',
-  },
-  {
-    id: '2',
-    offerText: 'FLAT 50% OFF',
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&q=80&w=1000',
-  },
-];
+const BANNERS_ENDPOINT = '/api/storefront/banners?placement=home_hero';
+
+interface Banner {
+  id: string;
+  image: string;
+}
+
+interface ApiBanner {
+  _id: string;
+  imageUrl: string;
+}
+
+interface BannersResponse {
+  success: boolean;
+  count: number;
+  data: ApiBanner[];
+}
+
+const mapApiBanner = (item: ApiBanner): Banner => ({
+  id: item._id,
+  image: item.imageUrl,
+});
 
 // ─── Product Types & API Config ───────────────────────────────────────────────
 
 const PRODUCTS_ENDPOINT = '/api/storefront/products';
+const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
+const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 
 /** Singleton product shape consumed by the ProductCard UI. */
 interface Product {
@@ -125,6 +137,28 @@ interface ProductsApiResponse {
   page: number;
   pages: number;
   data: ApiProduct[];
+}
+
+interface WishlishProduct {
+  id: string;
+  name: string;
+  price?: number;
+  images?: string[];
+}
+
+interface WishlistItem {
+  productId: string;
+  product: WishlishProduct;
+}
+
+interface WishlistData {
+  items: WishlistItem[];
+  count: number;
+}
+
+interface WishlistResponse {
+  success: boolean;
+  data: WishlistData;
 }
 
 /** Maps API product -> Product shape used by the product grid UI. */
@@ -244,21 +278,6 @@ const createStyles = (theme: AppTheme) => {
       width: '100%',
       justifyContent: 'flex-end',
       overflow: 'hidden',
-    },
-    bannerOverlay: {
-      padding: 12,
-      alignItems: 'center',
-    },
-    offerBadge: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 16,
-      paddingVertical: 6,
-      borderRadius: 6,
-    },
-    offerText: {
-      color: colors.textOnPrimary,
-      fontWeight: '800',
-      fontSize: 15,
     },
     dotsRow: {
       flexDirection: 'row',
@@ -520,32 +539,49 @@ const StarRating = ({ rating }: { rating: number }) => {
 
 // ─── BannerSlider Component ────────────────────────────────────────────────────
 
-const BannerSlider = ({ screenWidth }: { screenWidth: number }) => {
+const BannerSlider = ({
+  slides,
+  screenWidth,
+}: {
+  slides: Banner[];
+  screenWidth: number;
+}) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const [active, setActive] = useState(0);
   const bannerHeight = Math.min(screenWidth * 0.48, 220);
 
+  useEffect(() => {
+    if (slides.length < 2) return;
+
+    const interval = setInterval(() => {
+      setActive(prev => (prev + 1) % slides.length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [slides.length]);
+
+  if (slides.length === 0) {
+    return null;
+  }
+
   return (
     <View style={{ marginHorizontal: screenWidth * 0.04, marginBottom: 16 }}>
       <ImageBackground
-        source={{ uri: BANNER_SLIDES[active].image }}
+        source={{ uri: slides[Math.min(active, slides.length - 1)].image }}
         style={[styles.bannerCard, { height: bannerHeight }]}
-        imageStyle={{ borderRadius: 16 }}>
-        <View style={styles.bannerOverlay}>
-          <View style={styles.offerBadge}>
-            <Text style={styles.offerText}>{BANNER_SLIDES[active].offerText}</Text>
-          </View>
-        </View>
-      </ImageBackground>
+        imageStyle={{ borderRadius: 16 }}
+      />
 
-      <View style={styles.dotsRow}>
-        {BANNER_SLIDES.map((_, i) => (
-          <TouchableOpacity key={i} onPress={() => setActive(i)}>
-            <View style={[styles.dot, i === active && styles.activeDot]} />
-          </TouchableOpacity>
-        ))}
-      </View>
+      {slides.length > 1 && (
+        <View style={styles.dotsRow}>
+          {slides.map((_, i) => (
+            <TouchableOpacity key={i} onPress={() => setActive(i)}>
+              <View style={[styles.dot, i === active && styles.activeDot]} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </View>
   );
 };
@@ -556,20 +592,39 @@ const ProductCard = ({
   item,
   cardWidth,
   onAddToCart,
+  liked,
+  onToggleWishlist,
 }: {
   item: Product;
   cardWidth: number;
   onAddToCart: () => void;
+  liked: boolean;
+  onToggleWishlist: () => void;
 }) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const [isLiked, setIsLiked] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const imgHeight = cardWidth * 1.15;
 
+  const handleLikePress = async () => {
+    if (wishlistLoading) return;
+    setWishlistLoading(true);
+    try {
+      await onToggleWishlist();
+    } catch {
+      // no-op — parent handles optimistic update
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
   return (
     <View style={[styles.productCard, { width: cardWidth }]}>
-      <View style={{ position: 'relative' }}>
+      <TouchableOpacity
+        style={{ position: 'relative' }}
+        activeOpacity={0.8}
+        onPress={onAddToCart}>
         <ImageBackground
           source={{ uri: item.image }}
           style={[styles.productImgArea, { height: imgHeight }]}
@@ -580,26 +635,28 @@ const ProductCard = ({
           <TouchableOpacity
             style={styles.heartBtn}
             activeOpacity={0.7}
-            onPress={() => setIsLiked(!isLiked)}>
-            <SvgXml xml={isLiked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={16} height={16} />
+            onPress={handleLikePress}>
+            <SvgXml xml={liked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={16} height={16} />
           </TouchableOpacity>
         </ImageBackground>
-      </View>
+      </TouchableOpacity>
 
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>₹ {item.price}</Text>
-          <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-          <Text style={styles.discountText}>{item.discount}% OFF</Text>
+      <TouchableOpacity onPress={onAddToCart} activeOpacity={0.8}>
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>₹ {item.price}</Text>
+            <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
+            <Text style={styles.discountText}>{item.discount}% OFF</Text>
+          </View>
+          <View style={styles.ratingRow}>
+            <StarRating rating={item.rating} />
+            <Text style={styles.reviewCount}>({item.reviews})</Text>
+          </View>
         </View>
-        <View style={styles.ratingRow}>
-          <StarRating rating={item.rating} />
-          <Text style={styles.reviewCount}>({item.reviews})</Text>
-        </View>
-      </View>
+      </TouchableOpacity>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
         <View style={styles.sizeContainer}>
@@ -637,19 +694,29 @@ const HomeTab = () => {
   const styles = createStyles(theme);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<HomeTabNavigation>();
+  const route = useRoute<RouteProp<TabParamList, 'HomeTab'>>();
   const isTablet = width >= 768;
   const hPad = width * 0.04;
   const logoWidth = Math.min(width * 0.22, 90);
   const logoHeight = logoWidth * 0.4;
   const collectionCardW = Math.min(width * 0.3, 120);
   const productCardW = (width - hPad * 2 - 12) / 2;
+
+  const filteredProducts = searchQuery.trim()
+    ? products.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      )
+    : products;
 
   const fetchProducts = async (category: string) => {
     setLoading(true);
@@ -674,9 +741,74 @@ const HomeTab = () => {
     }
   };
 
+  const fetchBanners = async () => {
+    try {
+      const response = await apiService.get<BannersResponse>(BANNERS_ENDPOINT);
+      if (response.success) {
+        setBanners((response.data ?? []).map(mapApiBanner));
+      }
+    } catch {
+      // non-fatal — banner slider simply stays hidden
+    }
+  };
+
   useEffect(() => {
     fetchProducts(activeCategory);
+    fetchBanners();
   }, [activeCategory]);
+
+  // Category selected from CategoryTab — apply it like the menu drawer does.
+  useEffect(() => {
+    if (route.params?.category) {
+      setActiveCategory(route.params.category);
+    }
+  }, [route.params?.category]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWishlistItems();
+    }, []),
+  );
+
+  const fetchWishlistItems = async () => {
+    try {
+      const response = await apiService.get<WishlistResponse>(WISHLIST_ENDPOINT);
+      if (response.success) {
+        const ids = (response.data?.items ?? [])
+          .map(i => i.product?.id ?? i.productId)
+          .filter(Boolean);
+        setWishlistIds(new Set(ids));
+      }
+    } catch {
+      // non-fatal — hearts default to unliked
+    }
+  };
+
+  const handleToggleWishlist = async (productId: string) => {
+    const isCurrentlyLiked = wishlistIds.has(productId);
+
+    // Optimistic UI update
+    setWishlistIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyLiked) next.delete(productId); else next.add(productId);
+      return next;
+    });
+
+    try {
+      if (isCurrentlyLiked) {
+        await apiService.delete(`${WISHLIST_ITEMS_ENDPOINT}/${productId}`);
+      } else {
+        await apiService.post(WISHLIST_ITEMS_ENDPOINT, { productId });
+      }
+    } catch {
+      // Revert optimistic update on failure
+      setWishlistIds(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyLiked) next.add(productId); else next.delete(productId);
+        return next;
+      });
+    }
+  };
 
   const handleMenuItemSelect = (name: string) => {
     switch (name) {
@@ -752,10 +884,12 @@ const HomeTab = () => {
           leftIcon={<SvgXml xml={SEARCH_SVG} width={18} height={18} />}
           style={styles.searchInput}
           placeholder="Search for styles, clothes & more"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
 
         {/* Top Banner Slider */}
-        <BannerSlider screenWidth={width} />
+        <BannerSlider slides={banners} screenWidth={width} />
 
         {/* Horizontal Collections */}
         <ScrollView
@@ -824,14 +958,27 @@ const HomeTab = () => {
                   }" right now. Try another category.`}
             </Text>
           </View>
+        ) : filteredProducts.length === 0 ? (
+          <View style={styles.centerBox}>
+            <View style={styles.emptyIcon}>
+              <SvgXml xml={SEARCH_SVG} width={28} height={28} />
+            </View>
+            <Text style={styles.emptyTitle}>No results found</Text>
+            <Text style={styles.emptyMessage}>
+              We couldn't find anything matching "{searchQuery.trim()}". Try a
+              different keyword.
+            </Text>
+          </View>
         ) : (
           <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
-            {products.map(item => (
+            {filteredProducts.map(item => (
               <ProductCard
                 key={item.id}
                 item={item}
                 cardWidth={productCardW}
                 onAddToCart={() => handleProductPress(item)}
+                liked={wishlistIds.has(item.id)}
+                onToggleWishlist={() => handleToggleWishlist(item.id)}
               />
             ))}
           </View>

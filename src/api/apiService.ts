@@ -1,6 +1,7 @@
 import { BASE_URL } from '@env';
 import { navigationRef } from '../navigation/rootNavigation';
 import APP_CONFIG from '../config/app_config';
+import { store } from '../store';
 
 type RequestHeaders = Record<string, string>;
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -42,6 +43,11 @@ const getHeaders = (token?: string, isFormData = false): RequestHeaders => {
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  } else {
+    const storedToken = store.getState().auth.token;
+    if (storedToken) {
+      headers.Authorization = `Bearer ${storedToken}`;
+    }
   }
 
   return headers;
@@ -55,11 +61,16 @@ export const getFullUrl = (endpoint: string): string => {
 };
 
 const getErrorMessage = (data: unknown, status: number): string => {
+  if (typeof data === 'string' && data.trim()) {
+    return data;
+  }
+
   if (
     typeof data === 'object' &&
     data !== null &&
     'message' in data &&
-    typeof data.message === 'string'
+    typeof data.message === 'string' &&
+    data.message.trim()
   ) {
     return data.message;
   }
@@ -68,13 +79,17 @@ const getErrorMessage = (data: unknown, status: number): string => {
 };
 
 const parseResponse = async <T>(response: Response): Promise<T> => {
+  if (response.status === 204) {
+    return {} as T;
+  }
+
   const contentType = response.headers.get('content-type') || '';
   const data = contentType.includes('application/json')
     ? await response.json()
     : await response.text();
 
-  if (!response.ok && typeof data === 'string') {
-    throw new Error(`Request failed with status ${response.status}`);
+  if (!response.ok) {
+    throw new Error(getErrorMessage(data, response.status));
   }
 
   return data as T;
@@ -83,24 +98,69 @@ const parseResponse = async <T>(response: Response): Promise<T> => {
 const request = async <T>(
   endpoint: string,
   options: RequestOptions,
-): Promise<T> => {
+): Promise<{ status: number; data: T }> => {
   const response = await fetch(getFullUrl(endpoint), options);
 
   if (response.status === 401) {
     handleUnauthorized();
   }
 
-  return parseResponse<T>(response);
+  const data = await parseResponse<T>(response);
+
+  return { status: response.status, data };
 };
+
+const unwrap = async <T>(
+  result: Promise<{ status: number; data: T }>,
+): Promise<T> => (await result).data;
 
 export const apiService = {
   get: <T = unknown>(endpoint: string, token?: string) =>
-    request<T>(endpoint, {
-      method: 'GET',
-      headers: getHeaders(token),
-    }),
+    unwrap<T>(
+      request<T>(endpoint, {
+        method: 'GET',
+        headers: getHeaders(token),
+      }),
+    ),
 
   post: <T = unknown>(
+    endpoint: string,
+    body: unknown,
+    token?: string,
+    isFormData = false,
+  ) =>
+    unwrap<T>(
+      request<T>(endpoint, {
+        method: 'POST',
+        headers: getHeaders(token, isFormData),
+        body: isFormData ? (body as FormData) : JSON.stringify(body),
+      }),
+    ),
+
+  update: <T = unknown>(
+    endpoint: string,
+    body: unknown,
+    token?: string,
+    method: 'PUT' | 'PATCH' = 'PUT',
+  ) =>
+    unwrap<T>(
+      request<T>(endpoint, {
+        method,
+        headers: getHeaders(token),
+        body: JSON.stringify(body),
+      }),
+    ),
+
+  delete: <T = unknown>(endpoint: string, token?: string) =>
+    unwrap<T>(
+      request<T>(endpoint, {
+        method: 'DELETE',
+        headers: getHeaders(token),
+      }),
+    ),
+
+  /** Status-aware POST — returns { status, data } for flows that need the HTTP status (e.g. 204 No Content). */
+  postWithStatus: <T = unknown>(
     endpoint: string,
     body: unknown,
     token?: string,
@@ -110,23 +170,5 @@ export const apiService = {
       method: 'POST',
       headers: getHeaders(token, isFormData),
       body: isFormData ? (body as FormData) : JSON.stringify(body),
-    }),
-
-  update: <T = unknown>(
-    endpoint: string,
-    body: unknown,
-    token?: string,
-    method: 'PUT' | 'PATCH' = 'PUT',
-  ) =>
-    request<T>(endpoint, {
-      method,
-      headers: getHeaders(token),
-      body: JSON.stringify(body),
-    }),
-
-  delete: <T = unknown>(endpoint: string, token?: string) =>
-    request<T>(endpoint, {
-      method: 'DELETE',
-      headers: getHeaders(token),
     }),
 };

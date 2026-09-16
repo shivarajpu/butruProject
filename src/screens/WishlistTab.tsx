@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,11 @@ import {
   useWindowDimensions,
   Platform,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ARROW_BACK_ICON, CHEVRON_DOWN_SVG } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -20,68 +21,78 @@ import AppButton from '../components/AppButton';
 import AppCard from '../components/AppCard';
 import AppIconButton from '../components/AppIconButton';
 import BagIconButton from '../components/BagIconButton';
+import { apiService } from '../api/apiService';
 
 const LOCATION_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
 const HEART_PINK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
 
-const INITIAL_ITEMS = [
-  {
-    id: '1',
-    name: 'Boys Island Printed Shirt',
-    price: 1199,
-    originalPrice: 1599,
-    discount: 30,
-    rating: 5,
-    reviews: 53,
-    image: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?q=80&w=600&auto=format&fit=crop',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    tag: 'New Arrival',
-  },
-  {
-    id: '2',
-    name: 'Stylish Western Frock',
-    price: 299,
-    originalPrice: 588,
-    discount: 30,
-    rating: 5,
-    reviews: 53,
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?q=80&w=600&auto=format&fit=crop',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    tag: 'New Arrival',
-  },
-  {
-    id: '3',
-    name: 'Boys Island Printed Shirt',
-    price: 1199,
-    originalPrice: 1599,
-    discount: 30,
-    rating: 5,
-    reviews: 53,
-    image: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?q=80&w=600&auto=format&fit=crop',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    tag: 'New Arrival',
-  },
-  {
-    id: '4',
-    name: 'Stylish Western Frock',
-    price: 299,
-    originalPrice: 588,
-    discount: 30,
-    rating: 5,
-    reviews: 53,
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?q=80&w=600&auto=format&fit=crop',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y'],
-    tag: 'New Arrival',
-  },
-];
+const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
+
+interface WishlistProduct {
+  _id: string;
+  storeId: string;
+  name: string;
+  productCode?: string;
+  images?: string[];
+  isVisible?: boolean;
+  isOutOfStock?: boolean;
+  price?: number;
+  totalInventory?: number;
+  id: string;
+}
+
+interface WishlistItem {
+  productId: string;
+  addedAt: string;
+  product: WishlistProduct;
+}
+
+interface WishlistData {
+  items: WishlistItem[];
+  count: number;
+}
+
+interface WishlistResponse {
+  success: boolean;
+  data: WishlistData;
+}
+
+interface WishlistCardItem {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  discount?: number;
+  rating?: number;
+  reviews?: number;
+  image: string;
+  sizes: string[];
+  tag?: string;
+}
+
+const mapWishlistItem = (item: WishlistItem): WishlistCardItem => {
+  const product = item.product ?? ({} as WishlistProduct);
+  const price = product.price ?? 0;
+
+  return {
+    id: product.id ?? item.productId,
+    name: product.name ?? 'Product',
+    price,
+    originalPrice: price,
+    image: product.images?.[0] ?? '',
+    sizes: [],
+  };
+};
 
 const WishlistScreen = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
-  const [items, setItems] = useState(INITIAL_ITEMS);
-
   const navigation = useNavigation<any>();
+
+  const [items, setItems] = useState<WishlistCardItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const isTablet = width >= 768;
   const hPad = 16;
@@ -90,8 +101,39 @@ const WishlistScreen = () => {
   const cardW = (width - hPad * 2 - gap * (numCols - 1)) / numCols;
   const dynamicTopPadding = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
 
-  const removeItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+  const fetchWishlist = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await apiService.get<WishlistResponse>(WISHLIST_ENDPOINT);
+
+      if (!response.success) {
+        setItems([]);
+        return;
+      }
+
+      setItems((response.data?.items ?? []).map(mapWishlistItem));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWishlist();
+    }, [])
+  );
+
+  const removeItem = async (id: string) => {
+    try {
+      await apiService.delete(`/api/storefront/wishlist/items/${id}`);
+      setItems(prev => prev.filter(item => item.id !== id));
+    } catch {
+      // Leave item in list if server removal fails
+    }
   };
 
   const handleBackPress = () => {
@@ -139,9 +181,34 @@ const WishlistScreen = () => {
             paddingTop: 12,
             paddingBottom: 40,
           }}>
+          {loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator color={theme.colors.primary} size="large" />
+            </View>
+          ) : error ? (
+            <View style={styles.centerBox}>
+              <Text style={styles.emptyMessage}>{error}</Text>
+              <AppButton
+                style={styles.retryBtn}
+                textStyle={styles.retryBtnText}
+                size="sm"
+                label="Try Again"
+                onPress={fetchWishlist}
+              />
+            </View>
+          ) : items.length === 0 ? (
+            <View style={styles.centerBox}>
+              <Text style={styles.emptyTitle}>No items in your wishlist</Text>
+              <Text style={styles.emptyMessage}>
+                Tap the heart icon on any product to save it here.
+              </Text>
+            </View>
+          ) : (
           <View style={styles.grid}>
             {items.map(item => {
               const imgH = cardW * 1.05;
+              const hasOriginalPrice =
+                item.originalPrice != null && item.originalPrice > item.price;
 
               return (
                 <AppCard
@@ -150,19 +217,22 @@ const WishlistScreen = () => {
                   borderRadius={12}
                   style={[styles.wishCard, { width: cardW, marginBottom: gap }]}>
                   
-                  {/* Image Container (Non-clickable) */}
-                  <View style={{ position: 'relative' }}>
+                  {/* Image Container */}
+                  <TouchableOpacity
+                    style={{ position: 'relative' }}
+                    activeOpacity={0.8}
+                    onPress={() => handleAddToCart(item)}>
                     <Image
                       source={{ uri: item.image }}
                       style={{ width: '100%', height: imgH, borderRadius: 10 }}
                       resizeMode="cover"
                     />
 
-                    {item.tag && (
+                    {item.tag ? (
                       <View style={styles.tagBadge}>
                         <Text style={styles.tagText}>{item.tag}</Text>
                       </View>
-                    )}
+                    ) : null}
 
                     <TouchableOpacity
                       style={styles.heartBtn}
@@ -170,34 +240,43 @@ const WishlistScreen = () => {
                       activeOpacity={0.8}>
                       <SvgXml xml={HEART_PINK_SVG} width={16} height={16} />
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
 
-                  <View style={styles.cardDetails}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => handleAddToCart(item)}>
+                    <View style={styles.cardDetails}>
                     <Text style={styles.itemName} numberOfLines={1}>
                       {item.name}
                     </Text>
 
                     <View style={styles.priceRow}>
                       <Text style={styles.price}>₹{item.price}</Text>
-                      <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-                      <Text style={styles.discountText}>{item.discount}% OFF</Text>
+                      {hasOriginalPrice && (
+                        <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
+                      )}
+                      {hasOriginalPrice && item.discount ? (
+                        <Text style={styles.discountText}>{item.discount}% OFF</Text>
+                      ) : null}
                     </View>
 
-                    <View style={styles.ratingRow}>
-                      <Text style={styles.starText}>★★★★★</Text>
-                      <Text style={styles.reviewCount}>({item.reviews})</Text>
-                    </View>
+                    {item.rating != null && item.rating > 0 ? (
+                      <View style={styles.ratingRow}>
+                        <Text style={styles.starText}>★★★★★</Text>
+                        <Text style={styles.reviewCount}>({item.reviews})</Text>
+                      </View>
+                    ) : null}
 
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.sizeContainer}>
-                      {item.sizes.map((size, idx) => (
-                        <View key={idx} style={styles.sizeChip}>
-                          <Text style={styles.sizeText}>{size}</Text>
-                        </View>
-                      ))}
-                    </ScrollView>
+                    {item.sizes.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.sizeContainer}>
+                        {item.sizes.map((size, idx) => (
+                          <View key={idx} style={styles.sizeChip}>
+                            <Text style={styles.sizeText}>{size}</Text>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : null}
 
                     {/* Navigation only triggered here */}
                     <AppButton
@@ -207,11 +286,13 @@ const WishlistScreen = () => {
                       label="Add to Cart"
                       onPress={() => handleAddToCart(item)}
                     />
-                  </View>
+                    </View>
+                  </TouchableOpacity>
                 </AppCard>
               );
             })}
           </View>
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -391,6 +472,38 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textOnPrimary,
     fontSize: 12,
     fontFamily: fontFamily.bold,
+  },
+  centerBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    fontFamily: fontFamily.bold,
+    marginBottom: 6,
+  },
+  emptyMessage: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontFamily: fontFamily.regular,
+    lineHeight: 20,
+  },
+  retryBtn: {
+    marginTop: 18,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  retryBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   });
 };

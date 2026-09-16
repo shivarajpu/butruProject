@@ -30,8 +30,16 @@ import type { AppTheme } from '../theme/types';
 import AppInput from '../components/AppInput';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
+import { apiService } from '../api/apiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
+
+const SEND_OTP_ENDPOINT = '/api/auth/otp/send';
+
+interface OtpSendResponse {
+  success: boolean;
+  message?: string;
+}
 
 const OtpScreen = ({ navigation }: Props) => {
   const theme = useAppTheme();
@@ -42,6 +50,7 @@ const OtpScreen = ({ navigation }: Props) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   // Screen size categories for responsive layout
   const isTablet = width >= 768;
@@ -58,13 +67,37 @@ const OtpScreen = ({ navigation }: Props) => {
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     const trimmed = phoneNumber.trim();
     if (!trimmed) {
       Alert.alert('Mobile Number Required', 'Please enter your mobile number.');
       return;
     }
-    navigation.navigate('OtpVarify', { phoneNumber: trimmed });
+
+    if (isSendingOtp) return;
+    setIsSendingOtp(true);
+
+    try {
+      const response = await apiService.post<OtpSendResponse>(
+        SEND_OTP_ENDPOINT,
+        { phone: trimmed },
+      );
+
+      if (!response.success) {
+        Alert.alert('Unable to Send OTP', response.message || 'Something went wrong.');
+        return;
+      }
+
+      setIsOtpSent(true);
+      navigation.navigate('OtpVarify', { phoneNumber: trimmed });
+    } catch (error) {
+      Alert.alert(
+        'Unable to Send OTP',
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
   const handleVerifyOtp = () => {
@@ -72,7 +105,7 @@ const OtpScreen = ({ navigation }: Props) => {
       Alert.alert('OTP Required', 'Please enter the verification code.');
       return;
     }
-    dispatch(login({ phone: phoneNumber.trim() }));
+    dispatch(login({ user: { phone: phoneNumber.trim() } }));
     navigation.replace('Home');
   };
 
@@ -174,11 +207,14 @@ const OtpScreen = ({ navigation }: Props) => {
 
                 {/* Send OTP Button */}
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, isSendingOtp && styles.submitButtonDisabled]}
                   onPress={handleSendOtp}
                   activeOpacity={0.8}
+                  disabled={isSendingOtp}
                 >
-                  <Text style={styles.submitButtonText}>Send OTP</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isSendingOtp ? 'Sending OTP...' : 'Send OTP'}
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -424,6 +460,9 @@ const createStyles = (theme: AppTheme) => {
     shadowOpacity: 0.2,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonText: {
     color: colors.textOnPrimary,

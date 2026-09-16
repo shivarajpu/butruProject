@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { TabParamList } from '../navigation/types';
 
 // Theme Imports
 import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import type { AppTheme } from '../theme/types';
+import { apiService } from '../api/apiService';
 
 // Asset Imports
 import { ARROW_BACK_ICON } from '../assets/svg';
@@ -34,33 +37,20 @@ const getArrowRightSvg = (color: string) =>
 const getHeartSvg = (color: string) => 
   `<svg width="14" height="14" viewBox="0 0 24 24" fill="${color}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
 
-// Mock Categories
-const CATEGORIES = [
-  {
-    id: '1',
-    title: 'Clothing',
-    subtitle: 'Trendy outfits\nfor every\noccasion',
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '2',
-    title: 'Shoes',
-    subtitle: 'Stylish & comfy\nfootwear for\nlittle steps',
-    image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '3',
-    title: 'Accessories',
-    subtitle: 'Complete\ntheir look with\ncute essentials',
-    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=600&auto=format&fit=crop',
-  },
-  {
-    id: '4',
-    title: 'Toys',
-    subtitle: 'Fun, learning &\nplaytime\nfavorites',
-    image: 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?q=80&w=600&auto=format&fit=crop',
-  },
-];
+// Categories API
+const CATEGORIES_ENDPOINT = '/api/storefront/categories';
+
+interface ApiCategory {
+  name: string;
+  slug: string;
+  productCount: number;
+  image: string;
+}
+
+interface CategoriesResponse {
+  success: boolean;
+  data: ApiCategory[];
+}
 
 const createStyles = (theme: AppTheme) => {
   const { colors, fontFamily } = theme;
@@ -188,6 +178,12 @@ const createStyles = (theme: AppTheme) => {
       right: 0,
       bottom: 0,
     },
+    loadingText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontFamily: fontFamily.regular,
+      paddingVertical: 20,
+    },
 
     /* Promo Banner */
     promoBanner: {
@@ -295,6 +291,10 @@ const CategoryTab = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
 
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -304,13 +304,37 @@ const CategoryTab = () => {
   const cardW = (width - hPad * 2 - gap * (numCols - 1)) / numCols;
   const dynamicTopPadding = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
   
-  const navigation = useNavigation();
+  const navigation = useNavigation<BottomTabNavigationProp<TabParamList, 'CategoryTab'>>();
+
+  const handleCategoryPress = (name: string) => {
+    navigation.navigate('HomeTab', { category: name });
+  };
+
+  const filteredCategories = searchQuery.trim()
+    ? categories.filter(cat =>
+        cat.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      )
+    : categories;
 
   const handleBackPress = () => {
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
   };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await apiService.get<CategoriesResponse>(CATEGORIES_ENDPOINT);
+        if (response.success) {
+          setCategories(response.data ?? []);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -336,31 +360,46 @@ const CategoryTab = () => {
             inputContainerStyle={styles.searchBox}
             leftIcon={<SvgXml xml={getSearchIconSvg(theme.colors.textMuted)} width={18} height={18} />}
             style={styles.searchInput}
-            placeholder="Search for styles, clothes & more"
+            placeholder="Search for categories"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
 
           {/* Category Cards Grid */}
           <View style={[styles.grid, { paddingHorizontal: hPad }]}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.categoryCard, { width: cardW, marginBottom: gap }]}
-                activeOpacity={0.9}>
+            {loading ? (
+              <Text style={styles.loadingText}>Loading categories...</Text>
+            ) : filteredCategories.length === 0 ? (
+              <Text style={styles.loadingText}>No categories found</Text>
+            ) : (
+              filteredCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.slug}
+                  style={[styles.categoryCard, { width: cardW, marginBottom: gap }]}
+                  activeOpacity={0.9}
+                  onPress={() => handleCategoryPress(cat.name)}>
 
-                {/* Left Info Column */}
-                <View style={styles.cardInfo}>
-                  <Text style={styles.catTitle}>{cat.title}</Text>
-                  <Text style={styles.catSubtitle}>{cat.subtitle}</Text>
+                  {/* Left Info Column */}
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.catTitle}>{cat.name}</Text>
+                    <Text style={styles.catSubtitle}>
+                      {cat.productCount > 0
+                        ? `${cat.productCount} product${cat.productCount === 1 ? '' : 's'}`
+                        : 'No products yet'}
+                    </Text>
 
-                  <View style={styles.arrowCircle}>
-                    <SvgXml xml={getArrowRightSvg(theme.colors.textOnPrimary)} width={12} height={12} />
+                    <View style={styles.arrowCircle}>
+                      <SvgXml xml={getArrowRightSvg(theme.colors.textOnPrimary)} width={12} height={12} />
+                    </View>
                   </View>
-                </View>
 
-                {/* Right Image */}
-                <Image source={{ uri: cat.image }} style={styles.cardImage} resizeMode="contain" />
-              </TouchableOpacity>
-            ))}
+                  {/* Right Image */}
+                  {cat.image ? (
+                    <Image source={{ uri: cat.image }} style={styles.cardImage} resizeMode="contain" />
+                  ) : null}
+                </TouchableOpacity>
+              ))
+            )}
           </View>
 
           {/* New Arrivals Promo Banner */}

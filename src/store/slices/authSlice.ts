@@ -17,16 +17,23 @@ interface AuthUser {
   phone?: string;
 }
 
+interface LoginPayload {
+  user: AuthUser;
+  token?: string;
+}
+
 interface AuthState {
   isLoggedIn: boolean;
   isHydrated: boolean;
   user: AuthUser | null;
+  token?: string;
 }
 
 const initialState: AuthState = {
   isLoggedIn: false,
   isHydrated: false,
   user: null,
+  token: undefined,
 };
 
 export const loadAuthState = async (): Promise<AuthState> => {
@@ -61,19 +68,22 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    login(state, action: PayloadAction<AuthUser>) {
+    login(state, action: PayloadAction<LoginPayload>) {
       state.isLoggedIn = true;
-      state.user = action.payload;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
       persistAuthState(state);
     },
     logout(state) {
       state.isLoggedIn = false;
       state.user = null;
+      state.token = undefined;
       clearAuthState();
     },
     hydrate(state, action: PayloadAction<AuthState>) {
       state.isLoggedIn = action.payload.isLoggedIn;
       state.user = action.payload.user;
+      state.token = action.payload.token;
       state.isHydrated = true;
     },
   },

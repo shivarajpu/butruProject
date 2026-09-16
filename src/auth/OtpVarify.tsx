@@ -28,11 +28,18 @@ import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
+import { apiService } from '../api/apiService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 45;
+const VERIFY_OTP_ENDPOINT = '/api/auth/otp/email/verify';
+
+interface OtpVerifyResponse {
+  success: boolean;
+  message?: string;
+}
 
 const OtpVarify = ({ navigation, route }: Props) => {
   const theme = useAppTheme();
@@ -109,14 +116,35 @@ const OtpVarify = ({ navigation, route }: Props) => {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const code = otp.join('');
     if (code.length < OTP_LENGTH) {
       Alert.alert('Incomplete OTP', 'Please enter the complete 6-digit code.');
       return;
     }
-    dispatch(login({ email: emailAddress }));
-    navigation.replace('Home');
+
+    try {
+      const response = await apiService.post<OtpVerifyResponse>(
+        VERIFY_OTP_ENDPOINT,
+        {
+          email: emailAddress,
+          otp: code,
+        },
+      );
+
+      if (!response.success) {
+        Alert.alert('Verification Failed', response.message || 'Invalid OTP.');
+        return;
+      }
+
+      dispatch(login({ user: { email: emailAddress } }));
+      navigation.replace('Home');
+    } catch (error) {
+      Alert.alert(
+        'Verification Failed',
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      );
+    }
   };
 
   // Timer label: "00:45"

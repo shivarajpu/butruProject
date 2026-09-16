@@ -19,6 +19,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
+import { useDispatch } from 'react-redux';
+import { login } from '../store/slices/authSlice';
 
 import {
   Butruname,
@@ -85,6 +87,7 @@ const getPasswordError = (value: string) =>
  */
 
 const LoginScreen = ({ navigation }: Props) => {
+  const dispatch = useDispatch();
   /**
    * Get theme exactly like HomeTab.
    */
@@ -182,10 +185,14 @@ const LoginScreen = ({ navigation }: Props) => {
         return;
       }
 
-      // Login successful -> OTP verification screen
-      navigation.navigate('OtpVarify', {
-        email: email.trim().toLowerCase(),
-      });
+      // Email login successful -> go straight to Home tab
+      dispatch(
+        login({
+          user: { email: email.trim().toLowerCase() },
+          token: response.token,
+        }),
+      );
+      navigation.replace('Home');
     } catch (error) {
       const message =
         error instanceof Error
