@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -27,7 +28,11 @@ import {
   CART_WHITE_SVG,
   ARROW_BACK_ICON,
 } from '../assets/svg';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useDispatch } from 'react-redux';
+import { apiService } from '../api/apiService';
+import { addItem as addCartItem } from '../store/slices/cartSlice';
+import type { AppDispatch } from '../store';
 
 // Custom SVGs
 const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.65685 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
@@ -70,53 +75,152 @@ const CITY_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="non
 </svg>
 `;
 
-const THUMBNAILS = [
-  'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?auto=format&fit=crop&q=80&w=600',
-  'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?auto=format&fit=crop&q=80&w=600',
-  'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&q=80&w=600',
-  'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&q=80&w=600',
-];
+const PRODUCT_ENDPOINT = '/api/storefront/products';
+const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
+const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
 
-const SIZES = ['3-4 Y', '4-5 Y', '5-6 Y', '6-7 Y', '7-8 Y', '8-9 Y', '9-10 Y'];
+interface ProductSku {
+  size: string;
+  skuCode: string;
+  sellingPrice: number;
+  mrp: number;
+  costPrice: number;
+  heightCm: number;
+  weightKg: number;
+  lengthCm: number;
+  breadthCm: number;
+  volumeCm3: number;
+  warehouse: string;
+  quantity: number;
+}
 
-const RELATED_PRODUCTS = [
-  {
-    id: '101',
-    name: 'Printed Summer Frock',
-    price: 349,
-    originalPrice: 699,
-    discount: 50,
-    rating: 4.6,
-    reviews: 42,
-    tag: 'Trending',
-    sizes: ['3-4 Y', '4-5 Y'],
-    image: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&q=80&w=500',
-  },
-  {
-    id: '102',
-    name: 'Casual Party Dress',
-    price: 499,
-    originalPrice: 899,
-    discount: 44,
-    rating: 4.8,
-    reviews: 88,
-    tag: 'Best Seller',
-    sizes: ['5-6 Y', '6-7 Y'],
-    image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&q=80&w=500',
-  },
-  {
-    id: '103',
-    name: 'Cotton Floral Dress',
-    price: 279,
-    originalPrice: 599,
-    discount: 53,
-    rating: 4.3,
-    reviews: 29,
-    tag: 'New',
-    sizes: ['3-4 Y', '4-5 Y', '5-6 Y'],
-    image: 'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?auto=format&fit=crop&q=80&w=500',
-  },
-];
+interface ProductAttribute {
+  attribute: string;
+  value: string;
+  _id: string;
+}
+
+interface ApiProductDetail {
+  _id: string;
+  name: string;
+  price: number;
+  rating: number;
+  reviewCount: number;
+  images: string[];
+  videos: string[];
+  description: string;
+  tag: string;
+  tags: string[];
+  color: string;
+  sku: string;
+  skus: ProductSku[];
+  attributes: ProductAttribute[];
+  returnExchangeCondition: string;
+  categoryPath: string[];
+  totalInventory: number;
+  isOutOfStock: boolean;
+  isNewArrival: boolean;
+  isPopular: boolean;
+  isDealOfTheDay: boolean;
+  sizeType: string;
+  sizeChartUrl: string;
+}
+
+interface ProductDetailApiResponse {
+  success: boolean;
+  data: ApiProductDetail;
+}
+
+interface ProductListApiResponse {
+  success: boolean;
+  count: number;
+  total: number;
+  data: ApiProductDetail[];
+}
+
+interface ProductVariant {
+  _id: string;
+  id: string;
+  name: string;
+  productCode: string;
+  color: string;
+  price: number;
+  images: string[];
+  image: string;
+}
+
+interface ProductVariantsApiResponse {
+  success: boolean;
+  count: number;
+  groupId: string;
+  groupName: string;
+  data: ProductVariant[];
+}
+
+interface ProductVariantCardItem {
+  id: string;
+  name: string;
+  color: string;
+  price: number;
+  image: string;
+}
+
+const mapApiVariant = (item: ProductVariant): ProductVariantCardItem => ({
+  id: item._id || item.id,
+  name: item.name,
+  color: item.color,
+  price: item.price ?? 0,
+  image: item.images?.[0] || item.image || '',
+});
+
+interface WishlistProduct {
+  id: string;
+  name: string;
+}
+
+interface WishlistItem {
+  productId: string;
+  product?: WishlistProduct;
+}
+
+interface WishlistData {
+  items: WishlistItem[];
+  count: number;
+}
+
+interface WishlistResponse {
+  success: boolean;
+  data: WishlistData;
+}
+
+const mapApiProductToUI = (item: ApiProductDetail) => {
+  const sku = item.skus?.[0];
+  const sellingPrice = sku?.sellingPrice ?? item.price ?? 0;
+  const mrp = sku?.mrp ?? sellingPrice;
+  const discount = mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0;
+
+  return {
+    id: item._id,
+    name: item.name,
+    price: sellingPrice,
+    originalPrice: mrp,
+    discount,
+    rating: item.rating ?? 0,
+    reviews: item.reviewCount ?? 0,
+    tag: item.tag || (item.isNewArrival ? 'New Arrival' : item.isPopular ? 'Best Seller' : ''),
+    sizes: [...new Set((item.skus ?? []).map(s => s.size))],
+    images: item.images ?? [],
+    videos: item.videos ?? [],
+    description: item.description ?? '',
+    color: item.color ?? '',
+    attributes: item.attributes ?? [],
+    returnExchangeCondition: item.returnExchangeCondition ?? '',
+    categoryPath: item.categoryPath ?? [],
+    totalInventory: item.totalInventory ?? 0,
+    isOutOfStock: item.isOutOfStock ?? false,
+    sizeChartUrl: item.sizeChartUrl ?? '',
+  };
+};
 
 interface ProductDetailsProps {
   route?: {
@@ -127,10 +231,21 @@ interface ProductDetailsProps {
   navigation?: any;
 }
 
-const RelatedProductCard = ({ item, onSelect }: { item: any; onSelect: (prod: any) => void }) => {
+type UIProduct = ReturnType<typeof mapApiProductToUI>;
+
+const RelatedProductCard = ({
+  item,
+  liked,
+  onToggleLike,
+  onSelect,
+}: {
+  item: any;
+  liked: boolean;
+  onToggleLike: () => void;
+  onSelect: (prod: any) => void;
+}) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const [isLiked, setIsLiked] = useState(false);
 
   return (
     <View style={styles.relatedCard}>
@@ -146,8 +261,8 @@ const RelatedProductCard = ({ item, onSelect }: { item: any; onSelect: (prod: an
         <TouchableOpacity
           style={styles.heartBtn}
           activeOpacity={0.7}
-          onPress={() => setIsLiked(!isLiked)}>
-          <SvgXml xml={isLiked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={14} height={14} />
+          onPress={onToggleLike}>
+          <SvgXml xml={liked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={14} height={14} />
         </TouchableOpacity>
       </ImageBackground>
 
@@ -173,26 +288,205 @@ const RelatedProductCard = ({ item, onSelect }: { item: any; onSelect: (prod: an
 const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const product = route?.params?.product || {
-    name: 'Stylish Western Frock for Baby Girls',
-    price: 299,
-    originalPrice: 588,
-    discount: 30,
-    rating: 4.5,
-    reviews: 53,
-    image: THUMBNAILS[0],
-  };
+
+  const productId = route?.params?.product?.id || route?.params?.product?._id || '';
+
+  const [productData, setProductData] = useState<UIProduct | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [variants, setVariants] = useState<ProductVariantCardItem[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariantCardItem | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<(UIProduct & { image: string })[]>([]);
 
   const Navigation = useNavigation();
+  const dispatch = useDispatch<AppDispatch>();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const hPad = 16;
 
-  const [selectedImg, setSelectedImg] = useState(product.image || THUMBNAILS[0]);
-  const [selectedSize, setSelectedSize] = useState('3-4 Y');
+  const loadProduct = useCallback(async (id: string, showLoader = true) => {
+    if (!id) {
+      setError('Product not found');
+      setLoading(false);
+      return;
+    }
+    if (showLoader) {
+      setLoading(true);
+    }
+    setError('');
+    try {
+      const response = await apiService.get<ProductDetailApiResponse>(
+        `${PRODUCT_ENDPOINT}/${id}`,
+      );
+      console.log("it is the rsponse of api" , response)
+      if (response.success && response.data) {
+        setProductData(mapApiProductToUI(response.data));
+      } else {
+        setError('Product not found');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      if (showLoader) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  const fetchVariants = useCallback(async () => {
+    if (!productId) return;
+    try {
+      const response = await apiService.get<ProductVariantsApiResponse>(
+        `${PRODUCT_ENDPOINT}/${productId}/variants`,
+      );
+      if (response.success && Array.isArray(response.data)) {
+        const mapped = response.data.map(mapApiVariant).filter(v => v.image);
+        setVariants(mapped);
+        if (mapped.length > 0) {
+          const current = mapped.find(v => v.id === productId);
+          setSelectedVariant(current || mapped[0]);
+        }
+      }
+    } catch {
+      // Non-fatal — variant selector simply stays hidden on failure
+    }
+  }, [productId]);
+
+  const fetchRelatedProducts = useCallback(async () => {
+    try {
+      const response = await apiService.get<ProductListApiResponse>(
+        `${PRODUCT_ENDPOINT}?limit=4&isVisible=true`,
+      );
+      if (response.success && Array.isArray(response.data)) {
+        const mapped = response.data.slice(0, 4).map(p => {
+          const ui = mapApiProductToUI(p);
+          return { ...ui, image: ui.images?.[0] ?? '' };
+        });
+        setRelatedProducts(mapped);
+      }
+    } catch {
+      // Non-fatal — related products section simply stays empty on failure
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProduct(productId);
+    fetchVariants();
+    fetchRelatedProducts();
+  }, [productId, loadProduct, fetchVariants, fetchRelatedProducts]);
+
+  const product = productData;
+  const thumbnails = product?.images?.length ? product.images : [];
+  const sizes = product?.sizes?.length ? product.sizes : [];
+
+  const [selectedImg, setSelectedImg] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const [isLiked, setIsLiked] = useState(false);
+  const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
+  const [wishlistLoading, setWishlistLoading] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+
+  useEffect(() => {
+    const firstImage = productData?.images?.[0];
+    if (firstImage) {
+      setSelectedImg(firstImage);
+    }
+  }, [productData]);
+
+  useEffect(() => {
+    const firstSize = productData?.sizes?.[0];
+    if (firstSize) {
+      setSelectedSize(firstSize);
+    }
+  }, [productData]);
+
+  useEffect(() => {
+    setIsLiked(productData ? wishlistIds.has(productData.id) : false);
+  }, [productData, wishlistIds]);
+
+  const refreshWishlist = useCallback(async () => {
+    try {
+      const response = await apiService.get<WishlistResponse>(WISHLIST_ENDPOINT);
+      if (response.success) {
+        const ids = (response.data?.items ?? [])
+          .map(i => i.product?.id ?? i.productId)
+          .filter(Boolean);
+        setWishlistIds(new Set(ids));
+      }
+    } catch {
+      // Non-fatal — heart defaults to unliked
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshWishlist();
+    }, [refreshWishlist]),
+  );
+
+  const handleToggleWishlist = async (id?: string) => {
+    const currentId = id || productData?.id;
+    if (!currentId || wishlistLoading) return;
+
+    const isCurrentlyLiked = wishlistIds.has(currentId);
+    setWishlistLoading(true);
+
+    // Optimistic UI update
+    setWishlistIds(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyLiked) next.delete(currentId);
+      else next.add(currentId);
+      return next;
+    });
+
+    try {
+      if (isCurrentlyLiked) {
+        await apiService.delete(`${WISHLIST_ITEMS_ENDPOINT}/${currentId}`);
+      } else {
+        await apiService.post(WISHLIST_ITEMS_ENDPOINT, { productId: currentId });
+      }
+    } catch {
+      // Revert optimistic update on failure
+      setWishlistIds(prev => {
+        const next = new Set(prev);
+        if (isCurrentlyLiked) next.add(currentId);
+        else next.delete(currentId);
+        return next;
+      });
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  const handleSelectVariant = (variant: ProductVariantCardItem) => {
+    if (selectedVariant?.id === variant.id && productData?.id === variant.id) {
+      return;
+    }
+    setSelectedVariant(variant);
+    if (variant.image) {
+      setSelectedImg(variant.image);
+    }
+    if (variant.id !== productData?.id) {
+      loadProduct(variant.id, false);
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (!productData) return;
+    dispatch(
+      addCartItem({
+        productId: productData.id,
+        name: productData.name,
+        price: selectedVariant ? selectedVariant.price : productData.price,
+        originalPrice: productData.originalPrice,
+        image: selectedImg || productData.images?.[0] || '',
+        size: selectedSize || (productData.sizes?.[0] ?? ''),
+        color: selectedVariant?.color ?? productData.color ?? '',
+      }),
+    );
+    Navigation.navigate('CartScreen' as never);
+  };
 
   // Modals state
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
@@ -204,7 +498,10 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const heroHeight = width * 1.1;
 
   const handleSelectRelated = (item: any) => {
-    navigation?.push('ProductDetails', { product: item });
+    const relatedId = item?.id || item?._id;
+    if (relatedId && /^[a-fA-F0-9]{24}$/.test(relatedId)) {
+      navigation?.push('ProductDetails', { product: item });
+    }
   };
 
   const handleOpenAddAddress = () => {
@@ -213,6 +510,57 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       setIsAddAddressModalVisible(true);
     }, 250);
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.headerLeftGroup}>
+              <AppIconButton
+                style={styles.headerIconBtn}
+                icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                accessibilityLabel="Go back"
+                onPress={() => navigation?.goBack()}
+              />
+            </View>
+          </View>
+          <View style={[styles.centerBox, { flex: 1 }]}>
+            <ActivityIndicator color={theme.colors.primary} size="large" />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <View style={styles.headerLeftGroup}>
+              <AppIconButton
+                style={styles.headerIconBtn}
+                icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                accessibilityLabel="Go back"
+                onPress={() => navigation?.goBack()}
+              />
+            </View>
+          </View>
+          <View style={[styles.centerBox, { flex: 1 }]}>
+            <Text style={styles.errorTitle}>Oops!</Text>
+            <Text style={styles.errorMessage}>{error || 'Product not found'}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              activeOpacity={0.8}
+              onPress={() => loadProduct(productId)}>
+              <Text style={styles.retryBtnText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -256,34 +604,38 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Main Content */}
-          <Image source={{ uri: selectedImg }} style={[styles.heroImage, { height: heroHeight }]} />
+          <Image source={{ uri: selectedImg || thumbnails[0] }} style={[styles.heroImage, { height: heroHeight }]} />
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.thumbContainer}>
-            {THUMBNAILS.map((imgUrl, idx) => {
-              const isSelected = selectedImg === imgUrl;
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => setSelectedImg(imgUrl)}
-                  style={[styles.thumbBox, isSelected && styles.thumbBoxSelected]}>
-                  <Image source={{ uri: imgUrl }} style={styles.thumbImage} />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {thumbnails.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbContainer}>
+              {thumbnails.map((imgUrl, idx) => {
+                const isSelected = selectedImg === imgUrl;
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => setSelectedImg(imgUrl)}
+                    style={[styles.thumbBox, isSelected && styles.thumbBoxSelected]}>
+                    <Image source={{ uri: imgUrl }} style={styles.thumbImage} />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
 
           <View style={[styles.section, { paddingHorizontal: hPad }]}>
             <View style={styles.ratingHeartRow}>
               <View style={styles.ratingRow}>
                 {[1, 2, 3, 4, 5].map(s => (
-                  <SvgXml key={s} xml={STAR_FILLED_SVG} width={12} height={12} />
+                  <SvgXml key={s} xml={STAR_FILLED_SVG} width={12} height={12}
+                    style={s <= Math.round(product.rating) ? undefined : { opacity: 0.25 }}
+                  />
                 ))}
                 <Text style={styles.reviewText}>({product.reviews})</Text>
               </View>
-              <TouchableOpacity onPress={() => setIsLiked(!isLiked)} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => handleToggleWishlist()} activeOpacity={0.7}>
                 <SvgXml
                   xml={isLiked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG}
                   width={20}
@@ -294,30 +646,72 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
             <Text style={styles.titleText}>{product.name}</Text>
 
-            <Text style={styles.sectionLabel}>SELECT SIZE</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.sizeRow}>
-                {SIZES.map(sz => {
-                  const isSelected = selectedSize === sz;
-                  return (
-                    <TouchableOpacity
-                      key={sz}
-                      onPress={() => setSelectedSize(sz)}
-                      style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}>
-                      <Text style={[styles.sizeChipText, isSelected && styles.sizeChipTextSelected]}>
-                        {sz}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            {variants.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>SELECT COLOR</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.variantRow}>
+                    {variants.map(variant => {
+                      const isSelected = selectedVariant?.id === variant.id;
+                      return (
+                        <TouchableOpacity
+                          key={variant.id}
+                          onPress={() => handleSelectVariant(variant)}
+                          activeOpacity={0.8}
+                          style={[styles.variantChip, isSelected && styles.variantChipSelected]}>
+                          <View>
+                            <Image source={{ uri: variant.image }} style={styles.variantImage} />
+                            <View style={styles.variantPriceBadge}>
+                              <Text style={styles.variantPriceBadgeText}>Rs. {variant.price}</Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.variantName, isSelected && styles.variantNameSelected]} numberOfLines={1}>
+                            {variant.color || variant.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+
+           
+
+            {sizes.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>SELECT SIZE</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.sizeRow}>
+                    {sizes.map(sz => {
+                      const isSelected = selectedSize === sz;
+                      return (
+                        <TouchableOpacity
+                          key={sz}
+                          onPress={() => setSelectedSize(sz)}
+                          style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}>
+                          <Text style={[styles.sizeChipText, isSelected && styles.sizeChipTextSelected]}>
+                            {sz}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </>
+            )}
 
             <View style={styles.priceContainer}>
               <Text style={styles.currencySymbol}>Rs. </Text>
-              <Text style={styles.mainPrice}>{product.price}</Text>
-              <Text style={styles.mrpText}>MRP Rs. {product.originalPrice}</Text>
-              <Text style={styles.discountBadge}>{product.discount}% OFF</Text>
+              <Text style={styles.mainPrice}>
+                {selectedVariant ? selectedVariant.price : product.price}
+              </Text>
+              {product.originalPrice > (selectedVariant ? selectedVariant.price : product.price) && (
+                <>
+                  <Text style={styles.mrpText}>MRP Rs. {product.originalPrice}</Text>
+                  <Text style={styles.discountBadge}>{product.discount}% OFF</Text>
+                </>
+              )}
             </View>
             <Text style={styles.taxText}>MRP inclusive of all taxes</Text>
 
@@ -325,11 +719,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <TouchableOpacity
                 style={styles.buyNowBtn}
                 activeOpacity={0.8}
-                onPress={() => Navigation.navigate('CartScreen' as never)}>
+                onPress={handleAddToCart}>
                 <Text style={styles.buyNowBtnText}>Buy Now</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.8}
+                onPress={handleAddToCart}>
                 <SvgXml xml={CART_WHITE_SVG} width={14} height={14} />
                 <Text style={styles.addCartBtnText}>Add To Cart</Text>
               </TouchableOpacity>
@@ -352,10 +747,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               </Text>
             </View>
 
-            <View style={styles.deliveryFeatureRow}>
-              <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
-              <Text style={styles.deliveryFeatureText}>Return within 3 days</Text>
-            </View>
+            {product.returnExchangeCondition ? (
+              <View style={styles.deliveryFeatureRow}>
+                <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
+                <Text style={styles.deliveryFeatureText}>{product.returnExchangeCondition}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.deliveryFeatureRow}>
               <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
@@ -371,11 +768,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <Text style={styles.accordionTitle}>PRODUCT DETAILS</Text>
               <SvgXml xml={detailsOpen ? CHEVRON_UP_SVG : CHEVRON_DOWN_SVG} width={14} height={14} />
             </TouchableOpacity>
-            {detailsOpen && (
-              <Text style={styles.accordionContent}>
-                • Fabric: 100% Breathable Cotton{'\n'}• Pattern: Solid Top with Layered Skirt{'\n'}• Sleeve: Cap Sleeves{'\n'}• Wash Care: Gentle Machine Wash
-              </Text>
-            )}
+            {detailsOpen && product.description ? (
+              <Text style={styles.accordionContent}>{product.description}</Text>
+            ) : detailsOpen ? (
+              <Text style={styles.accordionContent}>No additional details available.</Text>
+            ) : null}
 
             <View style={styles.divider} />
 
@@ -386,9 +783,22 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <SvgXml xml={moreInfoOpen ? CHEVRON_UP_SVG : CHEVRON_DOWN_SVG} width={14} height={14} />
             </TouchableOpacity>
             {moreInfoOpen && (
-              <Text style={styles.accordionContent}>
-                • Country of Origin: India{'\n'}• Manufactured By: Butru Kids Apparel Ltd.{'\n'}• Easy 3-day returns available.
-              </Text>
+              <View>
+                {product.color ? (
+                  <Text style={styles.accordionContent}>• Color: {product.color}</Text>
+                ) : null}
+                {product.attributes?.length > 0 ? (
+                  product.attributes.map((attr) => (
+                    <Text key={attr._id} style={styles.accordionContent}>
+                      • {attr.attribute}: {attr.value}
+                    </Text>
+                  ))
+                ) : null}
+                {product.categoryPath?.length > 0 ? (
+                  <Text style={styles.accordionContent}>• Category: {product.categoryPath.join(' > ')}</Text>
+                ) : null}
+                <Text style={styles.accordionContent}>• Country of Origin: India</Text>
+              </View>
             )}
           </View>
 
@@ -424,8 +834,14 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: hPad, gap: 12 }}>
-              {RELATED_PRODUCTS.map(item => (
-                <RelatedProductCard key={item.id} item={item} onSelect={handleSelectRelated} />
+              {relatedProducts.map(item => (
+                <RelatedProductCard
+                  key={item.id}
+                  item={item}
+                  liked={wishlistIds.has(item.id)}
+                  onToggleLike={() => handleToggleWishlist(item.id)}
+                  onSelect={handleSelectRelated}
+                />
               ))}
             </ScrollView>
           </View>
@@ -869,6 +1285,59 @@ const createStyles = (theme: AppTheme) => {
     color: colors.primary,
     fontWeight: '700',
   },
+  variantRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  variantChip: {
+    width: 82,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceVariant,
+    overflow: 'hidden',
+  },
+  variantChipSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: colors.primaryLight,
+  },
+  variantImage: {
+    width: '100%',
+    height: 78,
+    resizeMode: 'cover',
+  },
+  variantPriceBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: colors.overlay,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  variantPriceBadgeText: {
+    color: colors.textOnPrimary,
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  variantName: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '500',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  variantNameSelected: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  selectedVariantText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 10,
+  },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -1131,6 +1600,38 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 11,
     fontWeight: '600',
     color: colors.primary,
+  },
+
+  /* Loading & Error States */
+  centerBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 6,
+  },
+  errorMessage: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  retryBtn: {
+    marginTop: 18,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  retryBtnText: {
+    color: colors.textOnPrimary,
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   /* Modal Base */

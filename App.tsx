@@ -14,6 +14,8 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
+import { loadCartState, hydrate as hydrateCart } from './src/store/slices/cartSlice';
+import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/auth/LoginScreen';
 import OtpScreen from './src/auth/otpScreen';
 import OtpVarify from './src/auth/OtpVarify';
@@ -34,7 +36,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Inner component so it can read from the Redux store
 function AppNavigator() {
   const mode = useSelector((state: RootState) => state.theme.mode);
-  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const isHydrated = useSelector((state: RootState) => state.auth.isHydrated);
   const dispatch = useDispatch<AppDispatch>();
 
@@ -42,6 +43,9 @@ function AppNavigator() {
   useEffect(() => {
     loadAuthState().then(saved => {
       dispatch(hydrateAuth(saved));
+    });
+    loadCartState().then(saved => {
+      dispatch(hydrateCart(saved));
     });
   }, [dispatch]);
 
@@ -60,8 +64,9 @@ function AppNavigator() {
       <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} />
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName={isLoggedIn ? 'Home' : 'Login'}
+          initialRouteName="Splash"
           screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Otp" component={OtpScreen} />
           <Stack.Screen name="OtpVarify" component={OtpVarify} />
@@ -92,7 +97,7 @@ function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(177, 43, 91, 1)',
   },
 });
 

@@ -1,6 +1,7 @@
 import type { SupportConfig } from '../theme/types';
 
 export type RootStackParamList = {
+  Splash: undefined;
   Login: undefined;
   Otp: undefined;
   OtpVarify: { phoneNumber?: string; email?: string } | undefined;

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector, useDispatch } from 'react-redux';
 import {
   Butruname,
   LOCATION_PIN_SVG,
@@ -22,6 +23,13 @@ import {
 } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import type { RootState, AppDispatch } from '../store';
+import {
+  increment,
+  decrement,
+  removeItem as removeCartItem,
+  clearCart,
+} from '../store/slices/cartSlice';
 
 // Custom SVGs
 const TAG_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
@@ -72,36 +80,15 @@ const PAYMENT_CARD_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="
 const PAYMENT_COD_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>`;
 const HOME_WHITE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>`;
 
-// Sample Initial Dynamic Cart Items Data
-const INITIAL_CART = [
-  {
-    id: '1',
-    name: 'Stylish Western Frock for Baby Girls',
-    size: '3-4 Y',
-    price: 299,
-    mrp: 599,
-    quantity: 1,
-    image: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?auto=format&fit=crop&q=80&w=600',
-  },
-  {
-    id: '2',
-    name: 'Striped Short Sleeve Shirt',
-    size: '6-4 Y',
-    price: 799,
-    mrp: 1577,
-    quantity: 1,
-    image: 'https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?auto=format&fit=crop&q=80&w=600',
-  },
-];
-
 const CartScreen = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const dispatch = useDispatch<AppDispatch>();
+  const cartItems = useSelector((state: RootState) => state.cart.items);
 
   // Dynamic States
-  const [cartItems, setCartItems] = useState(INITIAL_CART);
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
   const [couponCode, setCouponCode] = useState('');
   const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
@@ -136,6 +123,7 @@ const CartScreen = () => {
     setTimeout(() => {
       setIsProcessingPayment(false);
       setIsPaymentSuccess(true);
+      dispatch(clearCart());
     }, 1800);
   };
 
@@ -148,7 +136,7 @@ const CartScreen = () => {
   const isCOD = paymentMethod === 'COD';
 
   // --- Dynamic Calculations ---
-  const totalMRP = cartItems.reduce((acc, item) => acc + item.mrp * item.quantity, 0);
+  const totalMRP = cartItems.reduce((acc, item) => acc + item.originalPrice * item.quantity, 0);
   const subTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const discountRs = totalMRP - subTotal;
   const discountPercentage = totalMRP > 0 ? Math.round((discountRs / totalMRP) * 100) : 0;
@@ -158,22 +146,16 @@ const CartScreen = () => {
   const finalTotal = Math.max(0, subTotal - appliedCoupon);
 
   // --- Handlers ---
-  const updateQuantity = (id: string, delta: number) => {
-    setCartItems(prevItems =>
-      prevItems
-        .map(item => {
-          if (item.id === id) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
-          }
-          return item;
-        })
-        .filter(Boolean) as typeof INITIAL_CART
-    );
+  const updateQuantity = (cartId: string, delta: number) => {
+    if (delta < 0) {
+      dispatch(decrement(cartId));
+    } else {
+      dispatch(increment(cartId));
+    }
   };
 
-  const removeItem = (id: string) => {
-    setCartItems(prevItems => prevItems.filter(item => item.id !== id));
+  const removeItem = (cartId: string) => {
+    dispatch(removeCartItem(cartId));
   };
 
   const handleApplyCoupon = () => {
@@ -229,7 +211,7 @@ const CartScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Dynamic Cart Items List */}
           {cartItems.map(item => (
-            <View key={item.id} style={styles.cartItemCard}>
+            <View key={item.cartId} style={styles.cartItemCard}>
               <Image source={{ uri: item.image }} style={styles.itemImage} />
 
               <View style={styles.itemDetails}>
@@ -237,7 +219,7 @@ const CartScreen = () => {
                   <Text style={styles.itemName} numberOfLines={2}>
                     {item.name}
                   </Text>
-                  <TouchableOpacity onPress={() => removeItem(item.id)}>
+                  <TouchableOpacity onPress={() => removeItem(item.cartId)}>
                     <Text style={styles.removeText}>Remove</Text>
                   </TouchableOpacity>
                 </View>
@@ -251,13 +233,13 @@ const CartScreen = () => {
                   <View style={styles.quantityContainer}>
                     <TouchableOpacity
                       style={styles.qtyBtn}
-                      onPress={() => updateQuantity(item.id, -1)}>
+                      onPress={() => updateQuantity(item.cartId, -1)}>
                       <Text style={styles.qtyBtnText}>-</Text>
                     </TouchableOpacity>
                     <Text style={styles.qtyValueText}>{item.quantity}</Text>
                     <TouchableOpacity
                       style={styles.qtyBtn}
-                      onPress={() => updateQuantity(item.id, 1)}>
+                      onPress={() => updateQuantity(item.cartId, 1)}>
                       <Text style={styles.qtyBtnText}>+</Text>
                     </TouchableOpacity>
                   </View>
