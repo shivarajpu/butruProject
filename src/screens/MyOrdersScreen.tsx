@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   TextInput,
   Modal,
   Image,
+  ActivityIndicator,
+  Alert,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +20,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { FONTS } from '../constants/fonts';
+import { apiService } from '../api/apiService';
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 
@@ -66,7 +69,7 @@ const gearIcon = (color: string) =>
 const truckIcon = (color: string) =>
   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" stroke="${color}" stroke-width="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="${color}" stroke-width="2"/><circle cx="5.5" cy="18.5" r="2.5" fill="${color}"/><circle cx="18.5" cy="18.5" r="2.5" fill="${color}"/></svg>`;
 
-// ─── Types & Mock Data ────────────────────────────────────────────────────────
+// ─── Types & API Contracts ────────────────────────────────────────────────────
 
 type ProductItem = {
   id: string;
@@ -75,42 +78,211 @@ type ProductItem = {
   size: string;
   qty: number;
   price: number;
+  originalPrice: number;
   image: string;
 };
 
 type OrderType = {
+  id: string;
   orderId: string;
+  orderNumber: string;
   date: string;
+  rawDate: string;
   totalAmount: number;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  shippingCharges: number;
   status: string;
+  trackingStatus: string;
   items: ProductItem[];
+  shippingAddress?: {
+    name?: string;
+    phone?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  };
+  paymentMethod?: string;
 };
 
-const MOCK_ORDER: OrderType = {
-  orderId: '#ORD-790703-976472',
-  date: 'September 14, 2026',
-  totalAmount: 823.64,
-  status: 'ORDER PLACED',
-  items: [
-    {
-      id: '1',
-      code: 'TSH02',
-      name: 'Striped Short Sleeve',
-      size: '7-8 Y',
-      qty: 1,
-      price: 399,
-      image: 'https://via.placeholder.com/100',
-    },
-    {
-      id: '2',
-      code: 'H01',
-      name: 'Stylish Western Frock',
-      size: '3-4 Y',
-      qty: 1,
-      price: 299,
-      image: 'https://via.placeholder.com/100',
-    },
-  ],
+type OrderItemAsset = {
+  _id: string;
+  productId:
+    | string
+    | {
+        _id: string;
+        name: string;
+        productCode: string;
+        price: number;
+      };
+  productName: string;
+  productCode: string;
+  quantity: number;
+  size: string;
+  sku: string;
+  variant?: string;
+  color?: string;
+  pricePerUnit: number;
+  finalPrice: number;
+  weight?: number;
+  image?: string;
+};
+
+type ApiOrder = {
+  _id: string;
+  id: string;
+  orderNumber: string;
+  idempotencyKey: string;
+  placedAt?: string;
+  createdAt?: string;
+  status: string;
+  orderType: string;
+  items: OrderItemAsset[];
+  shippingAddress?: {
+    name?: string;
+    phone?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    country?: string;
+  };
+  payment?: {
+    mode?: string;
+    paymentStatus?: string;
+    amount?: number;
+  };
+  pricing?: {
+    subtotal?: number;
+    shippingCharges?: number;
+    tax?: number;
+    discount?: number;
+    total?: number;
+  };
+  tracking?: {
+    currentStatus?: string;
+    statusHistory?: { status: string; timestamp: string }[];
+  };
+};
+
+type OrdersResponse = {
+  success: boolean;
+  count: number;
+  total: number;
+  page: number;
+  pages: number;
+  data: ApiOrder[];
+};
+
+type CancelOrderResponse = {
+  success: boolean;
+  message: string;
+  data: ApiOrder;
+};
+
+type CancellationReasonsResponse = {
+  success: boolean;
+  data: {
+    customer: string[];
+    internal: string[];
+  };
+};
+
+const MY_ORDERS_ENDPOINT = '/api/storefront/orders/my?limit=200&page=1';
+const CANCEL_ORDER_ENDPOINT = '/api/storefront/orders';
+const CANCELLATION_REASONS_ENDPOINT = '/api/storefront/orders/cancellation-reasons';
+
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sept',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+const formatOrderDate = (iso?: string): string => {
+  if (!iso) {
+    return '';
+  }
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+};
+
+const formatMoney = (value: number): string => {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded % 1 === 0 ? `${rounded}` : rounded.toFixed(2);
+};
+
+const mapApiOrder = (order: ApiOrder): OrderType => {
+  const items: ProductItem[] = (order.items || []).map(item => {
+    const productId =
+      typeof item.productId === 'object' && item.productId
+        ? item.productId._id
+        : typeof item.productId === 'string'
+        ? item.productId
+        : item._id;
+    const productName =
+      (typeof item.productId === 'object' && item.productId?.name) ||
+      item.productName;
+    return {
+      id: item._id || productId,
+      code: item.productCode || item.sku,
+      name: productName,
+      size: item.size || item.sku || '',
+      qty: item.quantity,
+      price: item.pricePerUnit ?? item.finalPrice ?? 0,
+      originalPrice: item.pricePerUnit ?? item.finalPrice ?? 0,
+      image: item.image || '',
+    };
+  });
+
+  const currentStatus =
+    order.tracking?.currentStatus || (order.status ? `${order.status}` : 'Order Placed');
+
+  return {
+    id: order._id || order.id,
+    orderNumber: order.orderNumber,
+    orderId: order.orderNumber ? `#${order.orderNumber}` : order.id || order._id,
+    date: formatOrderDate(order.placedAt || order.createdAt),
+    rawDate: order.placedAt || order.createdAt || '',
+    totalAmount: order.pricing?.total ?? 0,
+    subtotal: order.pricing?.subtotal ?? 0,
+    tax: order.pricing?.tax ?? 0,
+    discount: order.pricing?.discount ?? 0,
+    shippingCharges: order.pricing?.shippingCharges ?? 0,
+    status: order.status || 'Pending',
+    trackingStatus: currentStatus,
+    items,
+    shippingAddress: order.shippingAddress,
+    paymentMethod: order.payment?.mode || 'COD',
+  };
+};
+
+const getOrderBucket = (order: OrderType): string => {
+  const text = `${order.status} ${order.trackingStatus}`.toLowerCase();
+  if (text.includes('cancel')) {
+    return 'Cancelled';
+  }
+  if (text.includes('return') || text.includes('refund')) {
+    return 'Returned';
+  }
+  if (text.includes('delivered') || text.includes('complete')) {
+    return 'Delivered';
+  }
+  return 'On the way';
 };
 
 // ─── StyleSheet Factory (Theme-aware) ─────────────────────────────────────────
@@ -860,13 +1032,16 @@ const CHEVRON_DOWN_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="
 const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const CANCEL_REASONS = [
-  'Ordered by mistake',
   'Changed my mind',
-  'Found a better price',
+  'Ordered by mistake',
+  'Found a better price elsewhere',
   'Delivery is taking too long',
   'Shipping cost is too high',
-  'Payment issue',
-  'Ordered wrong size or variant',
+  'Payment issue / failed transaction',
+  'Ordered wrong size / variant',
+  'Product no longer needed',
+  'Placed duplicate order',
+  'Want to change delivery address',
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -882,9 +1057,12 @@ const MyOrdersScreen = ({ navigation }: Props) => {
 
   // Navigation Flow States: 'LIST' | 'TRACK' | 'DETAILS'
   const [currentScreen, setCurrentScreen] = useState<'LIST' | 'TRACK' | 'DETAILS'>('LIST');
-  const [selectedProduct, setSelectedProduct] = useState<ProductItem>(MOCK_ORDER.items[0]);
+  const [orders, setOrders] = useState<OrderType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [detailsFrom, setDetailsFrom] = useState<'TRACK' | 'LIST'>('TRACK');
-const [orderStatus, setOrderStatus] = useState<'PLACED' | 'CANCELLED'>('PLACED');
   // Modal State
   const [filterVisible, setFilterVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState('All statuses');
@@ -893,6 +1071,53 @@ const [orderStatus, setOrderStatus] = useState<'PLACED' | 'CANCELLED'>('PLACED')
 const [cancelModalVisible, setCancelModalVisible] = useState(false);
 const [isDropdownOpen, setIsDropdownOpen] = useState(true);
 const [selectedReason, setSelectedReason] = useState<string | null>(null);
+const [cancelling, setCancelling] = useState(false);
+const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
+
+  const selectedOrder =
+    orders.find(o => o.id === selectedOrderId) || orders[0] || null;
+
+  const isCancelled = selectedOrder
+    ? `${selectedOrder.status} ${selectedOrder.trackingStatus}`
+        .toLowerCase()
+        .includes('cancel')
+    : false;
+
+  const filteredOrders = useMemo(() => {
+    if (activeTab === 'All') {
+      return orders;
+    }
+    return orders.filter(order => getOrderBucket(order) === activeTab);
+  }, [orders, activeTab]);
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiService.get<OrdersResponse>(MY_ORDERS_ENDPOINT);
+      if (response?.data) {
+        const mapped = (Array.isArray(response.data) ? response.data : []).map(
+          mapApiOrder,
+        );
+        setOrders(mapped);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load orders.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    if (!selectedOrderId && orders.length) {
+      setSelectedOrderId(orders[0].id);
+    }
+  }, [orders, selectedOrderId]);
+
   const handleProductSelect = (product: ProductItem, from: 'TRACK' | 'LIST') => {
     setSelectedProduct(product);
     setDetailsFrom(from);
@@ -911,14 +1136,78 @@ const [selectedReason, setSelectedReason] = useState<string | null>(null);
     }
   };
 
-  const handleConfirmCancel = () => {
-  setOrderStatus('CANCELLED');
-  setActiveTab('Cancelled'); // Direct 'Cancelled' tab par navigate hoga
-  setCancelModalVisible(false);
-  setCurrentScreen('LIST');
-};
+  const handleOpenOrder = (order: OrderType, from: 'TRACK' | 'LIST') => {
+    setSelectedOrderId(order.id);
+    if (from === 'TRACK') {
+      setCurrentScreen('TRACK');
+    } else {
+      if (order.items.length) {
+        setSelectedProduct(order.items[0]);
+      }
+      setDetailsFrom('LIST');
+      setCurrentScreen('DETAILS');
+    }
+  };
 
-const isCancelled = orderStatus === 'CANCELLED';
+  const fetchCancellationReasons = useCallback(async () => {
+    try {
+      const response = await apiService.get<CancellationReasonsResponse>(
+        CANCELLATION_REASONS_ENDPOINT,
+      );
+      if (response?.data?.customer?.length) {
+        setCancelReasons(response.data.customer);
+      }
+    } catch {
+      // Keep the static fallback list if the API fails.
+    }
+  }, []);
+
+  const handleOpenCancelModal = () => {
+    setSelectedReason(null);
+    setIsDropdownOpen(true);
+    setCancelModalVisible(true);
+    fetchCancellationReasons();
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!selectedOrder) {
+      return;
+    }
+    setCancelling(true);
+    try {
+      const response = await apiService.update<CancelOrderResponse>(
+        `${CANCEL_ORDER_ENDPOINT}/${selectedOrder.id}/cancel`,
+        {
+          reason: selectedReason || 'Placed duplicate order',
+          reasonType: 'customer',
+        },
+        undefined,
+        'PATCH',
+      );
+      setOrders(prev =>
+        prev.map(o => {
+          if (o.id !== selectedOrder.id) {
+            return o;
+          }
+          return response?.data ? mapApiOrder(response.data) : { ...o, status: 'Cancelled', trackingStatus: 'Cancelled' };
+        }),
+      );
+      setActiveTab('Cancelled'); // Direct 'Cancelled' tab par navigate hoga
+      setCancelModalVisible(false);
+      setCurrentScreen('LIST');
+      Alert.alert(
+        'Order Cancelled',
+        response?.message || 'Your order has been cancelled successfully.',
+      );
+    } catch (err) {
+      Alert.alert(
+        'Cancel Failed',
+        err instanceof Error ? err.message : 'Unable to cancel the order. Please try again.',
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
@@ -980,106 +1269,152 @@ const isCancelled = orderStatus === 'CANCELLED';
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Total orders</Text>
-              <Text style={styles.metricValue}>1</Text>
+              <Text style={styles.metricValue}>{orders.length}</Text>
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>In progress</Text>
-              <Text style={[styles.metricValue , {color:"#2563EB"}]}>1</Text>
+              <Text style={[styles.metricValue , {color:"#2563EB"}]}>
+                {orders.filter(o => getOrderBucket(o) === 'On the way').length}
+              </Text>
             </View>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Delivered</Text>
-              <Text style={[styles.metricValue, { color: colors.success }]}>0</Text>
-            </View>
-          </View>
-
-          {/* Main Order Box */}
-          <View style={styles.orderCard}>
-            <View style={styles.orderCardHeader}>
-              <View style={styles.orderHeaderRow}>
-                <View style={styles.statusBadgeRow}>
-                  <View
-                    style={[
-                      styles.orderStatusIconBox,
-                      { backgroundColor: isCancelled ? colors.error : colors.success },
-                    ]}>
-                    <SvgXml
-                      xml={isCancelled ? crossIcon(colors.surface) : boxIcon(colors.surface)}
-                      width={20}
-                      height={20}
-                    />
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: (isCancelled ? colors.error : colors.success) + '1A' },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.statusBadgeText,
-                        { color: isCancelled ? colors.error : colors.success },
-                      ]}>
-                      {isCancelled ? 'CANCELLED' : 'ORDER PLACED'}
-                    </Text>
-                  </View>
-                </View>
-                <SvgXml xml={chevRight(colors.textMuted)} />
-              </View>
-              <Text style={styles.orderDate}>
-                {isCancelled ? 'Cancelled on 14 Sept 2026' : 'Placed on 14 Sept 2026'}
+              <Text style={[styles.metricValue, { color: colors.success }]}>
+                {orders.filter(o => getOrderBucket(o) === 'Delivered').length}
               </Text>
             </View>
-
-            <View style={styles.orderSubHeader}>
-              <View>
-                <Text style={styles.orderIdLabel}>ORDER ID</Text>
-                <View style={styles.orderIdRow}>
-                  <Text style={styles.orderIdText}>{MOCK_ORDER.orderId}</Text>
-                  <SvgXml xml={copyIcon(colors.textMuted)} style={{ marginLeft: 6 }} />
-                </View>
-              </View>
-              <View style={styles.priceAlignEnd}>
-                <Text style={styles.orderPrice}>₹698</Text>
-                <Text style={styles.orderItemCount}>2 Items</Text>
-              </View>
-            </View>
-
-            {MOCK_ORDER.items.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.innerProductRow}
-                onPress={() => handleProductSelect(item, 'LIST')}
-                activeOpacity={0.7}>
-                <Image source={{ uri: item.image }} style={styles.productThumb} />
-                <View style={styles.productInfo}>
-                  <Text style={styles.productCode}>{item.code}</Text>
-                  <Text style={styles.productTitle}>{item.name}</Text>
-                  <Text style={styles.productMeta}>Size: {item.size}  •  Qty: {item.qty}</Text>
-                </View>
-                <Text style={styles.productPrice}>₹{item.price}</Text>
-                <SvgXml xml={chevRight(colors.textMuted)} style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={styles.btnOutline}
-                onPress={() => {
-                  setSelectedProduct(MOCK_ORDER.items[0]);
-                  setDetailsFrom('LIST');
-                  setCurrentScreen('DETAILS');
-                }}
-                activeOpacity={0.7}>
-                <Text style={styles.btnOutlineText}>View details</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.btnPrimary}
-                onPress={() => setCurrentScreen('TRACK')}
-                activeOpacity={0.8}>
-                <Text style={styles.btnPrimaryText}>Track order</Text>
-              </TouchableOpacity>
-            </View>
           </View>
+
+          {loading ? (
+            <View style={{ paddingVertical: 64, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text
+                style={{
+                  marginTop: 12,
+                  color: colors.textMuted,
+                  fontFamily: fontFamily.medium,
+                }}>
+                Loading your orders...
+              </Text>
+            </View>
+          ) : error ? (
+            <View style={{ paddingVertical: 64, alignItems: 'center' }}>
+              <Text
+                style={{
+                  color: colors.error,
+                  fontFamily: fontFamily.medium,
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}>
+                {error}
+              </Text>
+              <TouchableOpacity style={styles.btnOutline} onPress={fetchOrders} activeOpacity={0.7}>
+                <Text style={styles.btnOutlineText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filteredOrders.length === 0 ? (
+            <View style={{ paddingVertical: 64, alignItems: 'center' }}>
+              <Text style={{ color: colors.textMuted, fontFamily: fontFamily.medium }}>
+                No orders found.
+              </Text>
+            </View>
+          ) : (
+            filteredOrders.map(order => {
+              const cardCancelled = getOrderBucket(order) === 'Cancelled';
+              const cancelledColor = cardCancelled ? colors.error : colors.success;
+              return (
+                <View key={order.id} style={[styles.orderCard, { marginBottom: 16 }]}>
+                  <View style={styles.orderCardHeader}>
+                    <View style={styles.orderHeaderRow}>
+                      <View style={styles.statusBadgeRow}>
+                        <View
+                          style={[
+                            styles.orderStatusIconBox,
+                            { backgroundColor: cancelledColor },
+                          ]}>
+                          <SvgXml
+                            xml={cardCancelled ? crossIcon(colors.surface) : boxIcon(colors.surface)}
+                            width={20}
+                            height={20}
+                          />
+                        </View>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: cancelledColor + '1A' },
+                          ]}>
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              { color: cancelledColor },
+                            ]}>
+                            {cardCancelled
+                              ? 'CANCELLED'
+                              : order.trackingStatus.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <SvgXml xml={chevRight(colors.textMuted)} />
+                    </View>
+                    <Text style={styles.orderDate}>
+                      {cardCancelled
+                        ? `Cancelled on ${order.date}`
+                        : `Placed on ${order.date}`}
+                    </Text>
+                  </View>
+
+                  <View style={styles.orderSubHeader}>
+                    <View>
+                      <Text style={styles.orderIdLabel}>ORDER ID</Text>
+                      <View style={styles.orderIdRow}>
+                        <Text style={styles.orderIdText}>{order.orderId}</Text>
+                        <SvgXml xml={copyIcon(colors.textMuted)} style={{ marginLeft: 6 }} />
+                      </View>
+                    </View>
+                    <View style={styles.priceAlignEnd}>
+                      <Text style={styles.orderPrice}>₹{formatMoney(order.totalAmount)}</Text>
+                      <Text style={styles.orderItemCount}>
+                        {order.items.length} {order.items.length === 1 ? 'Item' : 'Items'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {order.items.slice(0, 3).map(item => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.innerProductRow}
+                      onPress={() => handleProductSelect(item, 'LIST')}
+                      activeOpacity={0.7}>
+                      <Image source={{ uri: item.image }} style={styles.productThumb} />
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productCode}>{item.code}</Text>
+                        <Text style={styles.productTitle}>{item.name}</Text>
+                        <Text style={styles.productMeta}>Size: {item.size}  •  Qty: {item.qty}</Text>
+                      </View>
+                      <Text style={styles.productPrice}>₹{formatMoney(item.price)}</Text>
+                      <SvgXml xml={chevRight(colors.textMuted)} style={{ marginLeft: 6 }} />
+                    </TouchableOpacity>
+                  ))}
+
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.btnOutline}
+                      onPress={() => handleOpenOrder(order, 'LIST')}
+                      activeOpacity={0.7}>
+                      <Text style={styles.btnOutlineText}>View details</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.btnPrimary}
+                      onPress={() => handleOpenOrder(order, 'TRACK')}
+                      activeOpacity={0.8}>
+                      <Text style={styles.btnPrimaryText}>Track order</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </ScrollView>
       )}
 
@@ -1103,11 +1438,11 @@ const isCancelled = orderStatus === 'CANCELLED';
                 />
               </View>
               <View style={{ marginLeft: 10, flex: 1 }}>
-                <Text style={styles.orderIdText}>Order {MOCK_ORDER.orderId}</Text>
+                <Text style={styles.orderIdText}>Order {selectedOrder?.orderId}</Text>
                 <Text style={styles.orderDate}>
                   {isCancelled
-                    ? 'Cancelled on September 14, 2026 • 2 Items'
-                    : 'Placed on September 14, 2026 • 2 Items'}
+                    ? `Cancelled on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`
+                    : `Placed on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`}
                 </Text>
               </View>
             </View>
@@ -1115,13 +1450,13 @@ const isCancelled = orderStatus === 'CANCELLED';
             <View style={styles.totalRowInBox}>
               <View>
                 <Text style={styles.metricLabel}>Total Amount</Text>
-                <Text style={styles.totalAmountText}>₹{MOCK_ORDER.totalAmount}</Text>
+                <Text style={styles.totalAmountText}>₹{formatMoney(selectedOrder?.totalAmount ?? 0)}</Text>
               </View>
               {!isCancelled && (
                 <TouchableOpacity
                   style={styles.cancelBtn}
                   activeOpacity={0.7}
-                  onPress={() => setCancelModalVisible(true)}>
+                  onPress={handleOpenCancelModal}>
                   <Text style={styles.cancelBtnText}>Cancel Order</Text>
                 </TouchableOpacity>
               )}
@@ -1139,7 +1474,7 @@ const isCancelled = orderStatus === 'CANCELLED';
                 </View>
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>Order Cancelled</Text>
-                  <Text style={styles.timelineTime}>September 14, 2026{'\n'}Cancelled</Text>
+                  <Text style={styles.timelineTime}>{selectedOrder?.date || ''}{'\n'}Cancelled</Text>
                 </View>
                 <Text
                   style={[
@@ -1151,11 +1486,11 @@ const isCancelled = orderStatus === 'CANCELLED';
               </View>
             ) : (
               [
-                { title: 'Order Placed', time: 'September 14, 2026\n10:43 AM', status: 'Completed', active: true, icon: checkIcon(colors.textOnPrimary) },
-                { title: 'Processing', time: 'September 14, 2026\n2:30 PM', status: 'In Progress', active: false, icon: gearIcon(colors.textMuted) },
-                { title: 'Shipped', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
-                { title: 'Out For Delivery', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: truckIcon(colors.textMuted) },
-                { title: 'Delivered', time: 'September 14, 2026\n2:30 PM', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
+                { title: 'Order Placed', time: selectedOrder?.date || '', status: 'Completed', active: true, icon: checkIcon(colors.textOnPrimary) },
+                { title: 'Processing', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: gearIcon(colors.textMuted) },
+                { title: 'Shipped', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
+                { title: 'Out For Delivery', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: truckIcon(colors.textMuted) },
+                { title: 'Delivered', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
               ].map((step, idx, arr) => (
                 <View key={idx} style={styles.timelineRow}>
                   <View style={styles.timelineNodeCol}>
@@ -1187,9 +1522,9 @@ const isCancelled = orderStatus === 'CANCELLED';
             </Text>
           </View>
 
-          <Text style={styles.sectionHeading}>Order Item (2)</Text>
+          <Text style={styles.sectionHeading}>Order Item ({selectedOrder?.items.length ?? 0})</Text>
           <View style={styles.productListBox}>
-            {MOCK_ORDER.items.map(item => (
+            {(selectedOrder?.items ?? []).map(item => (
               <TouchableOpacity
                 key={item.id}
                 style={styles.innerProductCard}
@@ -1201,7 +1536,7 @@ const isCancelled = orderStatus === 'CANCELLED';
                   <Text style={styles.productTitle}>{item.name}</Text>
                   <Text style={styles.productMeta}>Size: {item.size}  •  Qty: {item.qty}</Text>
                 </View>
-                <Text style={styles.productPrice}>₹{item.price}</Text>
+                <Text style={styles.productPrice}>₹{formatMoney(item.price)}</Text>
                 <SvgXml xml={chevRight(colors.textMuted)} style={{ marginLeft: 6 }} />
               </TouchableOpacity>
             ))}
@@ -1229,11 +1564,11 @@ const isCancelled = orderStatus === 'CANCELLED';
                 />
               </View>
               <View style={{ marginLeft: 10 }}>
-                <Text style={styles.orderIdText}>Order {MOCK_ORDER.orderId}</Text>
+                <Text style={styles.orderIdText}>Order {selectedOrder?.orderId}</Text>
                 <Text style={styles.orderDate}>
                   {isCancelled
-                    ? 'Cancelled on September 14, 2026 • 2 Items'
-                    : 'Placed on September 14, 2026 • 2 Items'}
+                    ? `Cancelled on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`
+                    : `Placed on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`}
                 </Text>
               </View>
             </View>
@@ -1255,28 +1590,28 @@ const isCancelled = orderStatus === 'CANCELLED';
                 {isCancelled ? 'Order Cancelled' : 'Order Placed'}
               </Text>
               <Text style={styles.selectedTimelineTime}>
-                {isCancelled
-                  ? 'September 14, 2026 • 12:15 PM'
-                  : 'September 14, 2026 • 10:43 AM'}
+                {selectedOrder?.date}
               </Text>
             </View>
           </View>
 
-          <View style={styles.selectedProductCard}>
-            <Image source={{ uri: selectedProduct.image }} style={styles.productThumbLarge} />
-            <View style={styles.productInfo}>
-              <Text style={styles.productTitleBold}>{selectedProduct.name}</Text>
-              <Text style={styles.productMeta}>Size: {selectedProduct.size}  •  Qty: {selectedProduct.qty}</Text>
+          {selectedProduct && (
+            <View style={styles.selectedProductCard}>
+              <Image source={{ uri: selectedProduct.image }} style={styles.productThumbLarge} />
+              <View style={styles.productInfo}>
+                <Text style={styles.productTitleBold}>{selectedProduct.name}</Text>
+                <Text style={styles.productMeta}>Size: {selectedProduct.size}  •  Qty: {selectedProduct.qty}</Text>
+              </View>
+              <Text style={styles.productPriceBold}>₹{formatMoney(selectedProduct.price)}</Text>
             </View>
-            <Text style={styles.productPriceBold}>₹{selectedProduct.price}</Text>
-          </View>
+          )}
 
           <Text style={styles.sectionHeading}>Other Items In This Order</Text>
-          <Text style={styles.orderIdSub}>Order ID {MOCK_ORDER.orderId}</Text>
+          <Text style={styles.orderIdSub}>Order ID {selectedOrder?.orderId}</Text>
 
           <View style={styles.productListBox}>
-            {MOCK_ORDER.items
-              .filter(i => i.id !== selectedProduct.id)
+            {(selectedOrder?.items ?? [])
+              .filter(i => i.id !== selectedProduct?.id)
               .map(item => (
                 <TouchableOpacity
                   key={item.id}
@@ -1288,7 +1623,7 @@ const isCancelled = orderStatus === 'CANCELLED';
                     <Text style={styles.productTitle}>{item.name}</Text>
                     <Text style={styles.productMeta}>Size: {item.size}  •  Qty: {item.qty}</Text>
                   </View>
-                  <Text style={styles.productPrice}>₹{item.price}</Text>
+                  <Text style={styles.productPrice}>₹{formatMoney(item.price)}</Text>
                   <SvgXml xml={chevRight(colors.textMuted)} style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
               ))}
@@ -1298,20 +1633,20 @@ const isCancelled = orderStatus === 'CANCELLED';
             <Text style={styles.sectionHeading}>Order Summary</Text>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>Rs. 698</Text>
+              <Text style={styles.summaryValue}>Rs. {formatMoney(selectedOrder?.subtotal ?? 0)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Shipping</Text>
-              <Text style={styles.summaryValue}>Rs. 0</Text>
+              <Text style={styles.summaryValue}>Rs. {formatMoney(selectedOrder?.shippingCharges ?? 0)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tax</Text>
-              <Text style={styles.summaryValue}>Rs. 125.64</Text>
+              <Text style={styles.summaryValue}>Rs. {formatMoney(selectedOrder?.tax ?? 0)}</Text>
             </View>
 
             <View style={[styles.summaryRow, { marginTop: 12 }]}>
               <Text style={styles.totalBoldLabel}>TOTAL</Text>
-              <Text style={styles.totalBoldValue}>Rs. 823.64</Text>
+              <Text style={styles.totalBoldValue}>Rs. {formatMoney(selectedOrder?.totalAmount ?? 0)}</Text>
             </View>
 
             <TouchableOpacity style={styles.downloadInvoiceBtn} activeOpacity={0.8}>
@@ -1323,10 +1658,24 @@ const isCancelled = orderStatus === 'CANCELLED';
             <Text style={styles.sectionHeading}>Delivery Address</Text>
             <View style={styles.addressNameRow}>
               <SvgXml xml={locationIcon(colors.textSecondary)} />
-              <Text style={styles.addressName}> GOUTAM CHAUDHARY</Text>
+              <Text style={styles.addressName}>
+                {' '}{(selectedOrder?.shippingAddress?.name || 'N/A').toUpperCase()}
+              </Text>
             </View>
-            <Text style={styles.addressText}>sgtdf, Khandwa, Madhya Pradesh, 450881, India</Text>
-            <Text style={styles.addressText}>9988776655</Text>
+            <Text style={styles.addressText}>
+              {[
+                selectedOrder?.shippingAddress?.street,
+                selectedOrder?.shippingAddress?.city,
+                selectedOrder?.shippingAddress?.state,
+                selectedOrder?.shippingAddress?.country,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+              {selectedOrder?.shippingAddress?.pincode
+                ? ` - ${selectedOrder.shippingAddress.pincode}`
+                : ''}
+            </Text>
+            <Text style={styles.addressText}>{selectedOrder?.shippingAddress?.phone || ''}</Text>
           </View>
 
           <View style={styles.paymentCard}>
@@ -1338,7 +1687,7 @@ const isCancelled = orderStatus === 'CANCELLED';
                 </View>
                 <Text style={styles.paymentLabel}>Method</Text>
               </View>
-              <Text style={styles.paymentValue}>COD</Text>
+              <Text style={styles.paymentValue}>{selectedOrder?.paymentMethod}</Text>
             </View>
           </View>
         </ScrollView>
@@ -1448,7 +1797,7 @@ const isCancelled = orderStatus === 'CANCELLED';
 
         {isDropdownOpen && (
           <ScrollView style={styles.dropdownList} nestedScrollEnabled>
-            {CANCEL_REASONS.map(reason => (
+            {cancelReasons.map(reason => (
               <TouchableOpacity
                 key={reason}
                 style={[
@@ -1482,10 +1831,15 @@ const isCancelled = orderStatus === 'CANCELLED';
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.confirmCancelBtn}
+          style={[styles.confirmCancelBtn, cancelling && { opacity: 0.6 }]}
           activeOpacity={0.8}
+          disabled={cancelling}
           onPress={handleConfirmCancel}>
-          <Text style={styles.confirmCancelBtnText}>Confirm Cancel</Text>
+          {cancelling ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.confirmCancelBtnText}>Confirm Cancel</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

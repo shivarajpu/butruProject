@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useDispatch } from 'react-redux';
+import { addItem as addCartItem } from '../store/slices/cartSlice';
+import type { AppDispatch } from '../store';
 import { ARROW_BACK_ICON, CHEVRON_DOWN_SVG } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import { useProfile, formatAddressLabel } from '../hooks/useProfile';
 import AppButton from '../components/AppButton';
 import AppCard from '../components/AppCard';
 import AppIconButton from '../components/AppIconButton';
@@ -89,10 +93,15 @@ const WishlistScreen = () => {
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
+  const dispatch = useDispatch<AppDispatch>();
+  const { addresses } = useProfile();
+  const deliveryAddress = addresses[0] || null;
 
   const [items, setItems] = useState<WishlistCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  const addTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const isTablet = width >= 768;
   const hPad = 16;
@@ -127,6 +136,13 @@ const WishlistScreen = () => {
     }, [])
   );
 
+  useEffect(
+    () => () => {
+      Object.values(addTimers.current).forEach(timer => clearTimeout(timer));
+    },
+    [],
+  );
+
   const removeItem = async (id: string) => {
     try {
       await apiService.delete(`/api/storefront/wishlist/items/${id}`);
@@ -144,6 +160,31 @@ const WishlistScreen = () => {
 
   const handleAddToCart = (product: any) => {
     navigation.navigate('ProductDetails', { product });
+  };
+
+  const handleQuickAdd = (item: WishlistCardItem) => {
+    dispatch(
+      addCartItem({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        originalPrice: item.originalPrice ?? item.price,
+        image: item.image,
+        size: '',
+        color: '',
+      }),
+    );
+    setAddedIds(prev => new Set(prev).add(item.id));
+    if (addTimers.current[item.id]) {
+      clearTimeout(addTimers.current[item.id]);
+    }
+    addTimers.current[item.id] = setTimeout(() => {
+      setAddedIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }, 1200);
   };
 
   return (
@@ -164,7 +205,9 @@ const WishlistScreen = () => {
               <Text style={styles.headerTitle}>Wishlist</Text>
               <View style={styles.deliveryRow}>
                 <SvgXml xml={LOCATION_SVG} width={12} height={12} />
-                <Text style={styles.deliveryText}> Delivering to Home </Text>
+                <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
+                 Delivering to {formatAddressLabel(deliveryAddress)}
+               </Text>
                 <SvgXml xml={CHEVRON_DOWN_SVG} width={15} height={15} />
               </View>
             </View>
@@ -278,13 +321,13 @@ const WishlistScreen = () => {
                       </ScrollView>
                     ) : null}
 
-                    {/* Navigation only triggered here */}
+                    {/* Add to cart adds directly here */}
                     <AppButton
-                      style={styles.addToCartBtn}
+                      style={[styles.addToCartBtn, addedIds.has(item.id) && styles.addToCartBtnAdded]}
                       textStyle={styles.addToCartText}
                       size="sm"
-                      label="Add to Cart"
-                      onPress={() => handleAddToCart(item)}
+                      label={addedIds.has(item.id) ? 'Added' : 'Add to Cart'}
+                      onPress={() => handleQuickAdd(item)}
                     />
                     </View>
                   </TouchableOpacity>
@@ -352,6 +395,7 @@ const createStyles = (theme: AppTheme) => {
     marginTop: 2,
   },
   deliveryText: {
+    flexShrink: 1,
     fontSize: 12,
     color: colors.textSecondary,
     fontFamily: fontFamily.medium,
@@ -472,6 +516,9 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textOnPrimary,
     fontSize: 12,
     fontFamily: fontFamily.bold,
+  },
+  addToCartBtnAdded: {
+    backgroundColor: colors.success,
   },
   centerBox: {
     alignItems: 'center',

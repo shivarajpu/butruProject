@@ -8,10 +8,8 @@ import {
   Image,
   useWindowDimensions,
   ImageBackground,
-  Modal,
-  TouchableWithoutFeedback,
-  TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -33,47 +31,14 @@ import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
 import { addItem as addCartItem } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
+import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import AddressSelectionModal from '../components/AddressSelectionModal';
+import AddAddressModal from '../components/AddAddressModal';
 
 // Custom SVGs
-const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.65685 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
+const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.6569 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
 const CHECK_GREEN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHEVRON_UP_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 15L12 9L6 15" stroke="#666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
-
-// Dynamic Address Type Icons
-const getHomeIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="6" y="8" width="4" height="6.66667" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-`;
-const getWorkIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
-const getOtherLocationSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>`;
-const CHECK_ROUND_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="#B12B5B"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-// Input Field Icons
-const USER_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-const PHONE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
-const PINCODE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
-const MAP_BUILDING_SVG = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M0.833344 5.00008V18.3334L6.66668 15.0001L13.3333 18.3334L19.1667 15.0001V1.66675L13.3333 5.00008L6.66668 1.66675L0.833344 5.00008V5.00008" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M6.66666 1.66675V15.0001" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M13.3333 5V18.3333" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>`;
-const FLAG_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`;
-const CITY_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M3.99999 1.33325H12C12.7359 1.33325 13.3333 1.9307 13.3333 2.66659V13.3333C13.3333 14.0691 12.7359 14.6666 12 14.6666H3.99999C3.2641 14.6666 2.66666 14.0691 2.66666 13.3333V2.66659C2.66666 1.9307 3.2641 1.33325 3.99999 1.33325V1.33325" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M6 14.6667V12H10V14.6667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 4H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 4H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 4H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 6.66675H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 9.33325H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 6.66675H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 9.33325H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 6.66675H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 9.33325H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
-`;
 
 const PRODUCT_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
@@ -483,6 +448,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         image: selectedImg || productData.images?.[0] || '',
         size: selectedSize || (productData.sizes?.[0] ?? ''),
         color: selectedVariant?.color ?? productData.color ?? '',
+        productCode: (productData as { productCode?: string }).productCode || '',
       }),
     );
     Navigation.navigate('CartScreen' as never);
@@ -491,9 +457,20 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   // Modals state
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
-  const [selectedAddressType, setSelectedAddressType] = useState('Home');
-  const [selectedAddressId, setSelectedAddressId] = useState('1');
-  const [isDefaultAddress, setIsDefaultAddress] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  const { addresses, refresh } = useProfile();
+
+  useEffect(() => {
+    if (!selectedAddressId && addresses.length) {
+      const defaultAddress = addresses.find(a => a.isDefault) || addresses[0];
+      setSelectedAddressId(defaultAddress._id || '0');
+    }
+  }, [addresses, selectedAddressId]);
+
+  const selectedAddress =
+    addresses.find(a => (a._id || '') === selectedAddressId) || null;
 
   const heroHeight = width * 1.1;
 
@@ -505,10 +482,58 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   };
 
   const handleOpenAddAddress = () => {
+    setEditingAddress(null);
     setIsAddressModalVisible(false);
     setTimeout(() => {
       setIsAddAddressModalVisible(true);
     }, 250);
+  };
+
+  const handleSelectAddress = (address: Address) => {
+    setSelectedAddressId(address._id || '0');
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setIsAddressModalVisible(false);
+    setTimeout(() => {
+      setIsAddAddressModalVisible(true);
+    }, 250);
+  };
+
+  const handleDeleteAddress = (address: Address) => {
+    if (!address._id) {
+      return;
+    }
+    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiService.delete(`/api/auth/profile/address/${address._id}`);
+            if (selectedAddressId === address._id) {
+              setSelectedAddressId(null);
+            }
+            refresh();
+          } catch (error) {
+            Alert.alert(
+              'Delete Failed',
+              error instanceof Error
+                ? error.message
+                : 'Something went wrong. Please try again.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddressSaved = () => {
+    setIsAddAddressModalVisible(false);
+    setEditingAddress(null);
+    refresh();
   };
 
   if (loading) {
@@ -586,7 +611,9 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               )}
               <View style={styles.locationRow}>
                 <SvgXml xml={LOCATION_PIN_SVG} width={11} height={11} />
-                <Text style={styles.locationText}>Delivering to Home</Text>
+<Text style={[styles.locationText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
+                   Delivering to {formatAddressLabel(selectedAddress)}
+                 </Text>
                 <SvgXml xml={CHEVRON_DOWN_SVG} width={15} height={15} />
               </View>
             </TouchableOpacity>
@@ -850,284 +877,24 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         </ScrollView>
 
         {/* 1. SELECT ADDRESS MODAL */}
-        <Modal
+        <AddressSelectionModal
           visible={isAddressModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setIsAddressModalVisible(false)}>
-          <TouchableWithoutFeedback onPress={() => setIsAddressModalVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={styles.modalContent}>
-                  <View style={styles.dragHandle} />
-
-                  <View style={styles.modalHeader}>
-                    <View>
-                      <Text style={styles.modalTitle}>Address</Text>
-                      <Text style={styles.modalSubTitle}>Select delivery address</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.closeBtn}
-                      onPress={() => setIsAddressModalVisible(false)}>
-                      <SvgXml xml={CLOSE_SVG} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    <TouchableOpacity
-                      style={[
-                        styles.addressCard,
-                        selectedAddressId === '1' && styles.selectedAddressCard,
-                      ]}
-                      onPress={() => setSelectedAddressId('1')}
-                      activeOpacity={0.8}>
-                      <View style={styles.addressHeaderRow}>
-                        <View style={styles.addressTypeBadge}>
-                          <SvgXml xml={getHomeIconSvg(theme.colors.primary)} />
-                          <Text
-                            style={[
-                              styles.addressTypeText,
-                              selectedAddressId !== '1' && { color: theme.colors.text },
-                            ]}>
-                            Home
-                          </Text>
-                          <View style={styles.defaultBadge}>
-                            <Text style={styles.defaultText}>DEFAULT</Text>
-                          </View>
-                        </View>
-                        <View style={styles.radioOuter}>
-                          {selectedAddressId === '1' && <View style={styles.radioInner} />}
-                        </View>
-                      </View>
-                      <Text style={styles.addressDetailsText}>
-                        123, Green Park, Near City Mall,{'\n'}Indore, Madhya Pradesh - 452001
-                      </Text>
-                      <Text style={styles.addressPhoneText}>+91 98765 43210</Text>
-                    </TouchableOpacity>
-
-                    <Text style={styles.otherAddressTitle}>Other Addresses</Text>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.addressCard,
-                        selectedAddressId === '2' && styles.selectedAddressCard,
-                      ]}
-                      onPress={() => setSelectedAddressId('2')}
-                      activeOpacity={0.8}>
-                      <View style={styles.addressHeaderRow}>
-                        <View style={styles.addressTypeBadge}>
-                          <SvgXml xml={getWorkIconSvg(theme.colors.textSecondary)} />
-                          <Text
-                            style={[
-                              styles.addressTypeText,
-                              selectedAddressId === '2'
-                                ? { color: theme.colors.primary }
-                                : { color: theme.colors.text },
-                            ]}>
-                            Work
-                          </Text>
-                        </View>
-                        <View style={styles.radioOuter}>
-                          {selectedAddressId === '2' && <View style={styles.radioInner} />}
-                        </View>
-                      </View>
-                      <Text style={styles.addressDetailsText}>
-                        456, Business Tower, MG Road,{'\n'}Indore, Madhya Pradesh - 452001
-                      </Text>
-                      <Text style={styles.addressPhoneText}>+91 98765 43211</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.addNewAddressBtn}
-                      activeOpacity={0.7}
-                      onPress={handleOpenAddAddress}>
-                      <Text style={styles.addNewAddressText}>+ Add New Address</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+          addresses={addresses}
+          selectedAddressId={selectedAddressId}
+          onSelect={handleSelectAddress}
+          onClose={() => setIsAddressModalVisible(false)}
+          onAddAddress={handleOpenAddAddress}
+          onEditAddress={handleEditAddress}
+          onDeleteAddress={handleDeleteAddress}
+        />
 
         {/* 2. ADD NEW ADDRESS MODAL */}
-        <Modal
+        <AddAddressModal
           visible={isAddAddressModalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setIsAddAddressModalVisible(false)}>
-          <TouchableWithoutFeedback onPress={() => setIsAddAddressModalVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-                  <View style={styles.dragHandle} />
-
-                  <View style={styles.modalHeader}>
-                    <View>
-                      <Text style={styles.modalTitle}>Add New Address</Text>
-                      <Text style={styles.modalSubTitle}>Enter your address details</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.closeBtn}
-                      onPress={() => setIsAddAddressModalVisible(false)}>
-                      <SvgXml xml={CLOSE_SVG} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Dynamic Icon Colors Based on Active State */}
-                    <Text style={styles.fieldLabel}>Address Type</Text>
-                    <View style={styles.typeSelectorRow}>
-                      {[
-                        { type: 'Home', getIcon: getHomeIconSvg },
-                        { type: 'Work', getIcon: getWorkIconSvg },
-                        { type: 'Other', getIcon: getOtherLocationSvg },
-                      ].map(item => {
-                        const isSel = selectedAddressType === item.type;
-                        const iconColor = isSel ? theme.colors.primary : theme.colors.textSecondary;
-
-                        return (
-                          <TouchableOpacity
-                            key={item.type}
-                            style={[styles.typeChip, isSel && styles.typeChipSelected]}
-                            onPress={() => setSelectedAddressType(item.type)}>
-                            <View style={styles.typeChipContent}>
-                              <SvgXml xml={item.getIcon(iconColor)} width={14} height={14} />
-                              <Text
-                                style={[
-                                  styles.typeChipText,
-                                  isSel && styles.typeChipTextSelected,
-                                ]}>
-                                {item.type}
-                              </Text>
-                            </View>
-                            {isSel && (
-                              <View style={styles.chipCheckBadge}>
-                                <SvgXml xml={CHECK_ROUND_SVG} width={16} height={16} />
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {/* Inputs with Icons */}
-                    <Text style={styles.fieldLabel}>Full Name</Text>
-                    <View style={styles.inputContainer}>
-                      <SvgXml xml={USER_ICON_SVG} style={styles.inputLeftIcon} />
-                      <TextInput
-                        style={styles.formInputWithIcon}
-                        placeholder="Enter full name"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-
-                    <Text style={styles.fieldLabel}>Mobile Number</Text>
-                    <View style={styles.inputContainer}>
-                      <SvgXml xml={PHONE_ICON_SVG} style={styles.inputLeftIcon} />
-                      <TextInput
-                        style={styles.formInputWithIcon}
-                        placeholder="Enter mobile number"
-                        keyboardType="phone-pad"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-
-                    <Text style={styles.fieldLabel}>Pincode</Text>
-                    <View style={styles.pinRow}>
-                      <View style={[styles.inputContainer, { flex: 1 }]}>
-                        <SvgXml xml={PINCODE_ICON_SVG} style={styles.inputLeftIcon} />
-                        <TextInput
-                          style={styles.formInputWithIcon}
-                          placeholder="Enter 6-digit pincode"
-                          keyboardType="number-pad"
-                          placeholderTextColor={theme.colors.textMuted}
-                        />
-                      </View>
-                      <TouchableOpacity style={styles.pinCheckBtn}>
-                        <Text style={styles.pinCheckText}>Check Pincode</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.fieldLabel}>Address</Text>
-                    <View style={styles.inputContainer}>
-                      <SvgXml xml={MAP_BUILDING_SVG} style={styles.inputLeftIcon} width={15} height={15} />
-                      <TextInput
-                        style={styles.formInputWithIcon}
-                        placeholder="House No., Building, Street, Area"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-
-                    <Text style={styles.fieldLabel}>Landmark (Optional)</Text>
-                    <View style={styles.inputContainer}>
-                      <SvgXml xml={FLAG_ICON_SVG} style={styles.inputLeftIcon} />
-                      <TextInput
-                        style={styles.formInputWithIcon}
-                        placeholder="Enter landmark"
-                        placeholderTextColor={theme.colors.textMuted}
-                      />
-                    </View>
-
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>City</Text>
-                        <View style={styles.inputContainer}>
-                          <SvgXml xml={CITY_ICON_SVG} style={styles.inputLeftIcon} />
-                          <TextInput
-                            style={styles.formInputWithIcon}
-                            placeholder="Enter city"
-                            placeholderTextColor={theme.colors.textMuted}
-                          />
-                        </View>
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>State</Text>
-                        <View style={styles.inputContainer}>
-                          <TextInput
-                            style={[styles.formInputWithIcon, { paddingLeft: 12 }]}
-                            placeholder="Select state"
-                            placeholderTextColor={theme.colors.textMuted}
-                          />
-                          <SvgXml
-                            xml={CHEVRON_DOWN_SVG}
-                            width={14}
-                            height={14}
-                            style={{ marginRight: 10 }}
-                          />
-                        </View>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.defaultCheckboxRow}
-                      activeOpacity={0.7}
-                      onPress={() => setIsDefaultAddress(!isDefaultAddress)}>
-                      <View
-                        style={[
-                          styles.checkboxBox,
-                          isDefaultAddress && styles.checkboxBoxSelected,
-                        ]}>
-                        {isDefaultAddress && (
-                          <SvgXml xml={CHECK_GREEN_SVG} width={10} height={10} />
-                        )}
-                      </View>
-                      <Text style={styles.defaultCheckboxLabel}>Set as default address</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.saveBtn}
-                      activeOpacity={0.8}
-                      onPress={() => setIsAddAddressModalVisible(false)}>
-                      <Text style={styles.saveBtnText}>Save Address</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+          editingAddress={editingAddress}
+          onClose={() => setIsAddAddressModalVisible(false)}
+          onSaved={handleAddressSaved}
+        />
       </View>
     </SafeAreaView>
   );
@@ -1194,6 +961,7 @@ const createStyles = (theme: AppTheme) => {
     marginTop: 2,
   },
   locationText: {
+    flexShrink: 1,
     fontSize: 11,
     color: colors.textSecondary,
     fontWeight: '500',

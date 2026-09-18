@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import MenuDrawer from '../components/MenuDrawer';
+import { useProfile, formatAddressLabel } from '../hooks/useProfile';
 import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
 import {
@@ -33,6 +34,9 @@ SEARCH_SVG,
   BOX_ICON_SVG,
 } from '../assets/svg';
 import BagIconButton from '../components/BagIconButton';
+import { useDispatch } from 'react-redux';
+import { addItem as addCartItem } from '../store/slices/cartSlice';
+import type { AppDispatch } from '../store';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -232,6 +236,7 @@ const createStyles = (theme: AppTheme) => {
       marginTop: 2,
     },
     locationText: {
+      flexShrink: 1,
       fontSize: 11,
       color: colors.textSecondary,
       fontFamily: fontFamily.regular,
@@ -464,6 +469,9 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 11,
       fontWeight: '700',
     },
+    addToCartBtnAdded: {
+      backgroundColor: colors.success,
+    },
     // State feedback
     centerBox: {
       alignItems: 'center',
@@ -603,9 +611,40 @@ const ProductCard = ({
 }) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const dispatch = useDispatch<AppDispatch>();
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
+  const addTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imgHeight = cardWidth * 1.15;
+
+  useEffect(
+    () => () => {
+      if (addTimer.current) {
+        clearTimeout(addTimer.current);
+      }
+    },
+    [],
+  );
+
+  const handleAddToCartPress = () => {
+    dispatch(
+      addCartItem({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        originalPrice: item.originalPrice,
+        image: item.image,
+        size: selectedSize || item.sizes[0] || '',
+        color: '',
+      }),
+    );
+    setAdded(true);
+    if (addTimer.current) {
+      clearTimeout(addTimer.current);
+    }
+    addTimer.current = setTimeout(() => setAdded(false), 1200);
+  };
 
   const handleLikePress = async () => {
     if (wishlistLoading) return;
@@ -677,11 +716,11 @@ const ProductCard = ({
       </ScrollView>
 
       <TouchableOpacity
-        style={styles.addToCartBtn}
+        style={[styles.addToCartBtn, added && styles.addToCartBtnAdded]}
         activeOpacity={0.8}
-        onPress={onAddToCart}>
+        onPress={handleAddToCartPress}>
         <SvgXml xml={CART_WHITE_SVG} width={13} height={13} />
-        <Text style={styles.addToCartText}>Add to Cart</Text>
+        <Text style={styles.addToCartText}>{added ? 'Added' : 'Add to Cart'}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -701,12 +740,15 @@ const HomeTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
+  const { addresses } = useProfile();
+  const deliveryAddress = addresses[0] || null;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<HomeTabNavigation>();
   const route = useRoute<RouteProp<TabParamList, 'HomeTab'>>();
   const isTablet = width >= 768;
   const hPad = width * 0.04;
+  const addressMaxWidth = Math.min(width * 0.42, 200);
   const logoWidth = Math.min(width * 0.22, 90);
   const logoHeight = logoWidth * 0.4;
   const collectionCardW = Math.min(width * 0.3, 120);
@@ -862,7 +904,9 @@ const HomeTab = () => {
               )}
               <View style={styles.locationRow}>
                 <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
-                <Text style={styles.locationText}>Delivering to Home</Text>
+                <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
+                  Delivering to {formatAddressLabel(deliveryAddress)}
+                </Text>
                 <SvgXml xml={CHEVRON_DOWN_SVG} width={10} height={10} />
               </View>
             </View>

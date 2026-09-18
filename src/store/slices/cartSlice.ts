@@ -21,6 +21,7 @@ export interface CartItem {
   size: string;
   color: string;
   quantity: number;
+  productCode?: string;
 }
 
 export interface CartState {
@@ -64,7 +65,10 @@ const cartSlice = createSlice({
     addItem(
       state,
       action: PayloadAction<
-        Omit<CartItem, 'cartId' | 'quantity'> & { quantity?: number }
+        Omit<CartItem, 'cartId' | 'quantity' | 'productCode'> & {
+          quantity?: number;
+          productCode?: string;
+        }
       >,
     ) {
       const incoming = action.payload;
