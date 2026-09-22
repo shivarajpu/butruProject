@@ -10,6 +10,7 @@ export type RootStackParamList = {
   ProductDetails: { product: any };
   CartScreen: undefined;
   MyOrders: undefined;
+  Notification: undefined;
   HelpSupport:
     | {
         config?: Partial<SupportConfig>;

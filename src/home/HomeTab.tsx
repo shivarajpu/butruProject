@@ -49,30 +49,64 @@ type HomeTabNavigation = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const COLLECTIONS = [
-  {
-    id: '1',
-    title: 'Comfort',
-    subtitle: 'Buy Now',
-    image: 'https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '2',
-    title: 'Cosy Nights',
-    subtitle: 'Buy Now',
-    image: 'https://images.unsplash.com/photo-1514090458221-65bb69cf63e6?auto=format&fit=crop&q=80&w=400',
-  },
-  {
-    id: '3',
-    title: 'Cosy Nights',
-    subtitle: 'Buy Now',
-    image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&q=80&w=400',
-  },
-];
+// ─── Collections & Banners API Config ────────────────────────────────────────
 
 const BANNERS_ENDPOINT = '/api/storefront/banners?placement=home_hero';
+const COLLECTIONS_ENDPOINT =
+  '/api/storefront/banners?placement=home_hero_cards&store=butru-store';
+
+interface Collection {
+  id: string;
+  title: string;
+  subtitle: string; // ctaText
+  image: string;
+  productId?: string;
+}
+
+interface ApiCollection {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  imageUrl: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  productId?: string;
+}
+
+interface CollectionsResponse {
+  success: boolean;
+  count: number;
+  data: ApiCollection[];
+}
+
+const mapApiCollection = (item: ApiCollection): Collection => ({
+  id: item._id,
+  title: item.title,
+  subtitle: item.ctaText || item.subtitle || 'Buy Now',
+  image: item.imageUrl,
+  productId: item.productId || undefined,
+});
+
+interface CollectionProductSku {
+  size: string;
+  sellingPrice: number;
+  mrp: number;
+}
+
+interface CollectionApiProduct {
+  _id: string;
+  name: string;
+  price: number;
+  images: string[];
+  color: string;
+  sku: string;
+  skus: CollectionProductSku[];
+}
+
+interface CollectionProductResponse {
+  success: boolean;
+  data: CollectionApiProduct;
+}
 
 interface Banner {
   id: string;
@@ -97,7 +131,8 @@ const mapApiBanner = (item: ApiBanner): Banner => ({
 
 // ─── Product Types & API Config ───────────────────────────────────────────────
 
-const PRODUCTS_ENDPOINT = '/api/storefront/products';
+const PRODUCTS_ENDPOINT = '/api/storefront/products?isVisible=true&store=butru-store';
+const PRODUCT_DETAIL_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 
@@ -731,9 +766,12 @@ const ProductCard = ({
 const HomeTab = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const dispatch = useDispatch<AppDispatch>();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionAddingId, setCollectionAddingId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -766,13 +804,13 @@ const HomeTab = () => {
     setProducts([]);
 
     try {
-      const params =
-        category === 'Home'
-          ? 'isVisible=true&limit=20&page=1'
-          : `isVisible=true&limit=20&page=1&category=${encodeURIComponent(category)}`;
+      const categoryParam =
+        category !== 'Home'
+          ? `&category=${encodeURIComponent(category)}`
+          : '';
 
       const response = await apiService.get<ProductsApiResponse>(
-        `${PRODUCTS_ENDPOINT}?${params}`,
+        `${PRODUCTS_ENDPOINT}${categoryParam}`,
       );
 
       setProducts((response.data ?? []).map(mapApiProduct));
@@ -794,9 +832,21 @@ const HomeTab = () => {
     }
   };
 
+  const fetchCollections = async () => {
+    try {
+      const response = await apiService.get<CollectionsResponse>(COLLECTIONS_ENDPOINT);
+      if (response.success) {
+        setCollections((response.data ?? []).map(mapApiCollection));
+      }
+    } catch {
+      // non-fatal — collections row simply stays hidden
+    }
+  };
+
   useEffect(() => {
     fetchProducts(activeCategory);
     fetchBanners();
+    fetchCollections();
   }, [activeCategory]);
 
   // Category selected from CategoryTab — apply it like the menu drawer does.
@@ -876,6 +926,43 @@ const HomeTab = () => {
     navigation.navigate('ProductDetails', { product: productItem });
   };
 
+  const handleCollectionPress = async (item: Collection) => {
+    if (item.productId && collectionAddingId) return;
+
+    if (item.productId) {
+      setCollectionAddingId(item.id);
+      try {
+        const response = await apiService.get<CollectionProductResponse>(
+          `${PRODUCT_DETAIL_ENDPOINT}/${item.productId}`,
+        );
+        if (response.success && response.data) {
+          const p = response.data;
+          const sku = p.skus?.[0];
+          const sellingPrice = sku?.sellingPrice ?? p.price ?? 0;
+          const mrp = sku?.mrp ?? sellingPrice;
+          dispatch(
+            addCartItem({
+              productId: p._id,
+              name: p.name,
+              price: sellingPrice,
+              originalPrice: mrp,
+              image: p.images?.[0] ?? '',
+              size: sku?.size ?? '',
+              color: p.color ?? '',
+              productCode: p.sku ?? '',
+            }),
+          );
+        }
+      } catch {
+        // non-fatal — item silently not added; cart stays as-is
+      } finally {
+        setCollectionAddingId(null);
+      }
+    }
+
+    navigation.navigate('CartScreen');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView
@@ -913,7 +1000,10 @@ const HomeTab = () => {
           </View>
 
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Notification')}>
               <SvgXml xml={BELL_SVG} width={25} height={25} />
               <View style={styles.notifDot} />
             </TouchableOpacity>
@@ -936,26 +1026,35 @@ const HomeTab = () => {
         <BannerSlider slides={banners} screenWidth={width} />
 
         {/* Horizontal Collections */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: hPad, gap: 10 }}
-          style={{ marginBottom: 20 }}>
-          {COLLECTIONS.map(item => (
-            <ImageBackground
-              key={item.id}
-              source={{ uri: item.image }}
-              style={[styles.collectionCard, { width: collectionCardW, height: collectionCardW * 1.25 }]}
-              imageStyle={{ borderRadius: 12 }}>
-              <View style={styles.collectionOverlay}>
-                <Text style={styles.collectionTitle}>{item.title}</Text>
-                <TouchableOpacity style={styles.buyNowBtn} activeOpacity={0.8}>
-                  <Text style={styles.buyNowText}>{item.subtitle}</Text>
-                </TouchableOpacity>
-              </View>
-            </ImageBackground>
-          ))}
-        </ScrollView>
+        {collections.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: hPad, gap: 10 }}
+            style={{ marginBottom: 20 }}>
+            {collections.map(item => (
+              <ImageBackground
+                key={item.id}
+                source={{ uri: item.image }}
+                style={[styles.collectionCard, { width: collectionCardW, height: collectionCardW * 1.25 }]}
+                imageStyle={{ borderRadius: 12 }}>
+                <View style={styles.collectionOverlay}>
+                  <Text style={styles.collectionTitle}>{item.title}</Text>
+                  {collectionAddingId === item.id ? (
+                    <ActivityIndicator color={styles.buyNowText.color} size="small" />
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.buyNowBtn}
+                      activeOpacity={0.8}
+                      onPress={() => handleCollectionPress(item)}>
+                      <Text style={styles.buyNowText}>{item.subtitle}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ImageBackground>
+            ))}
+          </ScrollView>
+        )}
 
         {/* Section Header */}
         <View style={[styles.sectionHeader, { paddingHorizontal: hPad }]}>

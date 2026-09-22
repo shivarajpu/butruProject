@@ -660,7 +660,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                     style={s <= Math.round(product.rating) ? undefined : { opacity: 0.25 }}
                   />
                 ))}
-                <Text style={styles.reviewText}>({product.reviews})</Text>
+                <Text style={styles.reviewText}>Review ({product.reviews})</Text>
               </View>
               <TouchableOpacity onPress={() => handleToggleWishlist()} activeOpacity={0.7}>
                 <SvgXml
