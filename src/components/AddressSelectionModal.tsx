@@ -43,11 +43,6 @@ const getAddressType = (address: Address): 'home' | 'work' | 'other' => {
   return 'other';
 };
 
-const formatPhone = (phone?: string) => {
-  if (!phone) return '';
-  return phone.startsWith('+') ? phone : `+91 ${phone}`;
-};
-
 const AddressSelectionModal = ({
   visible,
   addresses,
@@ -148,27 +143,30 @@ const AddressSelectionModal = ({
                         <Text style={styles.addressDetailsText}>
                           {addressText}
                         </Text>
-                        <Text style={styles.addressPhoneText}>
-                          {formatPhone(address.phone)}
-                        </Text>
-                        <View style={styles.cardActionsRow}>
-                          <TouchableOpacity
-                            style={styles.cardActionBtn}
-                            activeOpacity={0.7}
-                            onPress={() => onEditAddress?.(address)}>
-                            <SvgXml xml={EDIT_PENCIL_SVG} width={12} height={12} />
-                            <Text style={styles.cardActionText}>Edit</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.cardActionBtn}
-                            activeOpacity={0.7}
-                            onPress={() => onDeleteAddress?.(address)}>
-                            <SvgXml xml={TRASH_SVG} width={12} height={12} />
-                            <Text style={[styles.cardActionText, styles.cardActionDeleteText]}>
-                              Delete
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
+                        {(onEditAddress || onDeleteAddress) && (
+                          <View style={styles.cardActionsRow}>
+                            {onEditAddress && (
+                              <TouchableOpacity
+                                style={styles.cardActionBtn}
+                                activeOpacity={0.7}
+                                onPress={() => onEditAddress(address)}>
+                                <SvgXml xml={EDIT_PENCIL_SVG} width={12} height={12} />
+                                <Text style={styles.cardActionText}>Edit</Text>
+                              </TouchableOpacity>
+                            )}
+                            {onDeleteAddress && (
+                              <TouchableOpacity
+                                style={styles.cardActionBtn}
+                                activeOpacity={0.7}
+                                onPress={() => onDeleteAddress(address)}>
+                                <SvgXml xml={TRASH_SVG} width={12} height={12} />
+                                <Text style={[styles.cardActionText, styles.cardActionDeleteText]}>
+                                  Delete
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
                       </TouchableOpacity>
                     );
                   })
@@ -303,11 +301,6 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textSecondary,
       marginTop: 6,
       lineHeight: 16,
-    },
-    addressPhoneText: {
-      fontSize: 11,
-      color: colors.textMuted,
-      marginTop: 4,
     },
     cardActionsRow: {
       flexDirection: 'row',

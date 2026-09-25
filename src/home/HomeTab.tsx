@@ -10,13 +10,15 @@ import {
   ActivityIndicator,
   Keyboard,
   TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import MenuDrawer from '../components/MenuDrawer';
-import { useProfile, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
@@ -815,7 +817,10 @@ const HomeTab = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionAddingId, setCollectionAddingId] = useState<string | null>(null);
@@ -828,7 +833,71 @@ const HomeTab = () => {
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
   const { addresses, refresh } = useProfile();
-  const deliveryAddress = addresses[0] || null;
+
+  useEffect(() => {
+    if (!selectedAddressId && addresses.length) {
+      const defaultAddress = addresses.find(address => address.isDefault) || addresses[0];
+      setSelectedAddressId(defaultAddress._id || '0');
+    }
+  }, [addresses, selectedAddressId]);
+
+  const deliveryAddress =
+    addresses.find(address => (address._id || '') === selectedAddressId) || null;
+
+  const handleSelectAddress = (address: Address) => {
+    setSelectedAddressId(address._id || '0');
+  };
+
+  const handleOpenAddAddress = () => {
+    setEditingAddress(null);
+    setIsAddressModalVisible(false);
+    setTimeout(() => {
+      setIsAddAddressModalVisible(true);
+    }, 250);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setIsAddressModalVisible(false);
+    setTimeout(() => {
+      setIsAddAddressModalVisible(true);
+    }, 250);
+  };
+
+  const handleDeleteAddress = (address: Address) => {
+    if (!address._id) {
+      return;
+    }
+    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiService.delete(`/api/auth/profile/address/${address._id}`);
+            if (selectedAddressId === address._id) {
+              setSelectedAddressId(null);
+            }
+            refresh();
+          } catch (deleteError) {
+            Alert.alert(
+              'Delete Failed',
+              deleteError instanceof Error
+                ? deleteError.message
+                : 'Something went wrong. Please try again.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddressSaved = () => {
+    setIsAddAddressModalVisible(false);
+    setEditingAddress(null);
+    refresh();
+  };
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<HomeTabNavigation>();
@@ -1069,7 +1138,7 @@ const HomeTab = () => {
               <TouchableOpacity
                 style={{ marginLeft: 8 }}
                 activeOpacity={0.7}
-                onPress={() => setIsAddAddressModalVisible(true)}>
+                onPress={() => setIsAddressModalVisible(true)}>
                 {Butruname ? (
                   <SvgXml xml={Butruname} width={logoWidth} height={logoHeight} />
                 ) : (
@@ -1281,10 +1350,22 @@ const HomeTab = () => {
         <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
 
+      <AddressSelectionModal
+        visible={isAddressModalVisible}
+        addresses={addresses}
+        selectedAddressId={selectedAddressId}
+        onSelect={handleSelectAddress}
+        onClose={() => setIsAddressModalVisible(false)}
+        onAddAddress={handleOpenAddAddress}
+        onEditAddress={handleEditAddress}
+        onDeleteAddress={handleDeleteAddress}
+      />
+
       <AddAddressModal
         visible={isAddAddressModalVisible}
+        editingAddress={editingAddress}
         onClose={() => setIsAddAddressModalVisible(false)}
-        onSaved={refresh}
+        onSaved={handleAddressSaved}
       />
 
       {/* Side Menu Drawer Component */}

@@ -355,7 +355,7 @@ const CartScreen = () => {
             <TouchableOpacity
               style={styles.locationWrapper}
               activeOpacity={0.7}
-              onPress={() => setIsAddAddressModalVisible(true)}>
+              onPress={() => setIsAddressModalVisible(true)}>
               {Butruname ? (
                 <SvgXml xml={Butruname} width={65} height={24} />
               ) : (

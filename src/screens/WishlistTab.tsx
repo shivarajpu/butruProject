@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   useWindowDimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -15,7 +16,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ARROW_BACK_ICON, LOCATION_PIN_SVG } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
-import { useProfile, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import AddressSelectionModal from '../components/AddressSelectionModal';
 import AppButton from '../components/AppButton';
 import AppCard from '../components/AppCard';
 import AppIconButton from '../components/AppIconButton';
@@ -89,12 +91,79 @@ const WishlistScreen = () => {
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const { addresses, refresh } = useProfile();
-  const deliveryAddress = addresses[0] || null;
 
   const [items, setItems] = useState<WishlistCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  useEffect(() => {
+    if (!selectedAddressId && addresses.length) {
+      const defaultAddress = addresses.find(address => address.isDefault) || addresses[0];
+      setSelectedAddressId(defaultAddress._id || '0');
+    }
+  }, [addresses, selectedAddressId]);
+
+  const deliveryAddress =
+    addresses.find(address => (address._id || '') === selectedAddressId) || null;
+
+  const handleSelectAddress = (address: Address) => {
+    setSelectedAddressId(address._id || '0');
+  };
+
+  const handleOpenAddAddress = () => {
+    setEditingAddress(null);
+    setIsAddressModalVisible(false);
+    setTimeout(() => {
+      setIsAddAddressModalVisible(true);
+    }, 250);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setIsAddressModalVisible(false);
+    setTimeout(() => {
+      setIsAddAddressModalVisible(true);
+    }, 250);
+  };
+
+  const handleDeleteAddress = (address: Address) => {
+    if (!address._id) {
+      return;
+    }
+    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiService.delete(`/api/auth/profile/address/${address._id}`);
+            if (selectedAddressId === address._id) {
+              setSelectedAddressId(null);
+            }
+            refresh();
+          } catch (deleteError) {
+            Alert.alert(
+              'Delete Failed',
+              deleteError instanceof Error
+                ? deleteError.message
+                : 'Something went wrong. Please try again.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddressSaved = () => {
+    setIsAddAddressModalVisible(false);
+    setEditingAddress(null);
+    refresh();
+  };
 
   const isTablet = width >= 768;
   const hPad = 16;
@@ -166,7 +235,7 @@ const WishlistScreen = () => {
               <TouchableOpacity
                 style={styles.deliveryRow}
                 activeOpacity={0.7}
-                onPress={() => setIsAddAddressModalVisible(true)}>
+                onPress={() => setIsAddressModalVisible(true)}>
                 <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
                 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200)  , marginLeft:4}]} numberOfLines={1}>
                  Delivering to {formatAddressLabel(deliveryAddress)}
@@ -300,10 +369,22 @@ const WishlistScreen = () => {
           )}
         </ScrollView>
       </View>
+      <AddressSelectionModal
+        visible={isAddressModalVisible}
+        addresses={addresses}
+        selectedAddressId={selectedAddressId}
+        onSelect={handleSelectAddress}
+        onClose={() => setIsAddressModalVisible(false)}
+        onAddAddress={handleOpenAddAddress}
+        onEditAddress={handleEditAddress}
+        onDeleteAddress={handleDeleteAddress}
+      />
+
       <AddAddressModal
         visible={isAddAddressModalVisible}
+        editingAddress={editingAddress}
         onClose={() => setIsAddAddressModalVisible(false)}
-        onSaved={refresh}
+        onSaved={handleAddressSaved}
       />
     </SafeAreaView>
   );

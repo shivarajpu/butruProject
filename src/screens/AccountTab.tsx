@@ -325,7 +325,7 @@ const AccountTab = () => {
                    <TouchableOpacity
                      style={styles.deliveryRow}
                      activeOpacity={0.7}
-                     onPress={() => setIsAddAddressModalVisible(true)}>
+                      onPress={() => setIsAddressModalVisible(true)}>
                      <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) , marginLeft:4 }]} numberOfLines={1}>
                         Delivering to {formatAddressLabel(selectedAddress)}
