@@ -13,7 +13,7 @@ const HomeScreen = () => {
   const { colors } = theme;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background , }]}>
       <MainTabNavigator />
     </View>
   );

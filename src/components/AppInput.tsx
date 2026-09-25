@@ -38,6 +38,7 @@ interface AppInputProps extends TextInputProps {
   inputContainerStyle?: StyleProp<ViewStyle>;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  ref?: React.Ref<React.ElementRef<typeof TextInput>>;
 }
 
 const AppInput: React.FC<AppInputProps> = ({
@@ -47,6 +48,7 @@ const AppInput: React.FC<AppInputProps> = ({
   inputContainerStyle,
   leftIcon,
   rightIcon,
+  ref,
   ...textInputProps
 }) => {
   const theme = useAppTheme();
@@ -85,6 +87,7 @@ const AppInput: React.FC<AppInputProps> = ({
         ) : null}
 
         <TextInput
+          ref={ref}
           {...textInputProps}
           onFocus={e => {
             setIsFocused(true);

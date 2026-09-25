@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,12 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
-  Platform,
-  StatusBar,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { useDispatch } from 'react-redux';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
-import type { AppDispatch } from '../store';
-import { ARROW_BACK_ICON, CHEVRON_DOWN_SVG } from '../assets/svg';
+import { ARROW_BACK_ICON, LOCATION_PIN_SVG } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { useProfile, formatAddressLabel } from '../hooks/useProfile';
@@ -25,9 +20,9 @@ import AppButton from '../components/AppButton';
 import AppCard from '../components/AppCard';
 import AppIconButton from '../components/AppIconButton';
 import BagIconButton from '../components/BagIconButton';
+import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
 
-const LOCATION_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
 const HEART_PINK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
 
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
@@ -93,22 +88,19 @@ const WishlistScreen = () => {
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
-  const dispatch = useDispatch<AppDispatch>();
-  const { addresses } = useProfile();
+  const { addresses, refresh } = useProfile();
   const deliveryAddress = addresses[0] || null;
 
   const [items, setItems] = useState<WishlistCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
-  const addTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
 
   const isTablet = width >= 768;
   const hPad = 16;
   const gap = 12;
   const numCols = isTablet ? 3 : 2;
   const cardW = (width - hPad * 2 - gap * (numCols - 1)) / numCols;
-  const dynamicTopPadding = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
 
   const fetchWishlist = async () => {
     setLoading(true);
@@ -136,13 +128,6 @@ const WishlistScreen = () => {
     }, [])
   );
 
-  useEffect(
-    () => () => {
-      Object.values(addTimers.current).forEach(timer => clearTimeout(timer));
-    },
-    [],
-  );
-
   const removeItem = async (id: string) => {
     try {
       await apiService.delete(`/api/storefront/wishlist/items/${id}`);
@@ -158,38 +143,13 @@ const WishlistScreen = () => {
     }
   };
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: WishlistCardItem) => {
     navigation.navigate('ProductDetails', { product });
-  };
-
-  const handleQuickAdd = (item: WishlistCardItem) => {
-    dispatch(
-      addCartItem({
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        originalPrice: item.originalPrice ?? item.price,
-        image: item.image,
-        size: '',
-        color: '',
-      }),
-    );
-    setAddedIds(prev => new Set(prev).add(item.id));
-    if (addTimers.current[item.id]) {
-      clearTimeout(addTimers.current[item.id]);
-    }
-    addTimers.current[item.id] = setTimeout(() => {
-      setAddedIds(prev => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-    }, 1200);
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+      <View style={styles.container}>
         
         {/* ── Top Header ── */}
         <View style={styles.headerContainer}>
@@ -203,13 +163,15 @@ const WishlistScreen = () => {
 
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>Wishlist</Text>
-              <View style={styles.deliveryRow}>
-                <SvgXml xml={LOCATION_SVG} width={12} height={12} />
-                <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
+              <TouchableOpacity
+                style={styles.deliveryRow}
+                activeOpacity={0.7}
+                onPress={() => setIsAddAddressModalVisible(true)}>
+                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200)  , marginLeft:4}]} numberOfLines={1}>
                  Delivering to {formatAddressLabel(deliveryAddress)}
                </Text>
-                <SvgXml xml={CHEVRON_DOWN_SVG} width={15} height={15} />
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -321,13 +283,13 @@ const WishlistScreen = () => {
                       </ScrollView>
                     ) : null}
 
-                    {/* Add to cart adds directly here */}
+                    {/* Add to cart goes through ProductDetails so a size must be selected */}
                     <AppButton
-                      style={[styles.addToCartBtn, addedIds.has(item.id) && styles.addToCartBtnAdded]}
+                      style={styles.addToCartBtn}
                       textStyle={styles.addToCartText}
                       size="sm"
-                      label={addedIds.has(item.id) ? 'Added' : 'Add to Cart'}
-                      onPress={() => handleQuickAdd(item)}
+                      label="Add to Cart"
+                      onPress={() => handleAddToCart(item)}
                     />
                     </View>
                   </TouchableOpacity>
@@ -338,6 +300,11 @@ const WishlistScreen = () => {
           )}
         </ScrollView>
       </View>
+      <AddAddressModal
+        visible={isAddAddressModalVisible}
+        onClose={() => setIsAddAddressModalVisible(false)}
+        onSaved={refresh}
+      />
     </SafeAreaView>
   );
 };
@@ -516,9 +483,6 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textOnPrimary,
     fontSize: 12,
     fontFamily: fontFamily.bold,
-  },
-  addToCartBtnAdded: {
-    backgroundColor: colors.success,
   },
   centerBox: {
     alignItems: 'center',

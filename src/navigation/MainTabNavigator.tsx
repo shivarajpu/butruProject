@@ -107,6 +107,7 @@ const MainTabNavigator = () => {
             bottom: tabBarBottom,
             height: tabBarHeight,
             borderRadius: tabBarHeight / 2, // Perfect Pill shape dynamically
+            marginBottom: Platform.OS === 'android' ? Math.max(insets.bottom + 10, 25) : 15,
           },
         ],
         tabBarItemStyle: tabStyles.tabBarItem,

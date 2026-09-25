@@ -19,7 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, CHEVRON_DOWN_SVG, LOCATION_PIN_SVG, cameraicon} from '../assets/svg';
+import { BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, LOCATION_PIN_SVG, cameraicon} from '../assets/svg';
 import BagIconButton from '../components/BagIconButton';
 import { useNavigation } from '@react-navigation/native'; // 1. Hook import karein
 import { useAppTheme } from '../theme/useAppTheme';
@@ -31,6 +31,13 @@ import { apiService } from '../api/apiService';
 import { useProfile, type Address, type ProfileData, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import {
+  getPolicy,
+  policyHasContent,
+  policyTitle,
+  POLICY_KEYS,
+  type PolicyKey,
+} from '../api/policies';
 
 const LOGOUT_ENDPOINT = '/api/auth/logout';
 const UPDATE_PROFILE_ENDPOINT = '/api/auth/profile';
@@ -83,6 +90,49 @@ const AccountTab = () => {
   const [logoutError, setLogoutError] = useState('');
 
   const { profile, addresses, refresh } = useProfile();
+
+  const [policyAvailability, setPolicyAvailability] = useState<
+    Partial<Record<PolicyKey, boolean>>
+  >({});
+
+  // Pre-fetch policy availability. Options whose API has no content are hidden.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const results = await Promise.allSettled(
+        POLICY_KEYS.map(key => getPolicy(key)),
+      );
+      const availability: Partial<Record<PolicyKey, boolean>> = {};
+      results.forEach((result, index) => {
+        const key = POLICY_KEYS[index];
+        availability[key] =
+          result.status === 'fulfilled' &&
+          policyHasContent(result.value?.data);
+      });
+      if (mounted) {
+        setPolicyAvailability(availability);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Only render rows whose policy API returned content.
+  const POLICIES_CARD_ORDER: PolicyKey[] = ['terms', 'shipping', 'returns', 'privacy'];
+  const shownPolicyKeys = POLICIES_CARD_ORDER.filter(
+    key => policyAvailability[key] === true,
+  );
+
+  const openPolicy = (key: PolicyKey) => {
+    if (policyAvailability[key] === false) {
+      return;
+    }
+    navigation.getParent()?.navigate('Policy' as never, {
+      policyKey: key,
+      title: policyTitle(key),
+    } as never);
+  };
 
   useEffect(() => {
     if (profile) {
@@ -275,12 +325,11 @@ const AccountTab = () => {
                    <TouchableOpacity
                      style={styles.deliveryRow}
                      activeOpacity={0.7}
-                     onPress={() => setIsAddressModalVisible(true)}>
+                     onPress={() => setIsAddAddressModalVisible(true)}>
                      <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
-<Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
+<Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) , marginLeft:4 }]} numberOfLines={1}>
                         Delivering to {formatAddressLabel(selectedAddress)}
                       </Text>
-                     <SvgXml xml={CHEVRON_DOWN_SVG} width={15} height={15} />
                    </TouchableOpacity>
                  </View>
                </View>
@@ -396,7 +445,12 @@ const AccountTab = () => {
             <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.optionItem}
+            activeOpacity={0.7}
+            onPress={() =>
+              navigation.getParent()?.navigate('PaymentMethods' as never)
+            }>
             <View style={styles.optionRowLeft}>
               <View style={styles.iconBoxPink}>
                 <SvgXml xml={PAYMENT_CARD_SVG} width={18} height={18} />
@@ -424,59 +478,89 @@ const AccountTab = () => {
         </View>
 
         {/* Section: Policies Block */}
-        <View style={styles.groupedCard}>
-          <TouchableOpacity
-            style={styles.optionItem}
-            activeOpacity={0.7}
-            onPress={() => navigation.getParent()?.navigate('Terms' as never)}>
-            <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={DOCUMENT_SVG} width={18} height={18} />
-              </View>
-              <Text style={styles.optionTitle}>Terms and Conditions</Text>
-            </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-          </TouchableOpacity>
+        {shownPolicyKeys.length > 0 && (
+          <View style={styles.groupedCard}>
+            {shownPolicyKeys.includes('terms') && (
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  shownPolicyKeys[shownPolicyKeys.length - 1] === 'terms' && {
+                    borderBottomWidth: 0,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => openPolicy('terms')}>
+                <View style={styles.optionRowLeft}>
+                  <View style={styles.iconBoxPink}>
+                    <SvgXml xml={DOCUMENT_SVG} width={18} height={18} />
+                  </View>
+                  <Text style={styles.optionTitle}>Terms and Conditions</Text>
+                </View>
+                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={styles.optionItem}
-            activeOpacity={0.7}
-            onPress={() => navigation.getParent()?.navigate('ShippingPolicy' as never)}>
-            <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={TRUCK_SVG} width={18} height={18} />
-              </View>
-              <Text style={styles.optionTitle}>Shipping Policy</Text>
-            </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-          </TouchableOpacity>
+            {shownPolicyKeys.includes('shipping') && (
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  shownPolicyKeys[shownPolicyKeys.length - 1] === 'shipping' && {
+                    borderBottomWidth: 0,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => openPolicy('shipping')}>
+                <View style={styles.optionRowLeft}>
+                  <View style={styles.iconBoxPink}>
+                    <SvgXml xml={TRUCK_SVG} width={18} height={18} />
+                  </View>
+                  <Text style={styles.optionTitle}>Shipping Policy</Text>
+                </View>
+                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={styles.optionItem}
-            activeOpacity={0.7}
-            onPress={() => navigation.getParent()?.navigate('ReturnsRefunds' as never)}>
-            <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={RETURN_REFUND_SVG} width={18} height={18} />
-              </View>
-              <Text style={styles.optionTitle}>Returns, Refunds & Exchange</Text>
-            </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-          </TouchableOpacity>
+            {shownPolicyKeys.includes('returns') && (
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  shownPolicyKeys[shownPolicyKeys.length - 1] === 'returns' && {
+                    borderBottomWidth: 0,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => openPolicy('returns')}>
+                <View style={styles.optionRowLeft}>
+                  <View style={styles.iconBoxPink}>
+                    <SvgXml xml={RETURN_REFUND_SVG} width={18} height={18} />
+                  </View>
+                  <Text style={styles.optionTitle}>Returns, Refunds & Exchange</Text>
+                </View>
+                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={[styles.optionItem, { borderBottomWidth: 0 }]}
-            activeOpacity={0.7}
-            onPress={() => navigation.getParent()?.navigate('PrivacyPolicy' as never)}>
-            <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={PRIVACY_SHIELD_SVG} width={18} height={18} />
-              </View>
-              <Text style={styles.optionTitle}>Privacy Policy</Text>
-            </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-          </TouchableOpacity>
-        </View>
+            {shownPolicyKeys.includes('privacy') && (
+              <TouchableOpacity
+                style={[
+                  styles.optionItem,
+                  shownPolicyKeys[shownPolicyKeys.length - 1] === 'privacy' && {
+                    borderBottomWidth: 0,
+                  },
+                ]}
+                activeOpacity={0.7}
+                onPress={() => openPolicy('privacy')}>
+                <View style={styles.optionRowLeft}>
+                  <View style={styles.iconBoxPink}>
+                    <SvgXml xml={PRIVACY_SHIELD_SVG} width={18} height={18} />
+                  </View>
+                  <Text style={styles.optionTitle}>Privacy Policy</Text>
+                </View>
+                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Section: Support & Logout Block */}
         <View style={[styles.groupedCard, { marginBottom: 30 }]}>
@@ -493,15 +577,20 @@ const AccountTab = () => {
             <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
-            <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={ABOUT_INFO_SVG} width={18} height={18} />
+          {policyAvailability.about === true && (
+            <TouchableOpacity
+              style={styles.optionItem}
+              activeOpacity={0.7}
+              onPress={() => openPolicy('about')}>
+              <View style={styles.optionRowLeft}>
+                <View style={styles.iconBoxPink}>
+                  <SvgXml xml={ABOUT_INFO_SVG} width={18} height={18} />
+                </View>
+                <Text style={styles.optionTitle}>About Us</Text>
               </View>
-              <Text style={styles.optionTitle}>About Us</Text>
-            </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
-          </TouchableOpacity>
+              <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.optionItem, { borderBottomWidth: 0 }]}

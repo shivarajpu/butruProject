@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
-  Platform,
-  StatusBar,
   ImageBackground,
   ActivityIndicator,
+  Keyboard,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -17,6 +17,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import MenuDrawer from '../components/MenuDrawer';
 import { useProfile, formatAddressLabel } from '../hooks/useProfile';
+import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
 import {
@@ -27,10 +28,11 @@ import {
   HEART_OUTLINE_SVG,
   CART_WHITE_SVG,
   LOCATION_PIN_SVG,
-  CHEVRON_DOWN_SVG,
   BELL_SVG,
   BAG_SVG,
-SEARCH_SVG,
+  SEARCH_SVG,
+  CLOSE_SVG,
+  BACK_ARROW_SVG,
   BOX_ICON_SVG,
 } from '../assets/svg';
 import BagIconButton from '../components/BagIconButton';
@@ -242,7 +244,7 @@ const createStyles = (theme: AppTheme) => {
       backgroundColor: colors.surface,
     },
     scrollContent: {
-      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) / 2 : 0,
+      paddingTop: 0,
     },
     header: {
       flexDirection: 'row',
@@ -307,12 +309,40 @@ const createStyles = (theme: AppTheme) => {
       marginBottom: 16,
       gap: 8,
     },
+    searchBarActive: {
+      marginTop: 4,
+      marginBottom: 16,
+    },
     searchInput: {
       flex: 1,
       fontSize: 13,
       color: colors.text,
       fontFamily: fontFamily.regular,
       padding: 0,
+    },
+    suggestionsContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 2,
+      marginBottom: 16,
+      overflow: 'hidden',
+    },
+    suggestionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    suggestionText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.text,
+      fontFamily: fontFamily.regular,
     },
     bannerCard: {
       width: '100%',
@@ -507,6 +537,12 @@ const createStyles = (theme: AppTheme) => {
     addToCartBtnAdded: {
       backgroundColor: colors.success,
     },
+    sizeErrorText: {
+      color: colors.error,
+      fontSize: 10,
+      fontWeight: '600',
+      marginBottom: 6,
+    },
     // State feedback
     centerBox: {
       alignItems: 'center',
@@ -650,6 +686,7 @@ const ProductCard = ({
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  const [sizeError, setSizeError] = useState(false);
   const addTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const imgHeight = cardWidth * 1.15;
 
@@ -663,6 +700,10 @@ const ProductCard = ({
   );
 
   const handleAddToCartPress = () => {
+    if (item.sizes.length > 0 && !selectedSize) {
+      setSizeError(true);
+      return;
+    }
     dispatch(
       addCartItem({
         productId: item.id,
@@ -670,7 +711,7 @@ const ProductCard = ({
         price: item.price,
         originalPrice: item.originalPrice,
         image: item.image,
-        size: selectedSize || item.sizes[0] || '',
+        size: selectedSize ?? '',
         color: '',
       }),
     );
@@ -739,7 +780,10 @@ const ProductCard = ({
             return (
               <TouchableOpacity
                 key={idx}
-                onPress={() => setSelectedSize(sz)}
+                onPress={() => {
+                  setSelectedSize(sz);
+                  setSizeError(false);
+                }}
                 style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}>
                 <Text style={[styles.sizeText, isSelected && styles.sizeTextSelected]}>
                   {sz}
@@ -749,6 +793,8 @@ const ProductCard = ({
           })}
         </View>
       </ScrollView>
+
+      {sizeError ? <Text style={styles.sizeErrorText}>Please select a size</Text> : null}
 
       <TouchableOpacity
         style={[styles.addToCartBtn, added && styles.addToCartBtnAdded]}
@@ -769,16 +815,19 @@ const HomeTab = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionAddingId, setCollectionAddingId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const searchInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
-  const { addresses } = useProfile();
+  const { addresses, refresh } = useProfile();
   const deliveryAddress = addresses[0] || null;
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -797,6 +846,24 @@ const HomeTab = () => {
         product.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
       )
     : products;
+
+  const suggestions = searchQuery.trim()
+    ? Array.from(
+        new Set(
+          products
+            .filter(product =>
+              product.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+            )
+            .map(product => product.name),
+        ),
+      ).slice(0, 6)
+    : [];
+
+  const handleExitSearch = () => {
+    Keyboard.dismiss();
+    setSearchQuery('');
+    setSearchActive(false);
+  };
 
   const fetchProducts = async (category: string) => {
     setLoading(true);
@@ -858,9 +925,24 @@ const HomeTab = () => {
 
   useFocusEffect(
     useCallback(() => {
+      setSearchQuery('');
+      setSearchActive(false);
+      searchInputRef.current?.blur();
+      Keyboard.dismiss();
       fetchWishlistItems();
     }, []),
   );
+
+  // Reset search when leaving the tab so returning shows the normal home view.
+  useEffect(() => {
+    const unsub = navigation.addListener('blur', () => {
+      setSearchQuery('');
+      setSearchActive(false);
+      searchInputRef.current?.blur();
+      Keyboard.dismiss();
+    });
+    return unsub;
+  }, [navigation]);
 
   const fetchWishlistItems = async () => {
     try {
@@ -960,7 +1042,7 @@ const HomeTab = () => {
       }
     }
 
-    navigation.navigate('CartScreen');
+    // navigation.navigate('CartScreen');
   };
 
   return (
@@ -974,59 +1056,111 @@ const HomeTab = () => {
         ]}>
 
         {/* Header */}
-        <View style={[styles.header, { paddingHorizontal: hPad }]}>
-          <View style={styles.headerLeft}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              style={styles.menuBtn}
-              onPress={() => setMenuOpen(true)}>
-              <SvgXml xml={MENU_SVG} width={24} height={24} />
-            </TouchableOpacity>
+        {!searchActive && (
+          <View style={[styles.header, { paddingHorizontal: hPad }]}>
+            <View style={styles.headerLeft}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.menuBtn}
+                onPress={() => setMenuOpen(true)}>
+                <SvgXml xml={MENU_SVG} width={24} height={24} />
+              </TouchableOpacity>
 
-            <View style={{ marginLeft: 8 }}>
-              {Butruname ? (
-                <SvgXml xml={Butruname} width={logoWidth} height={logoHeight} />
-              ) : (
-                <Text style={styles.logoFallback}>{theme.appName}</Text>
-              )}
-              <View style={styles.locationRow}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
-                <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
-                  Delivering to {formatAddressLabel(deliveryAddress)}
-                </Text>
-                <SvgXml xml={CHEVRON_DOWN_SVG} width={10} height={10} />
-              </View>
+              <TouchableOpacity
+                style={{ marginLeft: 8 }}
+                activeOpacity={0.7}
+                onPress={() => setIsAddAddressModalVisible(true)}>
+                {Butruname ? (
+                  <SvgXml xml={Butruname} width={logoWidth} height={logoHeight} />
+                ) : (
+                  <Text style={styles.logoFallback}>{theme.appName}</Text>
+                )}
+                <View style={styles.locationRow}>
+                  <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                  <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
+                    Delivering to {formatAddressLabel(deliveryAddress)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('Notification')}>
+                <SvgXml xml={BELL_SVG} width={25} height={25} />
+                <View style={styles.notifDot} />
+              </TouchableOpacity>
+              <BagIconButton />
             </View>
           </View>
-
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.iconBtn}
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('Notification')}>
-              <SvgXml xml={BELL_SVG} width={25} height={25} />
-              <View style={styles.notifDot} />
-            </TouchableOpacity>
-            <BagIconButton />
-          </View>
-        </View>
+        )}
 
         {/* Search Bar */}
         <AppInput
+          ref={searchInputRef}
           containerStyle={{ marginHorizontal: hPad, marginBottom: 0 }}
-          inputContainerStyle={styles.searchBar}
-          leftIcon={<SvgXml xml={SEARCH_SVG} width={18} height={18} />}
+          inputContainerStyle={[
+            styles.searchBar,
+            searchActive && styles.searchBarActive,
+          ]}
+          leftIcon={
+            searchActive ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleExitSearch}>
+                <SvgXml xml={BACK_ARROW_SVG} width={20} height={20} />
+              </TouchableOpacity>
+            ) : (
+              <SvgXml xml={SEARCH_SVG} width={18} height={18} />
+            )
+          }
+          rightIcon={
+            searchQuery.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                onPress={() => setSearchQuery('')}>
+                <SvgXml xml={CLOSE_SVG} width={16} height={16} />
+              </TouchableOpacity>
+            ) : undefined
+          }
           style={styles.searchInput}
           placeholder="Search for styles, clothes & more"
           value={searchQuery}
           onChangeText={setSearchQuery}
+          onFocus={() => setSearchActive(true)}
+          onBlur={() => {
+            if (!searchQuery.trim()) {
+              setSearchActive(false);
+            }
+          }}
         />
 
+        {/* Search Suggestions */}
+        {searchActive && searchQuery.trim() && suggestions.length > 0 && (
+          <View style={[styles.suggestionsContainer, { marginHorizontal: hPad }]}>
+            {suggestions.map(name => (
+              <TouchableOpacity
+                key={name}
+                style={styles.suggestionRow}
+                activeOpacity={0.7}
+                onPress={() => setSearchQuery(name)}>
+                <SvgXml xml={SEARCH_SVG} width={15} height={15} />
+                <Text style={styles.suggestionText} numberOfLines={1}>
+                  {name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Top Banner Slider */}
-        <BannerSlider slides={banners} screenWidth={width} />
+        {!searchActive && <BannerSlider slides={banners} screenWidth={width} />}
 
         {/* Horizontal Collections */}
-        {collections.length > 0 && (
+        {!searchActive && collections.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1057,16 +1191,18 @@ const HomeTab = () => {
         )}
 
         {/* Section Header */}
-        <View style={[styles.sectionHeader, { paddingHorizontal: hPad }]}>
-          <Text style={styles.sectionTitle}>
-            {activeCategory === 'Home'
-              ? 'Premium Fashion for Kids'
-              : `${activeCategory} Collection`}
-          </Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={styles.showAll}>Show all</Text>
-          </TouchableOpacity>
-        </View>
+        {!searchActive && (
+          <View style={[styles.sectionHeader, { paddingHorizontal: hPad }]}>
+            <Text style={styles.sectionTitle}>
+              {activeCategory === 'Home'
+                ? 'Premium Fashion for Kids'
+                : `${activeCategory} Collection`}
+            </Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.showAll}>Show all</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Product Grid */}
         {loading ? (
@@ -1087,6 +1223,32 @@ const HomeTab = () => {
               <Text style={styles.retryBtnText}>Try Again</Text>
             </TouchableOpacity>
           </View>
+        ) : searchActive && !searchQuery.trim() ? null : searchActive ? (
+          filteredProducts.length === 0 ? (
+            <View style={styles.centerBox}>
+              <View style={styles.emptyIcon}>
+                <SvgXml xml={SEARCH_SVG} width={28} height={28} />
+              </View>
+              <Text style={styles.emptyTitle}>No results found</Text>
+              <Text style={styles.emptyMessage}>
+                We couldn't find anything matching "{searchQuery.trim()}". Try a
+                different keyword.
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
+              {filteredProducts.map(item => (
+                <ProductCard
+                  key={item.id}
+                  item={item}
+                  cardWidth={productCardW}
+                  onAddToCart={() => handleProductPress(item)}
+                  liked={wishlistIds.has(item.id)}
+                  onToggleWishlist={() => handleToggleWishlist(item.id)}
+                />
+              ))}
+            </View>
+          )
         ) : products.length === 0 ? (
           <View style={styles.centerBox}>
             <View style={styles.emptyIcon}>
@@ -1101,20 +1263,9 @@ const HomeTab = () => {
                   }" right now. Try another category.`}
             </Text>
           </View>
-        ) : filteredProducts.length === 0 ? (
-          <View style={styles.centerBox}>
-            <View style={styles.emptyIcon}>
-              <SvgXml xml={SEARCH_SVG} width={28} height={28} />
-            </View>
-            <Text style={styles.emptyTitle}>No results found</Text>
-            <Text style={styles.emptyMessage}>
-              We couldn't find anything matching "{searchQuery.trim()}". Try a
-              different keyword.
-            </Text>
-          </View>
         ) : (
           <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
-            {filteredProducts.map(item => (
+            {products.map(item => (
               <ProductCard
                 key={item.id}
                 item={item}
@@ -1129,6 +1280,12 @@ const HomeTab = () => {
 
         <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
+
+      <AddAddressModal
+        visible={isAddAddressModalVisible}
+        onClose={() => setIsAddAddressModalVisible(false)}
+        onSaved={refresh}
+      />
 
       {/* Side Menu Drawer Component */}
       <MenuDrawer

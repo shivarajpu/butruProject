@@ -20,7 +20,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   Butruname,
   LOCATION_PIN_SVG,
-  CHEVRON_DOWN_SVG,
   ARROW_BACK_ICON,
 } from '../assets/svg';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -35,6 +34,7 @@ import {
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
 import { apiService } from '../api/apiService';
 
 // Custom SVGs
@@ -52,6 +52,13 @@ const PAYMENT_COD_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="n
 const HOME_WHITE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>`;
 
 const CREATE_ORDER_ENDPOINT = '/api/storefront/orders/create';
+const COUPON_APPLY_ENDPOINT = '/api/storefront/coupon/apply';
+
+interface CouponApplyResponse {
+  success: boolean;
+  message?: string;
+  discount?: number;
+}
 
 const CartScreen = () => {
   const theme = useAppTheme();
@@ -65,7 +72,6 @@ const CartScreen = () => {
 
   // Dynamic States
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
-  const [couponCode, setCouponCode] = useState('');
   const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
 
   // Address modals state
@@ -296,13 +302,40 @@ const CartScreen = () => {
     dispatch(removeCartItem(cartId));
   };
 
-  const handleApplyCoupon = () => {
-    if (couponCode.trim().toUpperCase() === 'BUTRU100') {
-      setAppliedCoupon(100);
-      setIsCouponModalVisible(false);
-    } else if (couponCode.trim().length > 0) {
-      setAppliedCoupon(50); // Default dynamic discount for any entered coupon
-      setIsCouponModalVisible(false);
+  const handleApplyCoupon = async (code: string): Promise<ApplyCouponResult> => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      return { success: false, message: 'Please enter coupon code' };
+    }
+    if (cartItems.length === 0) {
+      return { success: false, message: 'Your cart is empty.' };
+    }
+    try {
+      const response = await apiService.post<CouponApplyResponse>(COUPON_APPLY_ENDPOINT, {
+        code: trimmed,
+        subtotal: subTotal,
+        cartItems: cartItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          size: item.size,
+          price: item.price,
+          finalPrice: item.price * item.quantity,
+          category: item.name,
+        })),
+      });
+      if (response.success) {
+        setAppliedCoupon(response.discount ?? 0);
+        return { success: true, message: response.message || 'Coupon applied successfully!' };
+      }
+      return { success: false, message: response.message || 'Invalid coupon code.' };
+    } catch (error) {
+      return {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+      };
     }
   };
 
@@ -322,18 +355,17 @@ const CartScreen = () => {
             <TouchableOpacity
               style={styles.locationWrapper}
               activeOpacity={0.7}
-              onPress={() => setIsAddressModalVisible(true)}>
+              onPress={() => setIsAddAddressModalVisible(true)}>
               {Butruname ? (
                 <SvgXml xml={Butruname} width={65} height={24} />
               ) : (
                 <Text style={styles.logoFallback}>Butru</Text>
               )}
               <View style={styles.locationRow}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={11} height={11} />
+                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
                    Delivering to {formatAddressLabel(selectedAddress)}
                  </Text>
-                <SvgXml xml={CHEVRON_DOWN_SVG} width={12} height={12} />
               </View>
             </TouchableOpacity>
           </View>
@@ -460,52 +492,31 @@ const CartScreen = () => {
         </ScrollView>
 
         {/* Dynamic Sticky Bottom Bar */}
-        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <View style={styles.bottomBarRow}>
-            <Text style={styles.bottomTotalLabel}>Total</Text>
-            <Text style={styles.bottomTotalValue}>
-              Rs. {finalTotal.toLocaleString('en-IN')}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.paymentBtn}
-            activeOpacity={0.85}
-            onPress={() => setIsPaymentModalVisible(true)}>
-            <SvgXml xml={ARROW_RIGHT_SVG} width={16} height={16} />
-            <Text style={styles.paymentBtnText}>Continue to Payment</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Coupon Input Modal */}
-        <Modal
-          visible={isCouponModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsCouponModalVisible(false)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Enter Coupon Code</Text>
-              <TextInput
-                style={styles.couponInput}
-                placeholder="Try BUTRU100"
-                value={couponCode}
-                onChangeText={setCouponCode}
-                autoCapitalize="characters"
-              />
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => setIsCouponModalVisible(false)}>
-                  <Text style={{ color: theme.colors.textSecondary }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalApplyBtn} onPress={handleApplyCoupon}>
-                  <Text style={{ color: theme.colors.textOnPrimary, fontWeight: '700' }}>Apply</Text>
-                </TouchableOpacity>
-              </View>
+        {cartItems.length > 0 && (
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={styles.bottomBarRow}>
+              <Text style={styles.bottomTotalLabel}>Total</Text>
+              <Text style={styles.bottomTotalValue}>
+                Rs. {finalTotal.toLocaleString('en-IN')}
+              </Text>
             </View>
+
+            <TouchableOpacity
+              style={styles.paymentBtn}
+              activeOpacity={0.85}
+              onPress={() => setIsPaymentModalVisible(true)}>
+              <SvgXml xml={ARROW_RIGHT_SVG} width={16} height={16} />
+              <Text style={styles.paymentBtnText}>Continue to Payment</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
+        )}
+
+        {/* Coupon Modal */}
+        <ApplyCouponModal
+          visible={isCouponModalVisible}
+          onClose={() => setIsCouponModalVisible(false)}
+          onApplyCoupon={handleApplyCoupon}
+        />
 
         {/* Address Selection Modal */}
         <AddressSelectionModal
@@ -554,8 +565,8 @@ const CartScreen = () => {
                       <View style={styles.inputContainer}>
                         <SvgXml
                           xml={LOCATION_PIN_SVG}
-                          width={14}
-                          height={14}
+                          width={12}
+                          height={12}
                           style={styles.inputLeftIcon}
                         />
                         <TextInput
@@ -975,44 +986,6 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 14,
     fontWeight: '700',
     color: colors.textOnPrimary,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  couponInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 40,
-    marginBottom: 16,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  modalCancelBtn: {
-    padding: 8,
-  },
-  modalApplyBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
   },
   sheetOverlay: {
     flex: 1,

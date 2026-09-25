@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
-  Platform,
-  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -467,7 +465,6 @@ const CategoryTab = () => {
   const gap = 12;
   const numCols = isTablet ? 3 : 2;
   const cardW = (width - hPad * 2 - gap * (numCols - 1)) / numCols;
-  const dynamicTopPadding = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0;
   
   const navigation = useNavigation<CategoryTabNavigation>();
 
@@ -578,7 +575,7 @@ const CategoryTab = () => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+      <View style={styles.container}>
 
         {/* Top Header */}
         <View style={styles.headerContainer}>

@@ -20,16 +20,15 @@ import LoginScreen from './src/auth/LoginScreen';
 import OtpScreen from './src/auth/otpScreen';
 import OtpVarify from './src/auth/OtpVarify';
 import SignUpScreen from './src/auth/sigupScreen';
+import ForgotPasswordScreen from './src/auth/ForgotPasswordScreen';
 import HomeScreen from './src/home/HomeScreen';
 import ProductDetailsScreen from './src/screens/ProductDetailsScreen';
 import CartScreen from './src/screens/CartScreen';
 import MyOrdersScreen from './src/screens/MyOrdersScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import HelpSupportScreen from './src/screens/HelpSupportScreen';
-import TermsAndConditionsScreen from './src/screens/TermsAndConditionsScreen';
-import ShippingPolicyScreen from './src/screens/ShippingPolicyScreen';
-import ReturnsRefundsScreen from './src/screens/ReturnsRefundsScreen';
-import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
+import PolicyScreen from './src/screens/PolicyScreen';
+import PaymentMethodsScreen from './src/screens/PaymentMethodsScreen';
 import type { RootStackParamList } from './src/navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -72,16 +71,15 @@ function AppNavigator() {
           <Stack.Screen name="Otp" component={OtpScreen} />
           <Stack.Screen name="OtpVarify" component={OtpVarify} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
           <Stack.Screen name="CartScreen" component={CartScreen} />
           <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
           <Stack.Screen name="Notification" component={NotificationScreen} />
           <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-          <Stack.Screen name="Terms" component={TermsAndConditionsScreen} />
-          <Stack.Screen name="ShippingPolicy" component={ShippingPolicyScreen} />
-          <Stack.Screen name="ReturnsRefunds" component={ReturnsRefundsScreen} />
-          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+          <Stack.Screen name="Policy" component={PolicyScreen} />
+          <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

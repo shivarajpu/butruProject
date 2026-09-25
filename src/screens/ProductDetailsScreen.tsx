@@ -346,6 +346,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const [selectedImg, setSelectedImg] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+  const [sizeError, setSizeError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [wishlistLoading, setWishlistLoading] = useState(false);
@@ -356,13 +357,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     const firstImage = productData?.images?.[0];
     if (firstImage) {
       setSelectedImg(firstImage);
-    }
-  }, [productData]);
-
-  useEffect(() => {
-    const firstSize = productData?.sizes?.[0];
-    if (firstSize) {
-      setSelectedSize(firstSize);
     }
   }, [productData]);
 
@@ -439,6 +433,10 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const handleAddToCart = () => {
     if (!productData) return;
+    if (sizes.length > 0 && !selectedSize) {
+      setSizeError(true);
+      return;
+    }
     dispatch(
       addCartItem({
         productId: productData.id,
@@ -446,7 +444,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         price: selectedVariant ? selectedVariant.price : productData.price,
         originalPrice: productData.originalPrice,
         image: selectedImg || productData.images?.[0] || '',
-        size: selectedSize || (productData.sizes?.[0] ?? ''),
+        size: selectedSize,
         color: selectedVariant?.color ?? productData.color ?? '',
         productCode: (productData as { productCode?: string }).productCode || '',
       }),
@@ -603,18 +601,17 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             <TouchableOpacity
               style={styles.locationWrapper}
               activeOpacity={0.7}
-              onPress={() => setIsAddressModalVisible(true)}>
+              onPress={() => setIsAddAddressModalVisible(true)}>
               {Butruname ? (
                 <SvgXml xml={Butruname} width={65} height={24} />
               ) : (
                 <Text style={styles.logoFallback}>Butru</Text>
               )}
               <View style={styles.locationRow}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={11} height={11} />
+                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
                    Delivering to {formatAddressLabel(selectedAddress)}
                  </Text>
-                <SvgXml xml={CHEVRON_DOWN_SVG} width={15} height={15} />
               </View>
             </TouchableOpacity>
           </View>
@@ -715,7 +712,10 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                       return (
                         <TouchableOpacity
                           key={sz}
-                          onPress={() => setSelectedSize(sz)}
+                          onPress={() => {
+                            setSelectedSize(sz);
+                            setSizeError(false);
+                          }}
                           style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}>
                           <Text style={[styles.sizeChipText, isSelected && styles.sizeChipTextSelected]}>
                             {sz}
@@ -725,6 +725,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                     })}
                   </View>
                 </ScrollView>
+                {sizeError ? <Text style={styles.sizeErrorText}>Please select a size</Text> : null}
               </>
             )}
 
@@ -1052,6 +1053,12 @@ const createStyles = (theme: AppTheme) => {
   sizeChipTextSelected: {
     color: colors.primary,
     fontWeight: '700',
+  },
+  sizeErrorText: {
+    color: colors.error,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 8,
   },
   variantRow: {
     flexDirection: 'row',

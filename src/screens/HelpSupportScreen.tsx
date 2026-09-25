@@ -508,7 +508,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
           <View style={styles.addressCard}>
             <View style={styles.addressHeader}>
               <View style={styles.iconCircle}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={16} height={16} />
+                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
               </View>
               <View style={styles.addressHeaderTitleWrapper}>
                 <Text style={styles.cardSmallLabel}>ADDRESS</Text>

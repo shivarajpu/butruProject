@@ -1,4 +1,5 @@
 import type { SupportConfig } from '../theme/types';
+import type { PolicyKey } from '../api/policies';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -6,6 +7,7 @@ export type RootStackParamList = {
   Otp: undefined;
   OtpVarify: { phoneNumber?: string; email?: string } | undefined;
   SignUp: undefined;
+  ForgotPassword: undefined;
   Home: undefined;
   ProductDetails: { product: any };
   CartScreen: undefined;
@@ -17,10 +19,8 @@ export type RootStackParamList = {
         title?: string;
       }
     | undefined;
-  Terms: undefined;
-  ShippingPolicy: undefined;
-  ReturnsRefunds: undefined;
-  PrivacyPolicy: undefined;
+  Policy: { policyKey: PolicyKey; title?: string };
+  PaymentMethods: undefined;
 };
 
 export type TabParamList = {
