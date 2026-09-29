@@ -11,6 +11,7 @@
  */
 
 import React from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   TouchableOpacity,
   Text,
@@ -61,7 +62,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   children,
 }) => {
   const theme = useAppTheme();
-  const { colors, fontFamily } = theme;
+  const { colors } = theme;
   const sz = SIZE_MAP[size];
 
   const containerStyle: ViewStyle = {
@@ -83,7 +84,7 @@ const AppButton: React.FC<AppButtonProps> = ({
   };
 
   const labelStyle: TextStyle = {
-    fontFamily: fontFamily.bold,
+    fontFamily: FONTS.poppinsBold,
     fontSize: sz.fontSize,
     ...(variant === 'primary' && { color: colors.textOnPrimary }),
     ...(variant === 'outline' && { color: colors.primary }),

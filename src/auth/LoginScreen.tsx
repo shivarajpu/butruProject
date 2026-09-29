@@ -23,19 +23,17 @@ import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 
 import {
-  Butruname,
   eyeIcon,
   emailIcon,
-  secureIcon,
-  supporIcon,
   phoneIcon,
-  rewardIcon,
-  passwordIcon,
   loginPagaImage,
 } from '../assets/svg';
 
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -254,16 +252,12 @@ const LoginScreen = ({ navigation }: Props) => {
             ]}
           >
             <View style={styles.brandTextContainer}>
-              {Butruname ? (
-                <SvgXml
-                  xml={Butruname}
-                  width={logoWidth}
-                  height={logoHeight}
-                  style={styles.logoSvg}
-                />
-              ) : (
-                <Text style={styles.logoText}>BuTRu</Text>
-              )}
+              <StoreLogo
+                width={logoWidth}
+                height={logoHeight}
+                style={styles.logoSvg}
+                textStyle={styles.logoText}
+              />
 
               <View style={styles.titleWrapper}>
                 <Text style={styles.titleText}>
@@ -294,7 +288,7 @@ const LoginScreen = ({ navigation }: Props) => {
               activeOpacity={0.9}
             >
               <SvgXml
-                xml={emailIcon}
+                xml={emailIcon(theme.colors.primary)}
                 width={18}
                 height={18}
               />
@@ -343,7 +337,7 @@ const LoginScreen = ({ navigation }: Props) => {
               >
                 <View style={styles.inputIcon}>
                   <SvgXml
-                    xml={emailIcon}
+                    xml={emailIcon(theme.colors.primary)}
                     width={18}
                     height={18}
                   />
@@ -391,8 +385,8 @@ const LoginScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml
-                    xml={passwordIcon}
+                  <BrandIcon
+                    icon={BRAND.password}
                     width={18}
                     height={18}
                   />
@@ -538,8 +532,8 @@ const LoginScreen = ({ navigation }: Props) => {
           >
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={secureIcon}
+                <BrandIcon
+                  icon={BRAND.secure}
                   width={22}
                   height={22}
                 />
@@ -552,8 +546,8 @@ const LoginScreen = ({ navigation }: Props) => {
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={rewardIcon}
+                <BrandIcon
+                  icon={BRAND.reward}
                   width={22}
                   height={22}
                 />
@@ -566,8 +560,8 @@ const LoginScreen = ({ navigation }: Props) => {
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={supporIcon}
+                <BrandIcon
+                  icon={BRAND.support}
                   width={22}
                   height={22}
                 />
@@ -626,7 +620,7 @@ const LoginScreen = ({ navigation }: Props) => {
 };
 
 const createStyles = (theme: AppTheme) => {
-  const { colors, fontFamily } = theme;
+  const { colors } = theme;
 
   return StyleSheet.create({
     container: {

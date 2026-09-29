@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   View,
   Text,
@@ -29,7 +30,11 @@ import type { AppTheme } from '../theme/types';
 import { apiService } from '../api/apiService';
 
 // Asset Imports
-import { ARROW_BACK_ICON } from '../assets/svg';
+import { heartFilledSvg, heartOutlineSvg } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import { filterByQuery } from '../storefront/search';
+import BrandIcon from '../components/BrandIcon';
+
 import BagIconButton from '../components/BagIconButton';
 
 // Dynamic SVGs Factory
@@ -38,12 +43,6 @@ const getSearchIconSvg = (color: string) =>
 
 const getArrowRightSvg = (color: string) => 
   `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-const getHeartFilledSvg = (color: string) => 
-  `<svg width="14" height="14" viewBox="0 0 24 24" fill="${color}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
-
-const getHeartOutlineSvg = (color: string) => 
-  `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
 
 // Categories API
 const CATEGORIES_ENDPOINT = '/api/storefront/categories';
@@ -178,7 +177,7 @@ const createStyles = (theme: AppTheme) => {
     },
     headerTitle: {
       fontSize: 16,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: colors.text,
     },
     headerBtn: {
@@ -235,7 +234,7 @@ const createStyles = (theme: AppTheme) => {
     },
     catTitle: {
       fontSize: 15,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: colors.primary,
     },
     catSubtitle: {
@@ -291,7 +290,7 @@ const createStyles = (theme: AppTheme) => {
     },
     promoTitle: {
       fontSize: 14,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: colors.text,
       lineHeight: 18,
       marginBottom: 10,
@@ -309,7 +308,7 @@ const createStyles = (theme: AppTheme) => {
     promoBtnText: {
       color: colors.textOnPrimary,
       fontSize: 10,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     promoImage: {
       width: 120,
@@ -382,7 +381,7 @@ const createStyles = (theme: AppTheme) => {
     },
     newArrivalTitle: {
       fontSize: 16,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: colors.text,
     },
     newArrivalCard: {
@@ -429,7 +428,7 @@ const createStyles = (theme: AppTheme) => {
     },
     newArrivalPrice: {
       fontSize: 14,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: colors.primary,
     },
     newArrivalOldPrice: {
@@ -529,11 +528,7 @@ const CategoryTab = () => {
     }
   };
 
-  const filteredCategories = searchQuery.trim()
-    ? categories.filter(cat =>
-        cat.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
-      )
-    : categories;
+  const filteredCategories = filterByQuery(categories, searchQuery);
 
   const handleBackPress = () => {
     if (navigation.canGoBack()) {
@@ -581,7 +576,7 @@ const CategoryTab = () => {
         <View style={styles.headerContainer}>
           <View style={styles.headerLeft}>
             <TouchableOpacity style={styles.backBtn} activeOpacity={0.7} onPress={handleBackPress}>
-              <SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />
+              <BrandIcon icon={BRAND.arrowBack} width={15} height={15} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Product Categories</Text>
           </View>
@@ -691,8 +686,8 @@ const CategoryTab = () => {
                         onPress={() => handleToggleWishlist(item.id)}>
                         <SvgXml
                           xml={wishlistIds.has(item.id)
-                            ? getHeartFilledSvg(theme.colors.primary)
-                            : getHeartOutlineSvg(theme.colors.textMuted)}
+                            ? heartFilledSvg(theme.colors.primary)
+                            : heartOutlineSvg(theme.colors.textMuted)}
                           width={14}
                           height={14}
                         />

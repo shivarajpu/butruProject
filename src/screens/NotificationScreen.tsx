@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   StyleSheet,
   Text,
@@ -303,7 +304,7 @@ const createStyles = (theme: AppTheme) => {
     activeChipText: {
       color: colors.textOnPrimary,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     inactiveChipText: {
       color: colors.text,
@@ -355,7 +356,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 14,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       flex: 1,
       marginRight: 6,
     },
@@ -393,7 +394,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       marginBottom: 8,
     },
     emptySubtitle: {

@@ -367,7 +367,7 @@ const createStyles = (theme: AppTheme) => {
     tabChipTextActive: {
       color: colors.textOnPrimary,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Metrics */
@@ -389,7 +389,7 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '700',
       color: colors.primary,
       marginTop: 4,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Cards & Lists */
@@ -436,7 +436,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.primary,
       fontSize: 10,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     orderDate: {
       fontSize: 11,
@@ -467,7 +467,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 14,
       fontWeight: '700',
       color: colors.primary,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     orderItemCount: {
       fontSize: 11,
@@ -504,7 +504,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 10,
       color: colors.primary,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     productTitle: {
       fontSize: 13,
@@ -516,7 +516,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     productMeta: {
       fontSize: 11,
@@ -528,13 +528,13 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     productPriceBold: {
       fontSize: 14,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Buttons */
@@ -551,7 +551,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.primary,
       fontSize: 13,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     btnPrimary: {
       flex: 1,
@@ -564,7 +564,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textOnPrimary,
       fontSize: 13,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Track Screen Elements */
@@ -585,7 +585,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 18,
       fontWeight: '700',
       color: colors.primary,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     cancelBtn: {
       paddingHorizontal: 16,
@@ -597,7 +597,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.error,
       fontSize: 12,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Timeline */
@@ -633,7 +633,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       fontWeight: '600',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     timelineTime: {
       fontSize: 10,
@@ -654,7 +654,7 @@ const createStyles = (theme: AppTheme) => {
     statusTagActive: {
       color: colors.primary,
       backgroundColor: colors.primaryLight,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     infoNoteBox: {
       flexDirection: 'row',
@@ -678,21 +678,21 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '700',
       color: colors.textMuted,
       letterSpacing: 0.5,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     sectionHeading: {
       fontSize: 14,
       fontWeight: '700',
       color: colors.text,
       marginVertical: 8,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     selectedTimelineRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
     selectedTimelineTitle: {
       fontSize: 12,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     selectedTimelineTime: {
       fontSize: 10,
@@ -737,13 +737,13 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       fontWeight: '800',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     totalBoldValue: {
       fontSize: 14,
       fontWeight: '800',
       color: colors.primary,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     downloadInvoiceBtn: {
       backgroundColor: "#837BA2",
@@ -756,7 +756,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textOnPrimary,
       fontSize: 12,
       fontWeight: '600',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     addressCard: {
       backgroundColor: colors.primaryLight,
@@ -769,7 +769,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 12,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     addressText: {
       fontSize: 11,
@@ -807,7 +807,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 12,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
 
     /* Modal */
@@ -854,7 +854,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.text,
       marginTop: 12,
       marginBottom: 8,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
     radioCircle: {
@@ -874,7 +874,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textSecondary,
       fontFamily: fontFamily.regular,
     },
-    radioLabelActive: { color: colors.text, fontWeight: '700', fontFamily: fontFamily.bold },
+    radioLabelActive: { color: colors.text, fontWeight: '700', fontFamily: FONTS.poppinsBold },
     modalActionRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
     clearBtn: {
       flex: 1,
@@ -901,7 +901,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textOnPrimary,
       fontSize: 14,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     /* Modal Base Overlay */
 modalOverlay1: {
@@ -1028,8 +1028,6 @@ confirmCancelBtnText: {
 };
 
 
-const CHEVRON_DOWN_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const CANCEL_REASONS = [
   'Changed my mind',
@@ -1479,7 +1477,7 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
                 <Text
                   style={[
                     styles.statusTag,
-                    { color: colors.error, backgroundColor: colors.error + '1A', fontFamily: fontFamily.bold },
+                    { color: colors.error, backgroundColor: colors.error + '1A', fontFamily: FONTS.poppinsBold },
                   ]}>
                   Cancelled
                 </Text>
@@ -1509,7 +1507,7 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
                     <Text style={styles.timelineTime}>{step.time}</Text>
                   </View>
 
-                  <Text style={[styles.statusTag, step.active && styles.statusTagActive, step.active && { color: colors.success, backgroundColor: colors.success + '1A', fontFamily: fontFamily.bold }]}>{step.status}</Text>
+                  <Text style={[styles.statusTag, step.active && styles.statusTagActive, step.active && { color: colors.success, backgroundColor: colors.success + '1A', fontFamily: FONTS.poppinsBold }]}>{step.status}</Text>
                 </View>
               ))
             )}
@@ -1776,7 +1774,7 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
         <TouchableOpacity
           style={styles.closeBtnCircle}
           onPress={() => setCancelModalVisible(false)}>
-          <SvgXml xml={CLOSE_SVG} />
+          <BrandIcon icon={BRAND.close} />
         </TouchableOpacity>
       </View>
 
@@ -1789,8 +1787,8 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
           <Text style={styles.dropdownHeaderText}>
             {selectedReason || 'Choose a reason'}
           </Text>
-          <SvgXml
-            xml={CHEVRON_DOWN_SVG}
+          <BrandIcon
+            icon={BRAND.chevronDown}
             style={isDropdownOpen && { transform: [{ rotate: '180deg' }] }}
           />
         </TouchableOpacity>
@@ -1849,4 +1847,5 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
   );
 };
 
-export default MyOrdersScreen;
+export default MyOrdersScreen;import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';

@@ -6,8 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
-  Platform,
-  StatusBar,
   Image,
   Switch,
   Modal,
@@ -19,7 +17,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import { BACK_ARROW_SVG ,EDIT_PENCIL_SVG , CHEVRON_RIGHT_SVG , CHEVRON_RIGHT_PINK_SVG , BOX_ICON_SVG , PROFILE_USER_SVG , LOCATION_PIN_SVGACOU , PAYMENT_CARD_SVG , BELL_ICON_SVG , DOCUMENT_SVG , TRUCK_SVG , RETURN_REFUND_SVG , PRIVACY_SHIELD_SVG , HELP_QUESTION_SVG , ABOUT_INFO_SVG , LOGOUT_ICON_SVG, ARROW_BACK_ICON, LOCATION_PIN_SVG, cameraicon} from '../assets/svg';
+import { LOCATION_PIN_SVG } from '../assets/svg';
 import BagIconButton from '../components/BagIconButton';
 import { useNavigation } from '@react-navigation/native'; // 1. Hook import karein
 import { useAppTheme } from '../theme/useAppTheme';
@@ -38,6 +36,8 @@ import {
   POLICY_KEYS,
   type PolicyKey,
 } from '../api/policies';
+import { BRAND, brandDef } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
 
 const LOGOUT_ENDPOINT = '/api/auth/logout';
 const UPDATE_PROFILE_ENDPOINT = '/api/auth/profile';
@@ -55,13 +55,15 @@ type LogoutResponse = {
 
 // ─── Pure SVG Icons ────────────────────────────────────────────────────────────
 const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
-const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.6569 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
-const LOGOUT_WHITE_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="#FFFFFF" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke="#FFFFFF" stroke-width="2"/><line x1="21" y1="12" x2="9" y2="12" stroke="#FFFFFF" stroke-width="2"/></svg>`;
 const CHECK_GREEN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const LOGOUT_MODAL_SVG = `<svg width="24" height="22" viewBox="0 0 24 22" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M17.6167 15.2834L22.2833 10.6168M22.2833 10.6168L17.6167 5.95011M22.2833 10.6168H5.94999M12.95 15.2834V16.4501C12.95 18.3818 11.3817 19.9501 9.44999 19.9501H4.78333C2.85162 19.9501 1.28333 18.3818 1.28333 16.4501V4.78345C1.28333 2.85174 2.85162 1.28345 4.78332 1.28345H9.44999C11.3817 1.28345 12.95 2.85174 12.95 4.78345V5.95011" stroke="white" stroke-width="2.56667" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 `
+// Registered against theme channels so they recolour with the storefront config.
+const CLOSE_ICON = brandDef(CLOSE_SVG, 'textSecondary', '#666666');
+const LOGOUT_MODAL_ICON = brandDef(LOGOUT_MODAL_SVG, 'onPrimary', 'white');
+
 // ─── Component Implementation ──────────────────────────────────────────────────
 
 const AccountTab = () => {
@@ -315,7 +317,7 @@ const AccountTab = () => {
                <View style={styles.headerLeft}>
                  <AppIconButton
                    style={styles.headerBtn}
-                   icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                   icon={<BrandIcon icon={BRAND.arrowBack} width={15} height={15} />}
                    accessibilityLabel="Go back"
                    onPress={handleBackPress}
                  />
@@ -326,7 +328,7 @@ const AccountTab = () => {
                      style={styles.deliveryRow}
                      activeOpacity={0.7}
                       onPress={() => setIsAddressModalVisible(true)}>
-                     <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                     <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) , marginLeft:4 }]} numberOfLines={1}>
                         Delivering to {formatAddressLabel(selectedAddress)}
                       </Text>
@@ -376,7 +378,7 @@ const AccountTab = () => {
                 </View>
               )}
               {/* <View style={styles.editBadge}>
-                <SvgXml xml={cameraicon} width={12} height={12} />
+                <BrandIcon icon={BRAND.camera} width={12} height={12} />
               </View> */}
             </View>
 
@@ -396,7 +398,7 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={() => navigation.getParent()?.navigate('MyOrders' as never)}>
             <Text style={styles.viewAllText}>View All</Text>
-            <SvgXml xml={CHEVRON_RIGHT_PINK_SVG} width={12} height={12} />
+            <BrandIcon icon={BRAND.chevronRightAccent} width={12} height={12} />
           </TouchableOpacity>
         </View>
 
@@ -406,15 +408,15 @@ const AccountTab = () => {
           activeOpacity={0.8}
           onPress={() => navigation.getParent()?.navigate('MyOrders' as never)}>
           <View style={styles.optionRowLeft}>
-            <View style={styles.iconBoxPink}>
-              <SvgXml xml={BOX_ICON_SVG} width={18} height={18} />
+            <View style={styles.iconBox}>
+              <BrandIcon icon={BRAND.box} width={18} height={18} />
             </View>
             <View>
               <Text style={styles.optionTitle}>My Orders</Text>
               <Text style={styles.optionSubtitle}>View delivery status & history</Text>
             </View>
           </View>
-          <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+          <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
         </TouchableOpacity>
 
         {/* Section: Main Account Settings Block */}
@@ -424,12 +426,12 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={() => setIsProfileModalVisible(true)}>
             <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={PROFILE_USER_SVG} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.profileUser} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>My Profile</Text>
             </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -437,12 +439,12 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={() => setIsAddressModalVisible(true)}>
             <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={LOCATION_PIN_SVGACOU} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.locationPin} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>Address</Text>
             </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -452,19 +454,19 @@ const AccountTab = () => {
               navigation.getParent()?.navigate('PaymentMethods' as never)
             }>
             <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={PAYMENT_CARD_SVG} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.paymentCard} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>Payment Methods</Text>
             </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
           </TouchableOpacity>
 
           {/* Toggle Item */}
           <View style={[styles.optionItem, { borderBottomWidth: 0 }]}>
             <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={BELL_ICON_SVG} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.bell} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>Notifications</Text>
             </View>
@@ -491,12 +493,12 @@ const AccountTab = () => {
                 activeOpacity={0.7}
                 onPress={() => openPolicy('terms')}>
                 <View style={styles.optionRowLeft}>
-                  <View style={styles.iconBoxPink}>
-                    <SvgXml xml={DOCUMENT_SVG} width={18} height={18} />
+                  <View style={styles.iconBox}>
+                    <BrandIcon icon={BRAND.document} width={18} height={18} />
                   </View>
                   <Text style={styles.optionTitle}>Terms and Conditions</Text>
                 </View>
-                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+                <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
               </TouchableOpacity>
             )}
 
@@ -511,12 +513,12 @@ const AccountTab = () => {
                 activeOpacity={0.7}
                 onPress={() => openPolicy('shipping')}>
                 <View style={styles.optionRowLeft}>
-                  <View style={styles.iconBoxPink}>
-                    <SvgXml xml={TRUCK_SVG} width={18} height={18} />
+                  <View style={styles.iconBox}>
+                    <BrandIcon icon={BRAND.truck} width={18} height={18} />
                   </View>
                   <Text style={styles.optionTitle}>Shipping Policy</Text>
                 </View>
-                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+                <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
               </TouchableOpacity>
             )}
 
@@ -531,12 +533,12 @@ const AccountTab = () => {
                 activeOpacity={0.7}
                 onPress={() => openPolicy('returns')}>
                 <View style={styles.optionRowLeft}>
-                  <View style={styles.iconBoxPink}>
-                    <SvgXml xml={RETURN_REFUND_SVG} width={18} height={18} />
+                  <View style={styles.iconBox}>
+                    <BrandIcon icon={BRAND.returnRefund} width={18} height={18} />
                   </View>
                   <Text style={styles.optionTitle}>Returns, Refunds & Exchange</Text>
                 </View>
-                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+                <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
               </TouchableOpacity>
             )}
 
@@ -551,12 +553,12 @@ const AccountTab = () => {
                 activeOpacity={0.7}
                 onPress={() => openPolicy('privacy')}>
                 <View style={styles.optionRowLeft}>
-                  <View style={styles.iconBoxPink}>
-                    <SvgXml xml={PRIVACY_SHIELD_SVG} width={18} height={18} />
+                  <View style={styles.iconBox}>
+                    <BrandIcon icon={BRAND.privacyShield} width={18} height={18} />
                   </View>
                   <Text style={styles.optionTitle}>Privacy Policy</Text>
                 </View>
-                <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+                <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
               </TouchableOpacity>
             )}
           </View>
@@ -569,12 +571,12 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={() => navigation.navigate('HelpSupport')}>
             <View style={styles.optionRowLeft}>
-              <View style={styles.iconBoxPink}>
-                <SvgXml xml={HELP_QUESTION_SVG} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.helpQuestion} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>Help & Support</Text>
             </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
           </TouchableOpacity>
 
           {policyAvailability.about === true && (
@@ -583,12 +585,12 @@ const AccountTab = () => {
               activeOpacity={0.7}
               onPress={() => openPolicy('about')}>
               <View style={styles.optionRowLeft}>
-                <View style={styles.iconBoxPink}>
-                  <SvgXml xml={ABOUT_INFO_SVG} width={18} height={18} />
+                <View style={styles.iconBox}>
+                  <BrandIcon icon={BRAND.aboutInfo} width={18} height={18} />
                 </View>
                 <Text style={styles.optionTitle}>About Us</Text>
               </View>
-              <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+              <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
             </TouchableOpacity>
           )}
 
@@ -597,21 +599,12 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={handleOpenLogoutModal}>
             <View style={styles.optionRowLeft}>
-              <View style={[styles.iconBoxPink, styles.iconBoxGradient]}>
-                <Svg style={styles.iconBoxGradientFill} width="100%" height="100%">
-                  <Defs>
-                    <LinearGradient id="gradLogoutIcon" x1="0" y1="0" x2="1" y2="1">
-                      <Stop offset="0" stopColor="#FFF0F5" />
-                      <Stop offset="1" stopColor="#FDF2F8" />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect width="100%" height="100%" fill="url(#gradLogoutIcon)" rx={10} />
-                </Svg>
-                <SvgXml xml={LOGOUT_ICON_SVG} width={18} height={18} />
+              <View style={styles.iconBox}>
+                <BrandIcon icon={BRAND.logout} width={18} height={18} />
               </View>
               <Text style={styles.optionTitle}>Logout</Text>
             </View>
-            <SvgXml xml={CHEVRON_RIGHT_SVG} width={18} height={18} />
+            <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
           </TouchableOpacity>
         </View>
 
@@ -658,7 +651,7 @@ const AccountTab = () => {
                   <TouchableOpacity
                     style={styles.closeBtnCircle}
                     onPress={() => setIsProfileModalVisible(false)}>
-                    <SvgXml xml={CLOSE_SVG} />
+                    <BrandIcon icon={CLOSE_ICON} />
                   </TouchableOpacity>
                 </View>
 
@@ -760,7 +753,7 @@ const AccountTab = () => {
 
                 {logoutStatus === 'loading' && (
                   <View style={styles.logoutCenterContent}>
-                    <ActivityIndicator size="large" color="#B12B5B" />
+                    <ActivityIndicator size="large" color={theme.colors.primary} />
                     <Text style={styles.logoutTitle}>Logging out...</Text>
                     <Text style={styles.logoutSubtitle}>Please wait a moment.</Text>
                   </View>
@@ -812,13 +805,13 @@ const AccountTab = () => {
                         <Svg style={styles.logoutIconCircleFill} width="100%" height="100%">
                           <Defs>
                             <LinearGradient id="gradLogoutModal" x1="0" y1="0" x2="1" y2="1">
-                              <Stop offset="0" stopColor="#FF377F" />
-                              <Stop offset="1" stopColor="#B12B5B" />
+                              <Stop offset="0" stopColor={theme.colors.primary} />
+                              <Stop offset="1" stopColor={theme.colors.secondary} />
                             </LinearGradient>
                           </Defs>
                           <Rect width="100%" height="100%" fill="url(#gradLogoutModal)" rx={28} />
                         </Svg>
-                        <SvgXml xml={LOGOUT_MODAL_SVG} width={26} height={26} />
+                        <BrandIcon icon={LOGOUT_MODAL_ICON} width={26} height={26} />
                       </View>
                       <Text style={styles.logoutTitle}>Log Out of Butru ?</Text>
                       <Text style={styles.logoutSubtitle}>
@@ -950,7 +943,7 @@ const createStyles = (theme: AppTheme) => {
     borderRadius:15,
     paddingVertical: 12,
     marginBottom: 16,
-    backgroundColor:'#B12B5B'
+    backgroundColor: colors.primary,
   },
   profileLeft: {
     flexDirection: 'row',
@@ -1052,24 +1045,18 @@ const createStyles = (theme: AppTheme) => {
     alignItems: 'center',
     gap: 12,
   },
-  iconBoxPink: {
+  // The card behind these rows is `primaryLight` (see `groupedCard` /
+  // `trackOrderCard`), which is `lighten(primary, 0.88)` — i.e. the primary at
+  // 12%. Tinting the box with the *same* token made it vanish into the card, so
+  // the box takes the primary at 20% instead: a deeper step of the same brand
+  // hue, guaranteed to stay darker than `primaryLight` for any tenant colour.
+  iconBox: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#FADFE8",
+    backgroundColor: `${colors.primary}33`,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconBoxGradient: {
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  iconBoxGradientFill: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
   },
   optionTitle: {
     fontSize: 14,
@@ -1503,7 +1490,7 @@ const createStyles = (theme: AppTheme) => {
       flex: 1,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#B12B5B',
+      backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -1522,7 +1509,7 @@ const createStyles = (theme: AppTheme) => {
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: '#B12B5B',
+      backgroundColor: colors.primary,
       position: 'relative',
       overflow: 'hidden',
       justifyContent: 'center',

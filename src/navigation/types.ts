@@ -24,7 +24,12 @@ export type RootStackParamList = {
 };
 
 export type TabParamList = {
-  HomeTab: { category?: string } | undefined;
+  /**
+   * `navNonce` is stamped on by `useWidgetActions.pushTab` so that re-navigating
+   * with the same `category` still counts as a change. Widgets pass params as a
+   * loose record, so it has to be part of the declared shape.
+   */
+  HomeTab: { category?: string; navNonce?: number } | undefined;
   CategoryTab: undefined;
   WishlistTab: undefined;
   AccountTab: undefined;

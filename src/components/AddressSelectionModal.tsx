@@ -12,14 +12,16 @@ import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import type { Address } from '../hooks/useProfile';
+import { tintSvg } from '../assets/svg/tint';
 
-const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
-const EDIT_PENCIL_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`;
-const TRASH_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+const EDIT_PENCIL_SVG = tintSvg(`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`);
+export const TRASH_SVG = (color: string) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
 
-const getHomeIconSvg = (_color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="6" y="8" width="4" height="6.66667" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+// Same bug as the add-address modal: this accepted a colour and then baked in
+// `#BE185D`, so the badge stayed pink whatever the tenant's primary was.
+export const getHomeIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="6" y="8" width="4" height="6.66667" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 `;
 const getWorkIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
@@ -79,7 +81,7 @@ const AddressSelectionModal = ({
                   <Text style={styles.modalSubTitle}>Select delivery address</Text>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                  <SvgXml xml={CLOSE_SVG} />
+                  <BrandIcon icon={BRAND.close} />
                 </TouchableOpacity>
               </View>
 
@@ -150,7 +152,7 @@ const AddressSelectionModal = ({
                                 style={styles.cardActionBtn}
                                 activeOpacity={0.7}
                                 onPress={() => onEditAddress(address)}>
-                                <SvgXml xml={EDIT_PENCIL_SVG} width={12} height={12} />
+                                <SvgXml xml={EDIT_PENCIL_SVG(theme.colors.primary)} width={12} height={12} />
                                 <Text style={styles.cardActionText}>Edit</Text>
                               </TouchableOpacity>
                             )}
@@ -159,7 +161,7 @@ const AddressSelectionModal = ({
                                 style={styles.cardActionBtn}
                                 activeOpacity={0.7}
                                 onPress={() => onDeleteAddress(address)}>
-                                <SvgXml xml={TRASH_SVG} width={12} height={12} />
+                                <SvgXml xml={TRASH_SVG(theme.colors.error)} width={12} height={12} />
                                 <Text style={[styles.cardActionText, styles.cardActionDeleteText]}>
                                   Delete
                                 </Text>
@@ -360,4 +362,5 @@ const createStyles = (theme: AppTheme) => {
   });
 };
 
-export default AddressSelectionModal;
+export default AddressSelectionModal;import { BRAND } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';

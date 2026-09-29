@@ -1,25 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Animated,
   Easing,
 } from 'react-native';
-import { SvgXml } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootState } from '../store';
 import type { RootStackParamList } from '../navigation/types';
-import { Butruname } from '../assets/svg';
+import { useAppTheme } from '../theme/useAppTheme';
+import { useStorefront } from '../storefront/useStorefront';
+import BrandIcon from '../components/BrandIcon';
+import { BRAND } from '../assets/svg/brand';
 import { FONTS } from '../constants/fonts';
 
-const BG_COLOR = 'rgba(177, 43, 91, 1)';
 const SPLASH_DURATION_MS = 5000;
 
-// White variant of the Butru logo (the source path uses the brand pink #B92D5E)
-const BUTRU_LOGO_WHITE = Butruname.replace('fill="#B92D5E"', 'fill="#FFFFFF"');
+/**
+ * Upper bound on how long the splash will wait for the tenant config. The
+ * screen still has to appear if the API is slow or down — past this point we
+ * show the compiled-in default colour rather than holding the app hostage.
+ */
+const CONFIG_GRACE_MS = 2500;
 
 // Slice layout for the three-direction entrance ("bu" left, "t" top, "ru" right)
 const LOGO_W = 160;
@@ -32,9 +36,12 @@ const SplashScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const isHydrated = useSelector((state: RootState) => state.auth.isHydrated);
+  const { colors } = useAppTheme();
+  const { ready, error } = useStorefront();
 
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [graceElapsed, setGraceElapsed] = useState(false);
 
   const buX = useRef(new Animated.Value(-420)).current;
   const tY = useRef(new Animated.Value(-420)).current;
@@ -75,17 +82,28 @@ const SplashScreen = () => {
   }, [buX, tY, ruX, taglineOpacity]);
 
   useEffect(() => {
+    const timer = setTimeout(() => setGraceElapsed(true), CONFIG_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (isHydrated) setHydrated(true);
   }, [isHydrated]);
 
+  // `ready` OR `error` means the config has settled; past the grace window we
+  // stop caring. Holding navigation until then is what stops the splash from
+  // painting the default pink and then flipping to the merchant's colour while
+  // the user is already looking at it.
+  const configSettled = ready || Boolean(error) || graceElapsed;
+
   useEffect(() => {
-    if (minTimeElapsed && hydrated) {
+    if (minTimeElapsed && hydrated && configSettled) {
       navigation.replace(isLoggedIn ? 'Home' : 'Login');
     }
-  }, [minTimeElapsed, hydrated, isLoggedIn, navigation]);
+  }, [minTimeElapsed, hydrated, configSettled, isLoggedIn, navigation]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.primary }]}>
       <View style={styles.logoBlock}>
         {/* Butru logo sliced into bu / t / ru, each sliding in from its side */}
         <View style={{ width: LOGO_W, height: LOGO_H, position: 'relative' }}>
@@ -100,7 +118,7 @@ const SplashScreen = () => {
               overflow: 'hidden',
               transform: [{ translateX: buX }],
             }}>
-            <SvgXml xml={BUTRU_LOGO_WHITE} width={LOGO_W} height={LOGO_H} />
+            <BrandIcon icon={BRAND.logoOnPrimary} width={LOGO_W} height={LOGO_H} />
           </Animated.View>
 
           {/* t — from the top */}
@@ -115,7 +133,7 @@ const SplashScreen = () => {
               transform: [{ translateY: tY }],
             }}>
             <View style={{ marginLeft: -BU_W }}>
-              <SvgXml xml={BUTRU_LOGO_WHITE} width={LOGO_W} height={LOGO_H} />
+              <BrandIcon icon={BRAND.logoOnPrimary} width={LOGO_W} height={LOGO_H} />
             </View>
           </Animated.View>
 
@@ -131,7 +149,7 @@ const SplashScreen = () => {
               transform: [{ translateX: ruX }],
             }}>
             <View style={{ marginLeft: -(BU_W + T_W) }}>
-              <SvgXml xml={BUTRU_LOGO_WHITE} width={LOGO_W} height={LOGO_H} />
+              <BrandIcon icon={BRAND.logoOnPrimary} width={LOGO_W} height={LOGO_H} />
             </View>
           </Animated.View>
         </View>
@@ -145,7 +163,6 @@ const SplashScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG_COLOR,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -8,9 +8,10 @@
 import React from 'react';
 import { TouchableOpacity, StyleSheet, View, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { SvgXml } from 'react-native-svg';
 import { useSelector } from 'react-redux';
-import { BAG_SVG } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';
+
 import { selectCartCount } from '../store/slices/cartSlice';
 import type { RootState } from '../store';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -25,7 +26,7 @@ const BagIconButton = () => {
       style={styles.bagBtn}
       activeOpacity={0.7}
       onPress={() => navigation.navigate('CartScreen')}>
-      <SvgXml xml={BAG_SVG} width={22} height={22} />
+      <BrandIcon icon={BRAND.bag} width={22} height={22} />
       {count > 0 && (
         <View style={[styles.badge, { backgroundColor: theme.colors.primary }]}>
           <Text style={[styles.badgeText, { color: theme.colors.textOnPrimary }]}>

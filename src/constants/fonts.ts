@@ -39,10 +39,21 @@ export const FONTS = {
     android: 'Inter_28pt-LightItalic',
     default: 'Inter_28pt-LightItalic',
   }),
+  // Poppins — the full 4-step ladder (Regular → Medium → SemiBold → Bold).
+  poppinsRegular: Platform.select({
+    ios: 'Poppins-Regular',
+    android: 'Poppins-Regular',
+    default: 'Poppins-Regular',
+  }),
   poppinsMedium: Platform.select({
     ios: 'Poppins-Medium',
     android: 'Poppins-Medium',
     default: 'Poppins-Medium',
+  }),
+  poppinsSemiBold: Platform.select({
+    ios: 'Poppins-SemiBold',
+    android: 'Poppins-SemiBold',
+    default: 'Poppins-SemiBold',
   }),
   poppinsBold: Platform.select({
     ios: 'Poppins-Bold',
@@ -54,3 +65,25 @@ export const FONTS = {
   arimoBold: 'Arimo-Bold',
   arimoRegular: 'Arimo-Regular',
 };
+
+/**
+ * PostScript names of every font bundled in `src/assets/fonts` (verified
+ * against each file's `name` table). Anything resolved outside this list will
+ * silently fall back to the system font on device, so callers can validate
+ * before handing a family name to a `<Text>`.
+ */
+export const INSTALLED_FONT_NAMES = [
+  'Arimo-Regular',
+  'Arimo-Bold',
+  'Inter28pt-Bold',
+  'Inter28pt-LightItalic',
+  'Inter24pt-Bold',
+  'Inter18pt-SemiBold',
+  'Inter18pt-Bold',
+  'Poppins-Regular',
+  'Poppins-Medium',
+  'Poppins-SemiBold',
+  'Poppins-Bold',
+  'MomoSignature-Regular',
+] as const;
+

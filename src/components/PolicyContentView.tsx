@@ -1,4 +1,5 @@
 import React from 'react';
+import { FONTS } from '../constants/fonts';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -289,7 +290,7 @@ const createStyles = (theme: AppTheme) => {
   return StyleSheet.create({
     heading: {
       fontSize: 15,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       color: '#1B1B21',
       lineHeight: 22,
       marginTop: 4,
@@ -304,7 +305,7 @@ const createStyles = (theme: AppTheme) => {
     },
     linkText: {
       color: colors.primary,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     listContainer: {
       marginBottom: 4,
@@ -319,7 +320,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       color: colors.primary,
       lineHeight: 20,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
   });
 };

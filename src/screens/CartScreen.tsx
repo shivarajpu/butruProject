@@ -17,11 +17,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  Butruname,
-  LOCATION_PIN_SVG,
-  ARROW_BACK_ICON,
-} from '../assets/svg';
+import { LOCATION_PIN_SVG } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import type { RootState, AppDispatch } from '../store';
@@ -36,13 +36,13 @@ import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
 import { apiService } from '../api/apiService';
+import { tintSvg } from '../assets/svg/tint';
 
 // Custom SVGs
-const TAG_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`;
+const TAG_ICON_SVG = tintSvg(`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`);
 const INFO_ICON_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
 const ARROW_RIGHT_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
 const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.6569 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
-const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
 
 // Payment Flow Icons
 const SUCCESS_CHECK_SVG = `<svg width="72" height="72" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="12" fill="#2E7D32"/><path d="M7 12.5l3 3 7-7" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -349,20 +349,16 @@ const CartScreen = () => {
               style={styles.headerIconBtn}
               onPress={() => navigation?.goBack()}
               activeOpacity={0.7}>
-              <SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />
+              <BrandIcon icon={BRAND.arrowBack} width={15} height={15} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.locationWrapper}
               activeOpacity={0.7}
               onPress={() => setIsAddressModalVisible(true)}>
-              {Butruname ? (
-                <SvgXml xml={Butruname} width={65} height={24} />
-              ) : (
-                <Text style={styles.logoFallback}>Butru</Text>
-              )}
+              <StoreLogo width={65} height={24} textStyle={styles.logoFallback} />
               <View style={styles.locationRow}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
                    Delivering to {formatAddressLabel(selectedAddress)}
                  </Text>
@@ -429,7 +425,7 @@ const CartScreen = () => {
           {/* Dynamic Coupon Card */}
           <View style={styles.couponCard}>
             <View style={styles.couponHeader}>
-              <SvgXml xml={TAG_ICON_SVG} width={22} height={22} />
+              <SvgXml xml={TAG_ICON_SVG(theme.colors.primary)} width={22} height={22} />
               <Text style={styles.couponTitle}>COUPONS</Text>
             </View>
             <Text style={styles.couponSub}>
@@ -557,14 +553,14 @@ const CartScreen = () => {
                           <Text style={styles.sheetSubTitle}>Complete your order securely</Text>
                         </View>
                         <TouchableOpacity style={styles.closeBtn} onPress={handleClosePaymentModal}>
-                          <SvgXml xml={CLOSE_SVG} />
+                          <BrandIcon icon={BRAND.close} />
                         </TouchableOpacity>
                       </View>
 
                       <Text style={styles.fieldLabel}>Deliver To</Text>
                       <View style={styles.inputContainer}>
                         <SvgXml
-                          xml={LOCATION_PIN_SVG}
+                          xml={LOCATION_PIN_SVG(theme.colors.primary)}
                           width={12}
                           height={12}
                           style={styles.inputLeftIcon}

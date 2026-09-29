@@ -1,4 +1,5 @@
 import React from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   View,
   Text,
@@ -10,6 +11,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAppTheme } from '../theme/useAppTheme';
+import { useSelector } from 'react-redux';
+import { selectPayment } from '../storefront/selectors';
 import type { AppTheme } from '../theme/types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -63,7 +66,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     scrollContent: {
       paddingHorizontal: 16,
@@ -105,7 +108,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 15,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     methodSub: {
       fontSize: 12,
@@ -173,7 +176,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 14,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       marginTop: 8,
     },
     emptySub: {
@@ -203,7 +206,16 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
   const styles = createStyles(theme);
   const accent = theme.colors.primary;
 
-  const methodCards = [
+  // Which methods the store has actually switched on. Until the config lands
+  // every method stays visible, so the screen never flashes as empty.
+  const payment = useSelector(selectPayment);
+  const configured = !!payment.modes;
+  const onlineEnabled = configured
+    ? payment.showOnlinePay || payment.modes?.Online === true
+    : true;
+  const codEnabled = configured ? payment.modes?.COD !== false : true;
+
+  const methodCards = ([
     {
       key: 'upi',
       icon: upiIcon(accent),
@@ -219,6 +231,7 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
         'No card details required',
       ],
       extras: null as React.ReactNode | null,
+      enabled: onlineEnabled,
     },
     {
       key: 'card',
@@ -234,6 +247,7 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
         'Supports domestic & international cards',
         'Instant payment confirmation',
       ],
+      enabled: onlineEnabled,
       extras: (
         <View style={styles.cardBrandsRow}>
           {['VISA', 'MasterCard', 'RuPay', 'AMEX'].map(brand => (
@@ -259,8 +273,9 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
         'Limited to order value eligibility',
       ],
       extras: null as React.ReactNode | null,
+      enabled: codEnabled,
     },
-  ];
+  ] as const).filter(card => card.enabled);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -278,6 +293,11 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>Available Options</Text>
+        {!methodCards.length ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No payment methods available</Text>
+          </View>
+        ) : null}
         {methodCards.map(card => (
           <View key={card.key} style={styles.methodCard}>
             <View style={styles.methodHeader}>
@@ -307,14 +327,25 @@ export const PaymentMethodsScreen = ({ navigation }: Props) => {
           </View>
         ))}
 
-        <Text style={styles.sectionLabel}>Saved Cards</Text>
-        <View style={styles.emptyCard}>
-          <SvgXml xml={cardIcon(theme.colors.textMuted)} width={26} height={26} />
-          <Text style={styles.emptyTitle}>No saved cards yet</Text>
-          <Text style={styles.emptySub}>
-            Cards you save while checking out will appear here.
-          </Text>
-        </View>
+        {!onlineEnabled ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No online payment enabled</Text>
+            <Text style={styles.emptySub}>
+              This store currently accepts payment on delivery only.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.sectionLabel}>Saved Cards</Text>
+            <View style={styles.emptyCard}>
+              <SvgXml xml={cardIcon(theme.colors.textMuted)} width={26} height={26} />
+              <Text style={styles.emptyTitle}>No saved cards yet</Text>
+              <Text style={styles.emptySub}>
+                Cards you save while checking out will appear here.
+              </Text>
+            </View>
+          </>
+        )}
 
         <View style={styles.secureNote}>
           <SvgXml xml={lockIcon(theme.colors.textMuted)} width={14} height={14} />

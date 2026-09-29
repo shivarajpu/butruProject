@@ -15,15 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import {
-  Butruname,
-  emailIconGray,
-  phoneIconPink,
-  secureIcon,
-  supporIcon,
-  rewardIcon,
-  loginPagaImage,
-} from '../assets/svg';
+import { emailIconGray, phoneIconPink, loginPagaImage } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 import { Callicon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -144,16 +140,12 @@ const OtpScreen = ({ navigation }: Props) => {
             ]}
           >
             <View style={styles.brandTextContainer}>
-              {Butruname ? (
-                <SvgXml
-                  xml={Butruname}
-                  width={logoWidth}
-                  height={logoHeight}
-                  style={styles.logoSvg}
-                />
-              ) : (
-                <Text style={styles.logoText}>BuTRu</Text>
-              )}
+              <StoreLogo
+                width={logoWidth}
+                height={logoHeight}
+                style={styles.logoSvg}
+                textStyle={styles.logoText}
+              />
               <View style={styles.titleWrapper}>
                 <Text style={styles.titleText}>Welcome Back!</Text>
                 <Text style={styles.subtitleText}>Sign in to shop kids' fashion.</Text>
@@ -181,7 +173,7 @@ const OtpScreen = ({ navigation }: Props) => {
               style={[styles.tabButton, styles.activeTabButton]}
               activeOpacity={0.9}
             >
-              <SvgXml xml={phoneIconPink} width={18} height={18} />
+              <SvgXml xml={phoneIconPink(theme.colors.primary)} width={18} height={18} />
               <Text style={[styles.tabText, styles.activeTabText]}>OTP Login</Text>
             </TouchableOpacity>
           </View>
@@ -195,7 +187,7 @@ const OtpScreen = ({ navigation }: Props) => {
                   <AppInput
                     containerStyle={styles.inputContainer}
                     inputContainerStyle={styles.inputWrapper}
-                    leftIcon={<SvgXml xml={Callicon} width={23} height={25} />}
+                    leftIcon={<SvgXml xml={Callicon(theme.colors.primary)} width={23} height={25} />}
                     placeholder="+91 9876543210"
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
@@ -229,7 +221,7 @@ const OtpScreen = ({ navigation }: Props) => {
                   <AppInput
                     containerStyle={styles.inputContainer}
                     inputContainerStyle={styles.inputWrapper}
-                    leftIcon={<SvgXml xml={phoneIconPink} width={18} height={18} />}
+                    leftIcon={<SvgXml xml={phoneIconPink(theme.colors.primary)} width={18} height={18} />}
                     placeholder="Enter verification code"
                     value={otpCode}
                     onChangeText={setOtpCode}
@@ -268,21 +260,21 @@ const OtpScreen = ({ navigation }: Props) => {
           >
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={secureIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.secure} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>SECURE</Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={rewardIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.reward} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>REWARDS</Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={supporIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.support} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>SUPPORT</Text>
             </View>

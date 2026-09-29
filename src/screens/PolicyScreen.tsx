@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   ActivityIndicator,
   ScrollView,
@@ -250,7 +251,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       marginBottom: 8,
     },
     stateSubText: {
@@ -271,7 +272,7 @@ const createStyles = (theme: AppTheme) => {
     retryButtonText: {
       color: colors.textOnPrimary,
       fontSize: 13,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
   });
 };

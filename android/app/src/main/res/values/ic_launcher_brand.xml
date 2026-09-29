@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Brand colour used for the window background during the cold-start frames,
+  before React Native has mounted and the JS splash can read the storefront
+  config's `theme.primaryColor`.
+
+  This is only a floor. The value cannot come from the API because it is
+  resolved at install time on a per-tenant basis, while the launch theme is
+  baked into the binary. It matches the compiled-in default in
+  `src/config/app_config.ts` so the hand-off from the native window to
+  `SplashScreen` does not visibly jump on a fresh install.
+-->
+<resources>
+    <color name="brand_launch_background">#B12B5B</color>
+</resources>

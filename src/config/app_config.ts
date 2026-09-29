@@ -84,6 +84,10 @@ const APP_CONFIG: AppConfig = {
       primary: '#E8457C',
       primaryLight: '#3A0F22',
       secondary: '#FF8A5C',
+      hrsbacroundc: '#0F0F10',
+      hiconbackround: '#4A152666',
+      hisemibackound: '#1B0E13',
+      helptextprcolor: '#8E8E93',
 
       // Surfaces
       background: '#0D0D0D',

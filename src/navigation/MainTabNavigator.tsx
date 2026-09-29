@@ -9,8 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
+import { useAppTheme } from '../theme/useAppTheme';
 import HomeTab from '../home/HomeTab';
 import CategoryTab from '../screens/CategoryTab';
 import WishlistTab from '../screens/WishlistTab';
@@ -19,23 +19,32 @@ import AccountTab from '../screens/AccountTab';
 const Tab = createBottomTabNavigator();
 
 // ─── SVG Tab Icons ─────────────────────────────────────────────────────────────
+//
+// Only the inner markup is stored — the wrapper injects the live theme colour,
+// so the active tab re-skins with the store config instead of a baked-in hex.
 
-const HOME_SVG_FILLED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#C0185A"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>`;
-const HOME_SVG_OUTLINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/></svg>`;
-const GRID_SVG_OUTLINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>`;
-const GRID_SVG_FILLED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#C0185A"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>`;
-const HEART_SVG_OUTLINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-const HEART_SVG_FILLED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#C0185A"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-const PERSON_SVG_OUTLINE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#555555" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-const PERSON_SVG_FILLED = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#C0185A"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+const HOME_PATH = `<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>`;
+const HOME_OUTLINE_PATH = `<path d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10"/>`;
+const GRID_PATH = `<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>`;
+const HEART_PATH = `<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>`;
+const PERSON_PATH = `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`;
+
+const svg = (color: string, body: string, filled: boolean) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ${
+    filled
+      ? `fill="${color}"`
+      : `fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`
+  }>${body}</svg>`;
 
 // ─── Tab Icon Component ────────────────────────────────────────────────────────
 
 type TabIconProps = {
   focused: boolean;
   label: string;
-  iconFocused: string;
-  iconUnfocused: string;
+  /** Inner markup rendered filled in the active colour. */
+  path: string;
+  /** Inner markup rendered stroked in the inactive colour. */
+  outlinePath: string;
   size: number;
   fontSize: number;
 };
@@ -43,18 +52,19 @@ type TabIconProps = {
 const TabBarIcon = ({
   focused,
   label,
-  iconFocused,
-  iconUnfocused,
+  path,
+  outlinePath,
   size,
   fontSize,
 }: TabIconProps) => {
-  const activeColor = COLORS.tabActive || '#B12B5B';
-  const inactiveColor = COLORS.tabInactive || '#555555';
+  const theme = useAppTheme();
+  const activeColor = theme.colors.tabActive;
+  const inactiveColor = theme.colors.tabInactive;
 
   return (
     <View style={tabStyles.iconWrapper}>
       <SvgXml
-        xml={focused ? iconFocused : iconUnfocused}
+        xml={focused ? svg(activeColor, path, true) : svg(inactiveColor, outlinePath, false)}
         width={size}
         height={size}
       />
@@ -66,8 +76,9 @@ const TabBarIcon = ({
           {
             fontSize: fontSize,
             color: focused ? activeColor : inactiveColor,
-            fontFamily: focused ? FONTS.inter18SemiBold : FONTS.arimoRegular,
-            fontWeight: focused ? '600' : '400',
+            // Screen names stay bold in both states — only the colour changes.
+            fontFamily: FONTS.inter18SemiBold,
+            fontWeight: '700',
           },
         ]}>
         {label}
@@ -120,8 +131,8 @@ const MainTabNavigator = () => {
             <TabBarIcon
               focused={focused}
               label="Home"
-              iconFocused={HOME_SVG_FILLED}
-              iconUnfocused={HOME_SVG_OUTLINE}
+              path={HOME_PATH}
+              outlinePath={HOME_OUTLINE_PATH}
               size={iconSize}
               fontSize={labelSize}
             />
@@ -136,8 +147,8 @@ const MainTabNavigator = () => {
             <TabBarIcon
               focused={focused}
               label="Category"
-              iconFocused={GRID_SVG_FILLED}
-              iconUnfocused={GRID_SVG_OUTLINE}
+              path={GRID_PATH}
+              outlinePath={GRID_PATH}
               size={iconSize}
               fontSize={labelSize}
             />
@@ -152,8 +163,8 @@ const MainTabNavigator = () => {
             <TabBarIcon
               focused={focused}
               label="Wishlist"
-              iconFocused={HEART_SVG_FILLED}
-              iconUnfocused={HEART_SVG_OUTLINE}
+              path={HEART_PATH}
+              outlinePath={HEART_PATH}
               size={iconSize}
               fontSize={labelSize}
             />
@@ -168,8 +179,8 @@ const MainTabNavigator = () => {
             <TabBarIcon
               focused={focused}
               label="Account"
-              iconFocused={PERSON_SVG_FILLED}
-              iconUnfocused={PERSON_SVG_OUTLINE}
+              path={PERSON_PATH}
+              outlinePath={PERSON_PATH}
               size={iconSize}
               fontSize={labelSize}
             />

@@ -16,6 +16,7 @@
  */
 
 import React from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   View,
   Text,
@@ -88,7 +89,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           <Text
             style={[
               styles.title,
-              { color: colors.text, fontFamily: fontFamily.bold },
+              { color: colors.text, fontFamily: FONTS.poppinsBold },
             ]}
             numberOfLines={1}>
             {title}

@@ -1,15 +1,17 @@
 /**
- * MenuDrawer — Reusable side menu drawer with brand header, nav items and promo.
+ * MenuDrawer — side menu whose category list comes from the storefront config.
  *
- * DRAWER_ITEMS config is kept here alongside the component so HomeTab (and any
- * future consumer) only needs to render <MenuDrawer />.
+ * Categories + labels are fully server driven (`website.navigation`); the
+ * account-level entries (Wishlist / Orders / Account / Help) are app routes
+ * and are appended after them, so a merchant can reorder or rename the shop
+ * menu without a release.
  *
  * Usage:
  *   const [open, setOpen] = useState(false);
  *   <MenuDrawer
  *     visible={open}
  *     onClose={() => setOpen(false)}
- *     onSelect={name => handleMenuItem(name)}
+ *     onSelect={action => handleMenuAction(action)}
  *     activeCategory="Home"
  *     logoWidth={90}
  *     logoHeight={36}
@@ -28,36 +30,54 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import { useSelector } from 'react-redux';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
-import {
-  Butruname,
-  HOME_ACTIVE_SVG,
-  CLOTHING_SVG,
-  SHOES_SVG,
-  ACCESSORIES_SVG,
-  TOYS_SVG,
-  WISHLIST_SVG,
-  ORDERS_SVG,
-  ACCOUNT_SVG,
-  HELP_SVG,
-  CLOSE_SVG,
-  Sidebaarimage,
-} from '../assets/svg';
+import { FONTS } from '../constants/fonts';
+import { Sidebaarimage } from '../assets/svg';
+import { BRAND, type BrandIconDef } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';
+import StoreLogo from './StoreLogo';
+import { selectNavigation } from '../storefront/selectors';
+import { categoryIcon } from '../storefront/categoryIcons';
+import { resolveLink, type WidgetAction } from '../storefront/links';
+import { useStoreConfig } from '../storefront/useStorefront';
+import type { NavItem, StoreConfig } from '../storefront/types';
 
 // ─── Drawer Menu Config ────────────────────────────────────────────────────────
 
-export const DRAWER_ITEMS = [
-  { id: '1', name: 'Home', icon: HOME_ACTIVE_SVG },
-  { id: '2', name: 'Clothing', icon: CLOTHING_SVG },
-  { id: '3', name: 'Shoes', icon: SHOES_SVG },
-  { id: '4', name: 'Accessories', icon: ACCESSORIES_SVG },
-  { id: '5', name: 'Toys', icon: TOYS_SVG },
-  { id: '6', name: 'Wishlist', icon: WISHLIST_SVG },
-  { id: '7', name: 'My Orders', icon: ORDERS_SVG },
-  { id: '8', name: 'Account', icon: ACCOUNT_SVG },
-  { id: '9', name: 'Help & Support', icon: HELP_SVG },
-];
+export type DrawerItem = {
+  id: string;
+  name: string;
+  icon: BrandIconDef;
+  action: WidgetAction;
+  /** Category this item highlights when active. */
+  category?: string;
+};
+
+/** Builds the drawer list from the storefront config + app routes. */
+export const buildDrawerItems = (
+  navItems: NavItem[],
+  config: StoreConfig | null,
+): DrawerItem[] => {
+  const configCategories = navItems
+    .filter(item => !item.children?.length)
+    .map((item, index) => {
+      const action = resolveLink(item.link, { config });
+      return {
+        id: item.id || `nav-${index}`,
+        name: item.title,
+        icon: categoryIcon(item.title),
+        action,
+        category: action.type === 'category' ? action.category : item.title,
+      };
+    });
+
+  return [
+    { id: 'home', name: 'Home', icon: BRAND.home, action: { type: 'none' }, category: 'Home' },
+    ...configCategories,
+  ];
+};
 
 // ─── StyleSheet Factory ────────────────────────────────────────────────────────
 
@@ -122,17 +142,19 @@ const createStyles = (theme: AppTheme) => {
     },
     drawerItemText: {
       fontSize: 14,
-      fontWeight: '500',
+      fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.medium,
+      fontFamily: FONTS.poppinsBold,
     },
     drawerItemTextActive: {
       color: colors.primary,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     shopNowBtn: {
-      backgroundColor: colors.primary,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: colors.primary,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 12,
@@ -143,9 +165,9 @@ const createStyles = (theme: AppTheme) => {
       left: 13,
     },
     shopNowText: {
-      color: colors.textOnPrimary,
+      color: colors.primary,
       fontSize: 9,
-      fontWeight: '700',
+      fontFamily: FONTS.poppinsBold,
     },
   });
 };
@@ -155,10 +177,12 @@ const createStyles = (theme: AppTheme) => {
 interface MenuDrawerProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (name: string) => void;
+  onSelect: (action: WidgetAction, item: DrawerItem) => void;
   activeCategory: string;
   logoWidth: number;
   logoHeight: number;
+  /** Bottom promo button — opens the full product listing. */
+  onShopNow: () => void;
 }
 
 const MenuDrawer: React.FC<MenuDrawerProps> = ({
@@ -168,13 +192,17 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
   activeCategory,
   logoWidth,
   logoHeight,
+  onShopNow,
 }) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
+  const navItems = useSelector(selectNavigation);
+  const config = useStoreConfig();
+  const items = buildDrawerItems(navItems, config);
 
-  const handleItemPress = (name: string) => {
-    onSelect(name);
+  const handleItemPress = (item: DrawerItem) => {
+    onSelect(item.action, item);
     onClose();
   };
 
@@ -189,42 +217,52 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Header with Logo and Close Button */}
             <View style={styles.drawerHeader}>
-              {Butruname ? (
-                <SvgXml xml={Butruname} width={logoWidth * 1.1} height={logoHeight * 1.1} />
-              ) : (
-                <Text style={styles.logoFallback}>{theme.appName}</Text>
-              )}
+              <StoreLogo
+                width={logoWidth * 1.1}
+                height={logoHeight * 1.1}
+                textStyle={styles.logoFallback}
+              />
               <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-                <SvgXml xml={CLOSE_SVG} width={18} height={18} />
+                <BrandIcon icon={BRAND.close} width={18} height={18} />
               </TouchableOpacity>
             </View>
 
             {/* Menu Items List */}
             <View style={styles.drawerList}>
-              {DRAWER_ITEMS.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.drawerItem,
-                    item.name === activeCategory && styles.drawerItemActive,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => handleItemPress(item.name)}>
-                  <SvgXml xml={item.icon} width={21} height={21} />
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      item.name === activeCategory && styles.drawerItemTextActive,
-                    ]}>
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {items.map(item => {
+                const isActive =
+                  !!item.category &&
+                  (item.category === activeCategory ||
+                    item.name.toLowerCase() === activeCategory.toLowerCase());
+
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.drawerItem, isActive && styles.drawerItemActive]}
+                    activeOpacity={0.7}
+                    onPress={() => handleItemPress(item)}>
+                    <BrandIcon icon={item.icon} width={21} height={21} />
+                    <Text
+                      style={[
+                        styles.drawerItemText,
+                        isActive && styles.drawerItemTextActive,
+                      ]}>
+                      {item.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Bottom Promo Banner */}
             <View>
-              <TouchableOpacity style={styles.shopNowBtn} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.shopNowBtn}
+                activeOpacity={0.8}
+                onPress={() => {
+                  onClose();
+                  onShopNow();
+                }}>
                 <Text style={styles.shopNowText}>Shop Now →</Text>
               </TouchableOpacity>
               <SvgXml xml={Sidebaarimage} />

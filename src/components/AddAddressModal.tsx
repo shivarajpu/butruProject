@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,14 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import Geolocation, {
+  type GeolocationError,
   type GeolocationResponse,
 } from '@react-native-community/geolocation';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { apiService } from '../api/apiService';
 import type { Address } from '../hooks/useProfile';
+import { tintSvg } from '../assets/svg/tint';
 
 type UpdateAddressResponse = {
   success: boolean;
@@ -50,42 +52,42 @@ type CheckPincodeResponse = {
   };
 };
 
-const CLOSE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
-const CHECK_GREEN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-const CHECK_ROUND_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="#B12B5B"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+export const CHECK_GREEN_SVG = (color: string) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CHECK_ROUND_SVG = tintSvg(`<svg width="16" height="16" viewBox="0 0 24 24" fill="#B12B5B"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`);
 
-const getHomeIconSvg = (_color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="6" y="8" width="4" height="6.66667" stroke="#BE185D" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+// The address-type icons used to be frozen strings: `getHomeIconSvg` accepted a
+// color and then ignored it, baking in `#BE185D`, so a tenant's brand colour
+// never reached the pin. Every icon here is a factory now.
+export const getHomeIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="6" y="8" width="4" height="6.66667" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
 `;
 const getWorkIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
 const getOtherLocationSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
-const USER_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
-const PHONE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
-const PINCODE_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
-const MAP_BUILDING_SVG = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M0.833344 5.00008V18.3334L6.66668 15.0001L13.3333 18.3334L19.1667 15.0001V1.66675L13.3333 5.00008L6.66668 1.66675L0.833344 5.00008V5.00008" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M6.66666 1.66675V15.0001" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M13.3333 5V18.3333" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+export const USER_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+export const PHONE_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+export const PINCODE_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+export const MAP_BUILDING_SVG = (color: string) => `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M0.833344 5.00008V18.3334L6.66668 15.0001L13.3333 18.3334L19.1667 15.0001V1.66675L13.3333 5.00008L6.66668 1.66675L0.833344 5.00008V5.00008" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6.66666 1.66675V15.0001" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M13.3333 5V18.3333" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
-const FLAG_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`;
-const CITY_ICON_SVG = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M3.99999 1.33325H12C12.7359 1.33325 13.3333 1.9307 13.3333 2.66659V13.3333C13.3333 14.0691 12.7359 14.6666 12 14.6666H3.99999C3.2641 14.6666 2.66666 14.0691 2.66666 13.3333V2.66659C2.66666 1.9307 3.2641 1.33325 3.99999 1.33325V1.33325" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M6 14.6667V12H10V14.6667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 4H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 4H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 4H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 6.66675H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 9.33325H8.00667" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 6.66675H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M10.6667 9.33325H10.6733" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 6.66675H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5.33334 9.33325H5.34001" stroke="#9CA3AF" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+export const FLAG_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`;
+export const CITY_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.99999 1.33325H12C12.7359 1.33325 13.3333 1.9307 13.3333 2.66659V13.3333C13.3333 14.0691 12.7359 14.6666 12 14.6666H3.99999C3.2641 14.6666 2.66666 14.0691 2.66666 13.3333V2.66659C2.66666 1.9307 3.2641 1.33325 3.99999 1.33325V1.33325" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6 14.6667V12H10V14.6667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 4H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 4H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 4H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 6.66675H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 9.33325H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 6.66675H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 9.33325H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 6.66675H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 9.33325H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
-const CHEVRON_DOWN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>`;
-const LOCATION_PIN_SVG_LOCAL = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#B12B5B"/></svg>`;
 
 type Props = {
   visible: boolean;
@@ -110,6 +112,22 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
   const [isSaving, setIsSaving] = useState(false);
   const [checkingPincode, setCheckingPincode] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [message, setMessage] = useState('');
+
+  /**
+   * The location request outlives any single render, so its state lives in refs.
+   *
+   * `locating` is what the button's `disabled` reads, and `visible` is what
+   * decides whether a late reply still has a form to write into. Reading either
+   * from state would capture a stale value inside the pending async function.
+   */
+  const locatingRef = useRef(false);
+  const visibleRef = useRef(visible);
+  const locationRequestRef = useRef(0);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) {
@@ -135,26 +153,55 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     setIsDefault(editingAddress?.isDefault || false);
   }, [visible, editingAddress]);
 
-  const requestLocationPermission = async (): Promise<boolean> => {
-    if (Platform.OS === 'android') {
-      const status = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      );
-      return status === PermissionsAndroid.RESULTS.GRANTED;
+  /**
+   * iOS: no explicit permission call.
+   *
+   * `Geolocation.requestAuthorization` used to be called here, and that is what
+   * made the button hang on the second tap. Its native implementation
+   * (RNCGeolocation.mm) always calls `requestWhenInUseAuthorization` and then
+   * waits for `locationManagerDidChangeAuthorization` to flush its queued
+   * callbacks. iOS only reports a change while the prompt is on screen — once
+   * the user has answered, the status never changes again, so the callbacks are
+   * never flushed and the JS `await` stays pending forever. The symptom was a
+   * spinner that never stopped and an address form that never filled in.
+   *
+   * `getCurrentPosition` needs no prompt of its own: the library requests
+   * permission implicitly and only reports a `PERMISSION_DENIED` error if the
+   * user actually refused, which is handled below. One call, no deadlock.
+   *
+   * Android: the runtime permission has to be asked for explicitly, and
+   * `shouldShowRationale` is honoured so a second tap explains rather than
+   * silently failing on an OS that refuses to re-prompt.
+   */
+  const hasLocationPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true;
     }
-    return new Promise(resolve => {
-      Geolocation.requestAuthorization(
-        () => resolve(true),
-        () => resolve(false),
-      );
-    });
+
+    const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    if (await PermissionsAndroid.check(fine)) {
+      return true;
+    }
+
+    const status = await PermissionsAndroid.request(fine);
+    return status === PermissionsAndroid.RESULTS.GRANTED;
   };
 
   const fetchCurrentLocation = async () => {
-    if (locating) {
+    // The state flag is the guard, not this one: `locating` is captured from the
+    // render that created this closure, so a fast second tap could still slip
+    // through and start a competing request. The ref is read at call time.
+    if (locatingRef.current) {
       return;
     }
+    locatingRef.current = true;
     setLocating(true);
+    setMessage('');
+
+    // A dismissed or replaced modal must not keep writing into a form nobody
+    // is looking at any more, and must not leave the button stuck disabled.
+    const requestId = ++locationRequestRef.current;
+    const isStale = () => !visibleRef.current || requestId !== locationRequestRef.current;
 
     let filledAddress = '';
     let filledCity = '';
@@ -162,13 +209,19 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     let filledPincode = '';
     let filledColony = '';
 
+    const finish = () => {
+      locatingRef.current = false;
+      setLocating(false);
+    };
+
     try {
-      const hasPermission = await requestLocationPermission();
-      if (!hasPermission) {
-        Alert.alert(
-          'Location Permission',
-          'Location permission is needed to fetch your current address.',
-        );
+      if (!(await hasLocationPermission())) {
+        if (!isStale()) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        }
         return;
       }
 
@@ -176,11 +229,20 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
         (resolve, reject) => {
           Geolocation.getCurrentPosition(resolve, reject, {
             enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 10000,
+            // 10s, not 15s. A cold GPS fix can take that long, but past it the
+            // user is looking at a spinner with no feedback, and a coarse fix is
+            // good enough to land on the right street.
+            timeout: 10000,
+            // Reuse the previous fix when it is younger than 60s. This is what
+            // makes a repeat tap feel instant instead of re-acquiring GPS.
+            maximumAge: 60000,
           });
         },
       );
+
+      if (isStale()) {
+        return;
+      }
 
       const { latitude, longitude } = position.coords;
 
@@ -231,7 +293,18 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
           }
         }
       } catch (reverseError) {
+        // A failed lookup still leaves usable coordinates behind, so tell the
+        // user that instead of implying nothing was found.
         console.log('Reverse geocoding failed:', reverseError);
+        if (!isStale()) {
+          setMessage('Location found, but the address could not be looked up. Please fill it in.');
+        }
+        finish();
+        return;
+      }
+
+      if (isStale()) {
+        return;
       }
 
       const summaryLines = [
@@ -249,12 +322,29 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
           : 'Could not fetch location details. Please fill the fields manually.',
       );
     } catch (error) {
-      Alert.alert(
-        'Location Failed',
-        error instanceof Error ? error.message : 'Unable to fetch current location.',
-      );
+      if (!isStale()) {
+        const code = (error as GeolocationError | undefined)?.code;
+        // The user said no. Sending them to Settings is the only thing that can
+        // actually change the answer — asking again does nothing.
+        if (code === 1 /* PERMISSION_DENIED */) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        } else if (code === 2 /* POSITION_UNAVAILABLE */) {
+          Alert.alert(
+            'Location Unavailable',
+            'Could not get a location fix. Make sure Location Services are on and try again.',
+          );
+        } else {
+          Alert.alert(
+            'Location Failed',
+            error instanceof Error ? error.message : 'Unable to fetch current location.',
+          );
+        }
+      }
     } finally {
-      setLocating(false);
+      finish();
     }
   };
 
@@ -402,7 +492,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                   </Text>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                  <SvgXml xml={CLOSE_SVG} />
+                  <BrandIcon icon={BRAND.close} />
                 </TouchableOpacity>
               </View>
 
@@ -436,7 +526,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                         </View>
                         {isSel && (
                           <View style={styles.chipCheckBadge}>
-                            <SvgXml xml={CHECK_ROUND_SVG} width={16} height={16} />
+                            <SvgXml xml={CHECK_ROUND_SVG(theme.colors.primary)} width={16} height={16} />
                           </View>
                         )}
                       </TouchableOpacity>
@@ -446,7 +536,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
                 <Text style={styles.fieldLabel}>Full Name</Text>
                 <View style={styles.inputContainer}>
-                  <SvgXml xml={USER_ICON_SVG} style={styles.inputLeftIcon} />
+                  <SvgXml xml={USER_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
                   <TextInput
                     style={styles.formInputWithIcon}
                     placeholder="Enter full name"
@@ -458,7 +548,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
                 <Text style={styles.fieldLabel}>Mobile Number</Text>
                 <View style={styles.inputContainer}>
-                  <SvgXml xml={PHONE_ICON_SVG} style={styles.inputLeftIcon} />
+                  <SvgXml xml={PHONE_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
                   <TextInput
                     style={styles.formInputWithIcon}
                     placeholder="Enter mobile number"
@@ -472,7 +562,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                 <Text style={styles.fieldLabel}>Pincode</Text>
                 <View style={styles.pinRow}>
                   <View style={[styles.inputContainer, { flex: 1 }]}>
-                    <SvgXml xml={PINCODE_ICON_SVG} style={styles.inputLeftIcon} />
+                    <SvgXml xml={PINCODE_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
                     <TextInput
                       style={styles.formInputWithIcon}
                       placeholder="Enter 6-digit pincode"
@@ -496,7 +586,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
                 <Text style={styles.fieldLabel}>Address</Text>
                 <View style={styles.inputContainer}>
-                  <SvgXml xml={MAP_BUILDING_SVG} style={styles.inputLeftIcon} width={15} height={15} />
+                  <SvgXml xml={MAP_BUILDING_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} width={15} height={15} />
                   <TextInput
                     style={styles.formInputWithIcon}
                     placeholder="House No., Building, Street, Area"
@@ -506,16 +596,26 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                   />
                 </View>
 
+                {/* Inline rather than an Alert: a modal on top of a modal is what
+                    made a failed lookup look like the form had simply stopped
+                    responding. */}
+                {!!message && <Text style={styles.locateMessage}>{message}</Text>}
+
                 <TouchableOpacity
                   style={styles.locateBtn}
                   activeOpacity={0.8}
                   disabled={locating}
                   onPress={fetchCurrentLocation}>
                   {locating ? (
-                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      {/* The button used to swap to a bare spinner, so a slow or
+                          stuck request looked identical to a dead button. */}
+                      <Text style={styles.locateBtnText}>Finding your location…</Text>
+                    </>
                   ) : (
                     <>
-                      <SvgXml xml={LOCATION_PIN_SVG_LOCAL} width={15} height={15} />
+                      <SvgXml xml={LOCATION_PIN_SVG_LOCAL(theme.colors.primary)} width={15} height={15} />
                       <Text style={styles.locateBtnText}>Use Current Location</Text>
                     </>
                   )}
@@ -523,7 +623,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
                 <Text style={styles.fieldLabel}>Landmark (Optional)</Text>
                 <View style={styles.inputContainer}>
-                  <SvgXml xml={FLAG_ICON_SVG} style={styles.inputLeftIcon} />
+                  <SvgXml xml={FLAG_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
                   <TextInput
                     style={styles.formInputWithIcon}
                     placeholder="Enter landmark"
@@ -537,7 +637,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                   <View style={{ flex: 1 }}>
                     <Text style={styles.fieldLabel}>City</Text>
                     <View style={styles.inputContainer}>
-                      <SvgXml xml={CITY_ICON_SVG} style={styles.inputLeftIcon} />
+                      <SvgXml xml={CITY_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
                       <TextInput
                         style={styles.formInputWithIcon}
                         placeholder="Enter city"
@@ -558,8 +658,8 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                         value={stateName}
                         onChangeText={setStateName}
                       />
-                      <SvgXml
-                        xml={CHEVRON_DOWN_SVG}
+                      <BrandIcon
+                        icon={BRAND.chevronDown}
                         width={14}
                         height={14}
                         style={{ marginRight: 10 }}
@@ -577,7 +677,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                       styles.checkboxBox,
                       isDefault && styles.checkboxBoxSelected,
                     ]}>
-                    {isDefault && <SvgXml xml={CHECK_GREEN_SVG} width={10} height={10} />}
+                    {isDefault && <SvgXml xml={CHECK_GREEN_SVG(theme.colors.success)} width={10} height={10} />}
                   </View>
                   <Text style={styles.defaultCheckboxLabel}>Set as default address</Text>
                 </TouchableOpacity>
@@ -747,6 +847,12 @@ const createStyles = (theme: AppTheme) => {
       borderStyle: 'dashed',
       backgroundColor: colors.primaryLight,
     },
+    locateMessage: {
+      fontSize: 12,
+      color: colors.error,
+      marginTop: 8,
+      fontFamily: fontFamily.regular,
+    },
     locateBtnText: {
       fontSize: 13,
       fontWeight: '600',
@@ -797,3 +903,5 @@ const createStyles = (theme: AppTheme) => {
 };
 
 export default AddAddressModal;
+const LOCATION_PIN_SVG_LOCAL = tintSvg(`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#B12B5B"/></svg>`);import { BRAND } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';

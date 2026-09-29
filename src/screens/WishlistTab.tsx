@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   View,
   Text,
@@ -11,9 +12,8 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { SvgXml } from 'react-native-svg';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ARROW_BACK_ICON, LOCATION_PIN_SVG } from '../assets/svg';
+
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
@@ -24,8 +24,10 @@ import AppIconButton from '../components/AppIconButton';
 import BagIconButton from '../components/BagIconButton';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
-
-const HEART_PINK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#B8235A"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+import { BRAND } from '../assets/svg/brand';
+import { SvgXml } from 'react-native-svg';
+import { heartFilledSvg } from '../assets/svg';
+import BrandIcon from '../components/BrandIcon';
 
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 
@@ -225,7 +227,7 @@ const WishlistScreen = () => {
           <View style={styles.headerLeft}>
             <AppIconButton
               style={styles.headerBtn}
-              icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+              icon={<BrandIcon icon={BRAND.arrowBack} width={15} height={15} />}
               accessibilityLabel="Go back"
               onPress={handleBackPress}
             />
@@ -236,7 +238,7 @@ const WishlistScreen = () => {
                 style={styles.deliveryRow}
                 activeOpacity={0.7}
                 onPress={() => setIsAddressModalVisible(true)}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                <BrandIcon icon={BRAND.locationPinSm} width={12} height={12} />
                 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200)  , marginLeft:4}]} numberOfLines={1}>
                  Delivering to {formatAddressLabel(deliveryAddress)}
                </Text>
@@ -312,7 +314,7 @@ const WishlistScreen = () => {
                       style={styles.heartBtn}
                       onPress={() => removeItem(item.id)}
                       activeOpacity={0.8}>
-                      <SvgXml xml={HEART_PINK_SVG} width={16} height={16} />
+                      <SvgXml xml={heartFilledSvg(theme.colors.primary)} width={16} height={16} />
                     </TouchableOpacity>
                   </TouchableOpacity>
 
@@ -495,7 +497,7 @@ const createStyles = (theme: AppTheme) => {
   },
   itemName: {
     fontSize: 13,
-    fontFamily: fontFamily.bold,
+    fontFamily: FONTS.poppinsBold,
     color: colors.text,
     marginBottom: 4,
   },
@@ -563,7 +565,7 @@ const createStyles = (theme: AppTheme) => {
   addToCartText: {
     color: colors.textOnPrimary,
     fontSize: 12,
-    fontFamily: fontFamily.bold,
+    fontFamily: FONTS.poppinsBold,
   },
   centerBox: {
     alignItems: 'center',
@@ -575,7 +577,7 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
-    fontFamily: fontFamily.bold,
+    fontFamily: FONTS.poppinsBold,
     marginBottom: 6,
   },
   emptyMessage: {

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FONTS } from '../constants/fonts';
+import { useSelector } from 'react-redux';
 import {
   StyleSheet,
   Text,
@@ -15,10 +17,14 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import { fetchCoupons, type StoreCoupon } from '../storefront/coupons';
+import { formatPrice } from '../storefront/catalog';
+import { selectCurrency } from '../storefront/selectors';
 
 const { height } = Dimensions.get('window');
 
 // --- Coupon Data Type ---
+/** What one ticket row needs. Derived from `StoreCoupon` by `describeCoupon`. */
 interface Coupon {
   id: string;
   code: string;
@@ -27,29 +33,54 @@ interface Coupon {
   minOrderText: string;
 }
 
-const COUPONS_DATA: Coupon[] = [
-  {
-    id: '1',
-    code: 'WELCOME10',
-    discountText: 'FLAT\n10%\nOFF',
-    subText: 'Flat 10% off on your order',
-    minOrderText: 'Min. order ₹999',
-  },
-  {
-    id: '2',
-    code: 'BUNNY15',
-    discountText: 'FLAT\n15%\nOFF',
-    subText: 'Flat 15% off on your order',
-    minOrderText: 'Min. order ₹1499',
-  },
-  {
-    id: '3',
-    code: 'SUPER20',
-    discountText: 'FLAT\n20%\nOFF',
-    subText: 'Flat 20% off on your order',
-    minOrderText: 'Min. order ₹1999',
-  },
-];
+const APPLIES_ON_LABEL: Record<string, string> = {
+  cart_subtotal: 'cart subtotal',
+  shipping: 'shipping',
+};
+
+/**
+ * Turns one API coupon into the three lines a ticket can show.
+ *
+ * The badge carries the headline number, the middle line says what the discount
+ * is computed against (and its ceiling, which a percentage coupon hiding its cap
+ * would be misleading about), and the last line carries the conditions — the
+ * two a shopper is most likely to trip on.
+ */
+const describeCoupon = (coupon: StoreCoupon, currency: string): Coupon => {
+  const isPercentage = coupon.type === 'percentage';
+  const amount = formatPrice(coupon.value, currency);
+  const basis = APPLIES_ON_LABEL[coupon.appliesOn] ?? coupon.appliesOn;
+
+  const discountText = isPercentage ? `${coupon.value}%\nOFF` : `${amount}\nOFF`;
+
+  const cap =
+    isPercentage && coupon.maxDiscount
+      ? ` (up to ${formatPrice(coupon.maxDiscount, currency)})`
+      : '';
+  const subText = `${isPercentage ? `${coupon.value}% off` : `Flat ${amount} off`} on ${basis}${cap}`;
+
+  const conditions = [
+    coupon.minOrderAmount > 0
+      ? `Min. order ${formatPrice(coupon.minOrderAmount, currency)}`
+      : '',
+    coupon.excludeDiscountedProducts ? 'Not on already-discounted items' : '',
+    coupon.validTo ? `Valid till ${formatDate(coupon.validTo)}` : '',
+  ].filter(Boolean);
+
+  return {
+    id: coupon.id,
+    code: coupon.code,
+    discountText,
+    subText,
+    minOrderText: conditions.join(' · '),
+  };
+};
+
+const formatDate = (iso: string): string => {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 // --- Close (X) Icon SVG ---
 interface CloseIconProps {
@@ -80,11 +111,35 @@ export default function ApplyCouponModal({
 }: ApplyCouponModalProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  // The store's currency, so a tenant billing in something other than INR
+  // renders ₹-prefixed thresholds from its own config.
+  const currency = useSelector(selectCurrency);
   const [couponInput, setCouponInput] = useState('');
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'error' | 'success'>('error');
   const [applying, setApplying] = useState(false);
+  const [coupons, setCoupons] = useState<StoreCoupon[] | null>(null);
+
+  /**
+   * The ticket list is fetched per open, not once on mount: the sheet is only
+   * reachable from the cart, `eligibilityType` is per user, and a code that was
+   * valid ten minutes ago may not be now. `coupons === null` is the "not
+   * fetched yet" state that renders the spinner; `[]` is a real empty list.
+   */
+  const loadCoupons = useCallback(async () => {
+    setCoupons(null);
+    const list = await fetchCoupons(theme.api.storeSlug);
+    setCoupons(list);
+  }, [theme.api.storeSlug]);
+
+  useEffect(() => {
+    if (visible) {
+      loadCoupons();
+    }
+  }, [visible, loadCoupons]);
+
+  const tickets = (coupons ?? []).map(coupon => describeCoupon(coupon, currency));
 
   const handleSelectCoupon = (coupon: Coupon) => {
     setSelectedCouponId(coupon.id);
@@ -192,47 +247,64 @@ export default function ApplyCouponModal({
           {/* Available Coupons Section */}
           <Text style={styles.sectionTitle}>Available Coupons</Text>
 
-          <FlatList
-            data={COUPONS_DATA}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContainer}
-            renderItem={({ item }) => {
-              const isSelected = selectedCouponId === item.id;
-              return (
-                <TouchableOpacity
-                  style={styles.couponCard}
-                  onPress={() => handleSelectCoupon(item)}
-                  activeOpacity={0.85}>
-                  {/* Left Side Discount Banner */}
-                  <View style={styles.cardLeft}>
-                    <Text style={styles.discountBadgeText}>{item.discountText}</Text>
-                  </View>
-
-                  {/* Dashed Ticket Divider */}
-                  <View style={styles.dashedLineContainer}>
-                    <View style={styles.topNotch} />
-                    <View style={styles.dashedLine} />
-                    <View style={styles.bottomNotch} />
-                  </View>
-
-                  {/* Right Side Details */}
-                  <View style={styles.cardRight}>
-                    <View style={styles.textDetails}>
-                      <Text style={styles.couponCode}>{item.code}</Text>
-                      <Text style={styles.couponSubText}>{item.subText}</Text>
-                      <Text style={styles.minOrderText}>{item.minOrderText}</Text>
+          {coupons === null ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : tickets.length === 0 ? (
+            // The input above still works, so this is an invitation, not a dead end.
+            <Text style={styles.stateText}>
+              No coupons are running right now. You can still enter a code above.
+            </Text>
+          ) : (
+            <FlatList
+              data={tickets}
+              keyExtractor={item => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContainer}
+              renderItem={({ item }) => {
+                const isSelected = selectedCouponId === item.id;
+                return (
+                  <TouchableOpacity
+                    style={styles.couponCard}
+                    onPress={() => handleSelectCoupon(item)}
+                    activeOpacity={0.85}>
+                    {/* Left Side Discount Banner */}
+                    <View style={styles.cardLeft}>
+                      <Text style={styles.discountBadgeText}>{item.discountText}</Text>
                     </View>
 
-                    {/* Custom Radio Button */}
-                    <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
-                      {isSelected && <View style={styles.radioInnerCircle} />}
+                    {/* Dashed Ticket Divider */}
+                    <View style={styles.dashedLineContainer}>
+                      <View style={styles.topNotch} />
+                      <View style={styles.dashedLine} />
+                      <View style={styles.bottomNotch} />
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            }}
-          />
+
+                    {/* Right Side Details */}
+                    <View style={styles.cardRight}>
+                      <View style={styles.textDetails}>
+                        <Text style={styles.couponCode}>{item.code}</Text>
+                        <Text style={styles.couponSubText} numberOfLines={2}>
+                          {item.subText}
+                        </Text>
+                        {!!item.minOrderText && (
+                          <Text style={styles.minOrderText} numberOfLines={2}>
+                            {item.minOrderText}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Custom Radio Button */}
+                      <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
+                        {isSelected && <View style={styles.radioInnerCircle} />}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
         </Pressable>
       </Pressable>
     </Modal>
@@ -325,7 +397,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.primary,
       fontSize: 15,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     messageText: {
       fontSize: 12,
@@ -348,6 +420,18 @@ const createStyles = (theme: AppTheme) => {
     listContainer: {
       paddingBottom: 12,
     },
+    stateBox: {
+      paddingVertical: 28,
+      alignItems: 'center',
+    },
+    stateText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      paddingVertical: 20,
+      paddingHorizontal: 12,
+      fontFamily: fontFamily.regular,
+    },
     couponCard: {
       flexDirection: 'row',
       backgroundColor: colors.coupanBackroun,
@@ -368,7 +452,7 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '900',
       textAlign: 'center',
       lineHeight: 18,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     dashedLineContainer: {
       width: 1,

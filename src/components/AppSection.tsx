@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { FONTS } from '../constants/fonts';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useAppTheme } from '../theme/useAppTheme';
 
@@ -15,7 +16,7 @@ const AppSection = ({ title, children, actionLabel, onActionPress }: AppSectionP
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text, fontFamily: fontFamily.bold }]}>{title}</Text>
+        <Text style={[styles.title, { color: colors.text, fontFamily: FONTS.poppinsBold }]}>{title}</Text>
         {actionLabel && onActionPress ? (
           <TouchableOpacity onPress={onActionPress} activeOpacity={0.7}>
             <Text style={[styles.action, { color: colors.primary, fontFamily: fontFamily.medium }]}>{actionLabel}</Text>

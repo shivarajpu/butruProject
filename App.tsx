@@ -15,6 +15,9 @@ import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
 import { loadCartState, hydrate as hydrateCart } from './src/store/slices/cartSlice';
+import { useStorefront } from './src/storefront/useStorefront';
+import { useAppTheme } from './src/theme/useAppTheme';
+import { readableOn } from './src/storefront/bridge';
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/auth/LoginScreen';
 import OtpScreen from './src/auth/otpScreen';
@@ -37,7 +40,13 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function AppNavigator() {
   const mode = useSelector((state: RootState) => state.theme.mode);
   const isHydrated = useSelector((state: RootState) => state.auth.isHydrated);
+  const { colors } = useAppTheme();
   const dispatch = useDispatch<AppDispatch>();
+
+  // Mounted above the hydration gate on purpose: the tenant config has to be in
+  // flight before the first paint, otherwise the pre-hydration splash below can
+  // only ever show the compiled-in default brand colour.
+  useStorefront();
 
   // Restore the saved session from storage when the app starts.
   useEffect(() => {
@@ -50,11 +59,13 @@ function AppNavigator() {
   }, [dispatch]);
 
   // Wait until the persisted session has been read before deciding which
-  // screen to show, so a logged-in user never sees the Login flash.
+  // screen to show, so a logged-in user never sees the Login flash. The
+  // background is `colors.primary`, so once the storefront config lands this
+  // blank screen is already the merchant's colour.
   if (!isHydrated) {
     return (
-      <View style={styles.splashContainer}>
-        <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} />
+      <View style={[styles.splashContainer, { backgroundColor: colors.primary }]}>
+        <StatusBar barStyle={readableOn(colors.primary) === '#101010' ? 'dark-content' : 'light-content'} />
       </View>
     );
   }
@@ -97,7 +108,6 @@ function App() {
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: 'rgba(177, 43, 91, 1)',
   },
 });
 

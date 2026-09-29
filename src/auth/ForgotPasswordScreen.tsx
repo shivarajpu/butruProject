@@ -19,15 +19,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
-import {
-  Butruname,
-  emailIcon,
-  secureIcon,
-  supporIcon,
-  rewardIcon,
-  loginPagaImage,
-  CLOSE_SVG,
-} from '../assets/svg';
+import { emailIcon, loginPagaImage } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -161,16 +157,12 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
             ]}
           >
             <View style={styles.brandTextContainer}>
-              {Butruname ? (
-                <SvgXml
-                  xml={Butruname}
-                  width={logoWidth}
-                  height={logoHeight}
-                  style={styles.logoSvg}
-                />
-              ) : (
-                <Text style={styles.logoText}>BuTRu</Text>
-              )}
+              <StoreLogo
+                width={logoWidth}
+                height={logoHeight}
+                style={styles.logoSvg}
+                textStyle={styles.logoText}
+              />
 
               <View style={styles.titleWrapper}>
                 <Text style={styles.titleText}>
@@ -198,7 +190,7 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
               >
                 <View style={styles.inputIcon}>
                   <SvgXml
-                    xml={emailIcon}
+                    xml={emailIcon(theme.colors.primary)}
                     width={18}
                     height={18}
                   />
@@ -268,8 +260,8 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
           >
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={secureIcon}
+                <BrandIcon
+                  icon={BRAND.secure}
                   width={22}
                   height={22}
                 />
@@ -280,8 +272,8 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={rewardIcon}
+                <BrandIcon
+                  icon={BRAND.reward}
                   width={22}
                   height={22}
                 />
@@ -292,8 +284,8 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml
-                  xml={supporIcon}
+                <BrandIcon
+                  icon={BRAND.support}
                   width={22}
                   height={22}
                 />
@@ -324,7 +316,7 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
                 onPress={() => setModalVisible(false)}
                 activeOpacity={0.7}
               >
-                <SvgXml xml={CLOSE_SVG} width={14} height={14} />
+                <BrandIcon icon={BRAND.close} width={14} height={14} />
               </TouchableOpacity>
             </View>
 

@@ -21,20 +21,16 @@ import { useAppTheme } from '../theme/useAppTheme';
 import { apiService } from '../api/apiService';
 import type { AppTheme, SupportConfig } from '../theme/types';
 import type { RootStackParamList } from '../navigation/types';
-import { phoneIcon, emailIcon, LOCATION_PIN_SVG, helpSupportnameicon, helpsupportmailicon, helpSupportcallicon } from '../assets/svg';
+import { LOCATION_PIN_SVG } from '../assets/svg';
 import { FONTS } from '../constants/fonts';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HelpSupport'>;
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 const backArrowIcon = (color: string) =>
   `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
-const locationIcon = (color: string) =>
-  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 13.5C13.6569 13.5 15 12.1569 15 10.5C15 8.84315 13.6569 7.5 12 7.5C10.3431 7.5 9 8.84315 9 10.5C9 12.1569 10.3431 13.5 12 13.5Z" stroke="${color}" stroke-width="2"/><path d="M12 22C16 18 20 14.4183 20 10.5C20 6.08172 16.4183 2.5 12 2.5C7.58172 2.5 4 6.08172 4 10.5C4 14.4183 8 18 12 22Z" stroke="${color}" stroke-width="2"/></svg>`;
-
-const userIcon = (color: string) =>
-  `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 21C20 16.5817 16.4183 13 12 13C7.58172 13 4 16.5817 4 21" stroke="${color}" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="${color}" stroke-width="2"/></svg>`;
 
 // ─── StyleSheet Factory (Theme-aware) ─────────────────────────────────────────
 const createStyles = (theme: AppTheme) => {
@@ -68,7 +64,7 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     scrollContent: {
       paddingHorizontal: 16,
@@ -181,13 +177,13 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textOnPrimary,
       fontSize: 13,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     secondaryButtonText: {
       color: colors.primary,
       fontSize: 13,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     addressCard: {
       backgroundColor: colors.primaryLight,
@@ -209,7 +205,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 15,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     addressBox: {
       backgroundColor: colors.hisemibackound,
@@ -234,7 +230,7 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '800',
       color: colors.text,
       letterSpacing: 0.5,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     addressFullText: {
       fontSize: 12,
@@ -253,7 +249,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       marginBottom: 14,
     },
     inputWrapper: {
@@ -303,7 +299,7 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textOnPrimary,
       fontSize: 14,
       fontWeight: '700',
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
   });
 };
@@ -468,7 +464,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
             <View style={styles.assistanceCard}>
               <View style={styles.cardHeader}>
                 <View style={styles.iconCircle}>
-                  <SvgXml xml={helpSupportcallicon} width={16} height={16} />
+                  <BrandIcon icon={BRAND.helpSupportCall} width={16} height={16} />
                 </View>
               </View>
               <Text style={styles.cardSmallLabel}>CALL US</Text>
@@ -485,7 +481,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
             <View style={styles.assistanceCard}>
               <View style={styles.cardHeaderWithBadge}>
                 <View style={styles.iconCircle}>
-                  <SvgXml xml={helpsupportmailicon} width={16} height={16} />
+                  <BrandIcon icon={BRAND.helpSupportMail} width={16} height={16} />
                 </View>
                 <View style={styles.timeBadge}>
                   <Text style={styles.timeBadgeText}>{config.responseTime}</Text>
@@ -508,7 +504,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
           <View style={styles.addressCard}>
             <View style={styles.addressHeader}>
               <View style={styles.iconCircle}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                <SvgXml xml={LOCATION_PIN_SVG(colors.primary)} width={12} height={12} />
               </View>
               <View style={styles.addressHeaderTitleWrapper}>
                 <Text style={styles.cardSmallLabel}>ADDRESS</Text>
@@ -538,7 +534,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
 
             <View style={styles.inputWrapper}>
               <View style={styles.inputIcon}>
-                <SvgXml xml={helpSupportnameicon} width={18} height={18} />
+                <BrandIcon icon={BRAND.helpSupportName} width={18} height={18} />
               </View>
               <TextInput
                 style={styles.input}
@@ -551,7 +547,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
 
             <View style={styles.inputWrapper}>
               <View style={styles.inputIcon}>
-                <SvgXml xml={emailIcon || `<svg></svg>`} width={18} height={18} />
+                <BrandIcon icon={BRAND.email} width={18} height={18} />
               </View>
               <TextInput
                 style={styles.input}

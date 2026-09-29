@@ -17,7 +17,6 @@ import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import {
-  Butruname,
   secureIcon,
   supporIcon,
   rewardIcon,
@@ -29,6 +28,7 @@ import type { AppTheme } from '../theme/types';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 import { apiService } from '../api/apiService';
+import StoreLogo from '../components/StoreLogo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 
@@ -201,16 +201,12 @@ const OtpVarify = ({ navigation, route }: Props) => {
           <View style={[styles.header, { marginTop: isSmall ? vs(40) : vs(60) }]}>
 
             {/* Logo */}
-            {Butruname ? (
-              <SvgXml
-                xml={Butruname}
-                width={logoW}
-                height={logoH}
-                style={{ marginBottom: scale(14), marginTop: scale(32) }}
-              />
-            ) : (
-              <Text style={[styles.logoFallback, { fontSize: scale(28) }]}>BuTRu</Text>
-            )}
+            <StoreLogo
+              width={logoW}
+              height={logoH}
+              style={{ marginBottom: scale(14), marginTop: scale(32) }}
+              textStyle={[styles.logoFallback, { fontSize: scale(28) }]}
+            />
 
             {/* Title + Subtitle */}
             <View style={{ marginTop: vs(28), paddingRight: '15%' }}>
@@ -233,7 +229,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   activeOpacity={0.7}
                 >
-                  <SvgXml xml={editPencilIcon} width={scale(15)} height={scale(15)} />
+                  <SvgXml xml={editPencilIcon(theme.colors.primary)} width={scale(15)} height={scale(15)} />
                 </TouchableOpacity>
               </View>
             </View>

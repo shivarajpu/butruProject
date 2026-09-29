@@ -18,16 +18,11 @@ import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
-import {
-  Butruname,
-  eyeIcon,
-  emailIcon,
-  secureIcon,
-  supporIcon,
-  rewardIcon,
-  passwordIcon,
-  loginPagaImage,
-} from '../assets/svg';
+import { eyeIcon, emailIcon, loginPagaImage } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 import { Callicon, userProfileIcon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -206,16 +201,12 @@ const SignUpScreen = ({ navigation }: Props) => {
             ]}
           >
             <View style={styles.brandTextContainer}>
-              {Butruname ? (
-                <SvgXml
-                  xml={Butruname}
-                  width={logoWidth}
-                  height={logoHeight}
-                  style={styles.logoSvg}
-                />
-              ) : (
-                <Text style={styles.logoText}>BuTRu</Text>
-              )}
+              <StoreLogo
+                width={logoWidth}
+                height={logoHeight}
+                style={styles.logoSvg}
+                textStyle={styles.logoText}
+              />
               <View style={styles.titleWrapper}>
                 <Text style={styles.titleText}>Sign Up</Text>
                 <Text style={styles.subtitleText}>
@@ -265,7 +256,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={emailIcon} width={18} height={18} />
+                  <SvgXml xml={emailIcon(theme.colors.primary)} width={18} height={18} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -294,7 +285,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={Callicon} width={23} height={25} />
+                  <SvgXml xml={Callicon(theme.colors.primary)} width={23} height={25} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -322,7 +313,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={passwordIcon} width={18} height={18} />
+                  <BrandIcon icon={BRAND.password} width={18} height={18} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -357,7 +348,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={passwordIcon} width={18} height={18} />
+                  <BrandIcon icon={BRAND.password} width={18} height={18} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -442,21 +433,21 @@ const SignUpScreen = ({ navigation }: Props) => {
           >
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={secureIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.secure} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>SECURE</Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={rewardIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.reward} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>REWARDS</Text>
             </View>
 
             <View style={styles.featureItem}>
               <View style={styles.featureIconBg}>
-                <SvgXml xml={supporIcon} width={22} height={22} />
+                <BrandIcon icon={BRAND.support} width={22} height={22} />
               </View>
               <Text style={styles.featureText}>SUPPORT</Text>
             </View>

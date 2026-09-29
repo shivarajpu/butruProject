@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FONTS } from '../constants/fonts';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   useWindowDimensions,
   ImageBackground,
@@ -16,31 +18,38 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
-import MenuDrawer from '../components/MenuDrawer';
+import MenuDrawer, { type DrawerItem } from '../components/MenuDrawer';
+import DynamicPage from '../components/DynamicPage';
+import AnnouncementBar from '../widgets/AnnouncementBar';
+import { useWidgetActions } from '../widgets/common';
+import { selectCollections } from '../storefront/selectors';
+import { useDispatch, useSelector } from 'react-redux';
+import { addItem as addCartItem } from '../store/slices/cartSlice';
+import type { AppDispatch, RootState } from '../store';
+import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
+import { fetchProductsByCategoryName, fetchProductsForSource } from '../storefront/catalog';
+import { useStorefront } from '../storefront/useStorefront';
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
 import {
-  MENU_SVG,
-  Butruname,
   STAR_FILLED_SVG,
-  HEART_FILLED_SVG,
-  HEART_OUTLINE_SVG,
-  CART_WHITE_SVG,
+  heartFilledSvg,
+  heartOutlineSvg,
   LOCATION_PIN_SVG,
-  BELL_SVG,
-  BAG_SVG,
-  SEARCH_SVG,
-  CLOSE_SVG,
-  BACK_ARROW_SVG,
-  BOX_ICON_SVG,
 } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import {
+  buildSuggestions,
+  filterByQuery,
+  shouldRequestCatalogue,
+} from '../storefront/search';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 import BagIconButton from '../components/BagIconButton';
-import { useDispatch } from 'react-redux';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
-import type { AppDispatch } from '../store';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import type { RouteProp, CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -53,90 +62,12 @@ type HomeTabNavigation = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-// ─── Collections & Banners API Config ────────────────────────────────────────
-
-const BANNERS_ENDPOINT = '/api/storefront/banners?placement=home_hero';
-const COLLECTIONS_ENDPOINT =
-  '/api/storefront/banners?placement=home_hero_cards&store=butru-store';
-
-interface Collection {
-  id: string;
-  title: string;
-  subtitle: string; // ctaText
-  image: string;
-  productId?: string;
-}
-
-interface ApiCollection {
-  _id: string;
-  title: string;
-  subtitle?: string;
-  imageUrl: string;
-  ctaText?: string;
-  ctaUrl?: string;
-  productId?: string;
-}
-
-interface CollectionsResponse {
-  success: boolean;
-  count: number;
-  data: ApiCollection[];
-}
-
-const mapApiCollection = (item: ApiCollection): Collection => ({
-  id: item._id,
-  title: item.title,
-  subtitle: item.ctaText || item.subtitle || 'Buy Now',
-  image: item.imageUrl,
-  productId: item.productId || undefined,
-});
-
-interface CollectionProductSku {
-  size: string;
-  sellingPrice: number;
-  mrp: number;
-}
-
-interface CollectionApiProduct {
-  _id: string;
-  name: string;
-  price: number;
-  images: string[];
-  color: string;
-  sku: string;
-  skus: CollectionProductSku[];
-}
-
-interface CollectionProductResponse {
-  success: boolean;
-  data: CollectionApiProduct;
-}
-
-interface Banner {
-  id: string;
-  image: string;
-}
-
-interface ApiBanner {
-  _id: string;
-  imageUrl: string;
-}
-
-interface BannersResponse {
-  success: boolean;
-  count: number;
-  data: ApiBanner[];
-}
-
-const mapApiBanner = (item: ApiBanner): Banner => ({
-  id: item._id,
-  image: item.imageUrl,
-});
+// ─── Product API Config ───────────────────────────────────────────────────────
+// Banners and collection cards are served by the widget layer
+// (src/widgets/home) — this tab only lists products.
 
 // ─── Product Types & API Config ───────────────────────────────────────────────
 
-const PRODUCTS_ENDPOINT = '/api/storefront/products?isVisible=true&store=butru-store';
-const PRODUCT_DETAIL_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 
@@ -152,34 +83,6 @@ interface Product {
   tag: string;
   sizes: string[];
   image: string;
-}
-
-interface ProductSku {
-  size: string;
-  sellingPrice: number;
-  mrp: number;
-}
-
-interface ApiProduct {
-  _id: string;
-  name: string;
-  price: number;
-  rating: number;
-  reviewCount: number;
-  tag?: string;
-  isNewArrival?: boolean;
-  isPopular?: boolean;
-  images?: string[];
-  skus?: ProductSku[];
-}
-
-interface ProductsApiResponse {
-  success: boolean;
-  count: number;
-  total: number;
-  page: number;
-  pages: number;
-  data: ApiProduct[];
 }
 
 interface WishlishProduct {
@@ -203,31 +106,6 @@ interface WishlistResponse {
   success: boolean;
   data: WishlistData;
 }
-
-/** Maps API product -> Product shape used by the product grid UI. */
-const mapApiProduct = (item: ApiProduct): Product => {
-  const sku = item.skus?.[0];
-  const price = sku?.sellingPrice ?? item.price ?? 0;
-  const originalPrice = sku?.mrp ?? price;
-
-  return {
-    id: item._id,
-    name: item.name,
-    price,
-    originalPrice,
-    discount:
-      originalPrice > price
-        ? Math.round(((originalPrice - price) / originalPrice) * 100)
-        : 0,
-    rating: item.rating ?? 0,
-    reviews: item.reviewCount ?? 0,
-    tag:
-      item.tag ||
-      (item.isNewArrival ? 'New Arrival' : item.isPopular ? 'Best Seller' : ''),
-    sizes: [...new Set((item.skus ?? []).map(skuEntry => skuEntry.size))],
-    image: item.images?.[0] ?? '',
-  };
-};
 
 // ─── StyleSheet Factory ────────────────────────────────────────────────────────
 // Called inside each component AFTER reading the theme. This pattern
@@ -382,7 +260,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 12,
       fontWeight: '700',
       marginBottom: 4,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     buyNowBtn: {
       backgroundColor: colors.primary,
@@ -406,7 +284,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 15,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     showAll: {
       fontSize: 12,
@@ -470,7 +348,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 13,
       fontWeight: '700',
       color: colors.primary,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
     },
     originalPrice: {
       fontSize: 10,
@@ -572,7 +450,7 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
-      fontFamily: fontFamily.bold,
+      fontFamily: FONTS.poppinsBold,
       marginBottom: 6,
     },
     emptyMessage: {
@@ -618,55 +496,6 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
-// ─── BannerSlider Component ────────────────────────────────────────────────────
-
-const BannerSlider = ({
-  slides,
-  screenWidth,
-}: {
-  slides: Banner[];
-  screenWidth: number;
-}) => {
-  const theme = useAppTheme();
-  const styles = createStyles(theme);
-  const [active, setActive] = useState(0);
-  const bannerHeight = Math.min(screenWidth * 0.48, 220);
-
-  useEffect(() => {
-    if (slides.length < 2) return;
-
-    const interval = setInterval(() => {
-      setActive(prev => (prev + 1) % slides.length);
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [slides.length]);
-
-  if (slides.length === 0) {
-    return null;
-  }
-
-  return (
-    <View style={{ marginHorizontal: screenWidth * 0.04, marginBottom: 16 }}>
-      <ImageBackground
-        source={{ uri: slides[Math.min(active, slides.length - 1)].image }}
-        style={[styles.bannerCard, { height: bannerHeight }]}
-        imageStyle={{ borderRadius: 16 }}
-      />
-
-      {slides.length > 1 && (
-        <View style={styles.dotsRow}>
-          {slides.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => setActive(i)}>
-              <View style={[styles.dot, i === active && styles.activeDot]} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-};
-
 // ─── ProductCard Component ─────────────────────────────────────────────────────
 
 const ProductCard = ({
@@ -685,6 +514,7 @@ const ProductCard = ({
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const dispatch = useDispatch<AppDispatch>();
+
   const [wishlistLoading, setWishlistLoading] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
@@ -753,7 +583,11 @@ const ProductCard = ({
             style={styles.heartBtn}
             activeOpacity={0.7}
             onPress={handleLikePress}>
-            <SvgXml xml={liked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={16} height={16} />
+            <SvgXml
+              xml={liked ? heartFilledSvg(theme.colors.primary) : heartOutlineSvg(theme.colors.textMuted)}
+              width={16}
+              height={16}
+            />
           </TouchableOpacity>
         </ImageBackground>
       </TouchableOpacity>
@@ -802,7 +636,7 @@ const ProductCard = ({
         style={[styles.addToCartBtn, added && styles.addToCartBtnAdded]}
         activeOpacity={0.8}
         onPress={handleAddToCartPress}>
-        <SvgXml xml={CART_WHITE_SVG} width={13} height={13} />
+        <BrandIcon icon={BRAND.cart} width={13} height={13} />
         <Text style={styles.addToCartText}>{added ? 'Added' : 'Add to Cart'}</Text>
       </TouchableOpacity>
     </View>
@@ -811,25 +645,42 @@ const ProductCard = ({
 
 // ─── Main HomeTab Component ────────────────────────────────────────────────────
 
+/** Sentinel category: the drawer's "Shop Now" opens every product. */
+// Shared with the link resolver so `/Collections` and the drawer's "Shop Now"
+// produce the exact same filter value.
+const SHOP_ALL = SHOP_ALL_CATEGORY;
+
 const HomeTab = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const dispatch = useDispatch<AppDispatch>();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [collectionAddingId, setCollectionAddingId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const searchInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
-  const [loading, setLoading] = useState(true);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  // Remounts the home sections on refresh; see `DynamicPage.refreshKey`.
+  const [refreshKey, setRefreshKey] = useState(0);
+  // `false`, not `true`. The home feed is rendered by <DynamicPage />, which has
+  // its own loading state, so this flag only ever describes "we asked for a
+  // product list and it has not come back". Starting it at `true` meant the
+  // first view switch (any search, any category) could not be distinguished
+  // from a finished request, so the spinner could never be dismissed.
+  const [loading, setLoading] = useState(false);
+  /**
+   * Guards the search-triggered catalogue fetch. `products` is empty until a
+   * category is picked or a search runs, so the effect below keys off its
+   * emptiness — but an empty *result* is also a legitimate outcome, and without
+   * a latch the effect would re-request forever on a store with no matches.
+   */
+  const [catalogueRequested, setCatalogueRequested] = useState(false);
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
   const { addresses, refresh } = useProfile();
@@ -902,31 +753,33 @@ const HomeTab = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<HomeTabNavigation>();
   const route = useRoute<RouteProp<TabParamList, 'HomeTab'>>();
+  const widgetActions = useWidgetActions();
+  const storeCollections = useSelector(selectCollections);
+  // `useStorefront` is idempotent (module-level guard), so calling it here on
+  // top of `App` just gives us `refresh` for pull-to-refresh.
+  const { refresh: refreshStorefront } = useStorefront();
+  const appAnnouncementSticky = useSelector(
+    (state: RootState) =>
+      state.storefront.config?.website.webConfig.appAnnouncement?.sticky === true,
+  );
   const isTablet = width >= 768;
   const hPad = width * 0.04;
   const addressMaxWidth = Math.min(width * 0.42, 200);
   const logoWidth = Math.min(width * 0.22, 90);
   const logoHeight = logoWidth * 0.4;
-  const collectionCardW = Math.min(width * 0.3, 120);
   const productCardW = (width - hPad * 2 - 12) / 2;
 
-  const filteredProducts = searchQuery.trim()
-    ? products.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
-      )
-    : products;
+  /** Search results and category listings replace the widget-driven home. */
+  const isListView = searchActive || activeCategory !== 'Home';
 
-  const suggestions = searchQuery.trim()
-    ? Array.from(
-        new Set(
-          products
-            .filter(product =>
-              product.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
-            )
-            .map(product => product.name),
-        ),
-      ).slice(0, 6)
-    : [];
+  /** Category heading, preferring the collection's own description. */
+  const activeCategoryTitle =
+    storeCollections.find(
+      item => item.title.toLowerCase() === activeCategory.toLowerCase(),
+    )?.title ?? '';
+
+  const filteredProducts = filterByQuery(products, searchQuery);
+  const suggestions = buildSuggestions(products, searchQuery, 6);
 
   const handleExitSearch = () => {
     Keyboard.dismiss();
@@ -934,63 +787,116 @@ const HomeTab = () => {
     setSearchActive(false);
   };
 
-  const fetchProducts = async (category: string) => {
+  const fetchProducts = useCallback(async (category: string) => {
     setLoading(true);
     setError('');
     setProducts([]);
 
     try {
-      const categoryParam =
-        category !== 'Home'
-          ? `&category=${encodeURIComponent(category)}`
-          : '';
+      // SHOP_ALL (and the default 'Home') show the whole catalogue, so no
+      // filter is applied. Anything else is resolved by name: the endpoint
+      // filters product types like `Clothing`, while collection titles such as
+      // `New Arrivals` are narrowed against `categoryPath` client side.
+      const list =
+        category === 'Home' || category === SHOP_ALL
+          ? await fetchProductsForSource({ source: 'all', limit: 100 })
+          : await fetchProductsByCategoryName(
+              category,
+              storeCollections ?? [],
+            );
 
-      const response = await apiService.get<ProductsApiResponse>(
-        `${PRODUCTS_ENDPOINT}${categoryParam}`,
-      );
-
-      setProducts((response.data ?? []).map(mapApiProduct));
+      setProducts(list);
+      setCatalogueRequested(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setCatalogueRequested(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, [storeCollections]);
 
-  const fetchBanners = async () => {
-    try {
-      const response = await apiService.get<BannersResponse>(BANNERS_ENDPOINT);
-      if (response.success) {
-        setBanners((response.data ?? []).map(mapApiBanner));
-      }
-    } catch {
-      // non-fatal — banner slider simply stays hidden
-    }
-  };
+  /**
+   * Back to the unfiltered home feed.
+   *
+   * Tapping a widget CTA ("By Now →") or a drawer category pushes a `category`
+   * param, which puts this tab into its list view. Resetting only the local
+   * state was not enough:
+   *  - the route param stayed behind, so any later re-render of the param effect
+   *    could re-apply the stale filter, and
+   *  - the ScrollView stayed parked wherever the list was scrolled to, which
+   *    made the reset look like nothing had happened at all.
+   */
+  const resetToHomeFeed = useCallback(() => {
+    setSearchQuery('');
+    setSearchActive(false);
+    setActiveCategory('Home');
+    setCatalogueRequested(false);
+    setProducts([]);
+    setError('');
+    searchInputRef.current?.blur();
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    navigation.setParams({ category: undefined, navNonce: undefined });
+  }, [navigation]);
 
-  const fetchCollections = async () => {
+  /**
+   * Pull-to-refresh.
+   *
+   * A pull is read as "take me back to the top of the feed", so this always
+   * lands on the unfiltered home — the category filter, the search bar and the
+   * list scroll position are dropped together, exactly as on a cold start.
+   * Previously the refresh kept you in the list view, so pulling re-rendered the
+   * same filtered products behind the search bar.
+   *
+   * Because the list view is always left, there is no point re-fetching its
+   * products: the only things worth waiting on are the config (which remounts
+   * the home sections via `refreshKey`) and the wishlist hearts.
+   */
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
     try {
-      const response = await apiService.get<CollectionsResponse>(COLLECTIONS_ENDPOINT);
-      if (response.success) {
-        setCollections((response.data ?? []).map(mapApiCollection));
-      }
-    } catch {
-      // non-fatal — collections row simply stays hidden
+      await Promise.all([refreshStorefront(), fetchWishlistItems()]);
+      setRefreshKey(key => key + 1);
+    } finally {
+      setRefreshing(false);
+      // In `finally` so a failed request still returns the user to the home
+      // feed — the gesture is a navigation intent, not just a data request.
+      resetToHomeFeed();
     }
-  };
+  }, [refreshStorefront, resetToHomeFeed]);
 
   useEffect(() => {
-    fetchProducts(activeCategory);
-    fetchBanners();
-    fetchCollections();
-  }, [activeCategory]);
+    // The default home view is built from the storefront config, so products
+    // are only fetched when a category is picked (or a search runs).
+    if (activeCategory !== 'Home') {
+      fetchProducts(activeCategory);
+    }
+  }, [activeCategory, fetchProducts]);
 
-  // Category selected from CategoryTab — apply it like the menu drawer does.
+  /**
+   * Searching from the home feed.
+   *
+   * `products` is still empty at this point — the feed is <DynamicPage />, not
+   * the product grid — so without this the first keystroke rendered
+   * "No results found" for every term and the suggestion sheet never opened,
+   * because both are computed from that empty list. One fetch per search
+   * session; the latch in `fetchProducts` keeps a store with no matching
+   * products from re-requesting on every render.
+   */
+  useEffect(() => {
+    if (shouldRequestCatalogue({ searchActive, requested: catalogueRequested, loading })) {
+      fetchProducts(activeCategory);
+    }
+  }, [searchActive, catalogueRequested, loading, activeCategory, fetchProducts]);
+
+  // Category selected from CategoryTab, the menu drawer, or a widget CTA
+  // ("View all"). `navNonce` is part of the deps because re-selecting the
+  // category you are already on leaves `category` unchanged, and the effect
+  // would otherwise never fire.
   useEffect(() => {
     if (route.params?.category) {
       setActiveCategory(route.params.category);
     }
-  }, [route.params?.category]);
+  }, [route.params?.category, route.params?.navNonce]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1002,16 +908,15 @@ const HomeTab = () => {
     }, []),
   );
 
-  // Reset search when leaving the tab so returning shows the normal home view.
+  // Leaving the tab drops any applied filter and search. Without this the
+  // category stuck around: apply one, visit Category / Wishlist / Account, come
+  // back, and the home feed was still filtered to that collection.
   useEffect(() => {
     const unsub = navigation.addListener('blur', () => {
-      setSearchQuery('');
-      setSearchActive(false);
-      searchInputRef.current?.blur();
-      Keyboard.dismiss();
+      resetToHomeFeed();
     });
     return unsub;
-  }, [navigation]);
+  }, [navigation, resetToHomeFeed]);
 
   const fetchWishlistItems = async () => {
     try {
@@ -1053,72 +958,42 @@ const HomeTab = () => {
     }
   };
 
-  const handleMenuItemSelect = (name: string) => {
-    switch (name) {
-      case 'Wishlist':
-        navigation.navigate('WishlistTab');
-        break;
-      case 'My Orders':
-        navigation.navigate('MyOrders');
-        break;
-      case 'Account':
-        navigation.navigate('AccountTab');
-        break;
-      case 'Help & Support':
-        navigation.navigate('HelpSupport');
-        break;
-      default:
-        // Product categories (Home, Clothing, Shoes, Accessories, Toys...)
-        setActiveCategory(name);
+  // Drawer entries are server driven: the action is resolved from the config
+  // link, so a renamed / added / removed menu item needs no app release.
+  const handleMenuItemSelect = (action: WidgetAction, item: DrawerItem) => {
+    if (item.category === 'Home') {
+      resetToHomeFeed();
+      return;
     }
+    widgetActions.run(action);
+  };
+
+  /** Drawer's "Shop Now" — same listing a category click produces, unfiltered. */
+  const handleShopNow = () => {
+    setSearchActive(false);
+    setActiveCategory(SHOP_ALL);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const handleProductPress = (productItem: any) => {
     navigation.navigate('ProductDetails', { product: productItem });
   };
 
-  const handleCollectionPress = async (item: Collection) => {
-    if (item.productId && collectionAddingId) return;
-
-    if (item.productId) {
-      setCollectionAddingId(item.id);
-      try {
-        const response = await apiService.get<CollectionProductResponse>(
-          `${PRODUCT_DETAIL_ENDPOINT}/${item.productId}`,
-        );
-        if (response.success && response.data) {
-          const p = response.data;
-          const sku = p.skus?.[0];
-          const sellingPrice = sku?.sellingPrice ?? p.price ?? 0;
-          const mrp = sku?.mrp ?? sellingPrice;
-          dispatch(
-            addCartItem({
-              productId: p._id,
-              name: p.name,
-              price: sellingPrice,
-              originalPrice: mrp,
-              image: p.images?.[0] ?? '',
-              size: sku?.size ?? '',
-              color: p.color ?? '',
-              productCode: p.sku ?? '',
-            }),
-          );
-        }
-      } catch {
-        // non-fatal — item silently not added; cart stays as-is
-      } finally {
-        setCollectionAddingId(null);
-      }
-    }
-
-    // navigation.navigate('CartScreen');
-  };
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={theme.colors.primary}
+            colors={[theme.colors.primary]}
+            progressBackgroundColor={theme.colors.surface}
+          />
+        }
         contentContainerStyle={[
           styles.scrollContent,
           isTablet && { maxWidth: 600, alignSelf: 'center', width: '100%' },
@@ -1132,20 +1007,16 @@ const HomeTab = () => {
                 activeOpacity={0.7}
                 style={styles.menuBtn}
                 onPress={() => setMenuOpen(true)}>
-                <SvgXml xml={MENU_SVG} width={24} height={24} />
+                <BrandIcon icon={BRAND.menu} width={24} height={24} />
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={{ marginLeft: 8 }}
                 activeOpacity={0.7}
                 onPress={() => setIsAddressModalVisible(true)}>
-                {Butruname ? (
-                  <SvgXml xml={Butruname} width={logoWidth} height={logoHeight} />
-                ) : (
-                  <Text style={styles.logoFallback}>{theme.appName}</Text>
-                )}
+                <StoreLogo width={logoWidth} height={logoHeight} textStyle={styles.logoFallback} />
                 <View style={styles.locationRow}>
-                  <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                  <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
                   <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
                     Delivering to {formatAddressLabel(deliveryAddress)}
                   </Text>
@@ -1158,7 +1029,7 @@ const HomeTab = () => {
                 style={styles.iconBtn}
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Notification')}>
-                <SvgXml xml={BELL_SVG} width={25} height={25} />
+                <BrandIcon icon={BRAND.bellOutline} width={25} height={25} />
                 <View style={styles.notifDot} />
               </TouchableOpacity>
               <BagIconButton />
@@ -1179,10 +1050,10 @@ const HomeTab = () => {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleExitSearch}>
-                <SvgXml xml={BACK_ARROW_SVG} width={20} height={20} />
+                <BrandIcon icon={BRAND.backArrow} width={20} height={20} />
               </TouchableOpacity>
             ) : (
-              <SvgXml xml={SEARCH_SVG} width={18} height={18} />
+              <BrandIcon icon={BRAND.search} width={18} height={18} />
             )
           }
           rightIcon={
@@ -1191,7 +1062,7 @@ const HomeTab = () => {
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 onPress={() => setSearchQuery('')}>
-                <SvgXml xml={CLOSE_SVG} width={16} height={16} />
+                <BrandIcon icon={BRAND.close} width={16} height={16} />
               </TouchableOpacity>
             ) : undefined
           }
@@ -1216,7 +1087,7 @@ const HomeTab = () => {
                 style={styles.suggestionRow}
                 activeOpacity={0.7}
                 onPress={() => setSearchQuery(name)}>
-                <SvgXml xml={SEARCH_SVG} width={15} height={15} />
+                <BrandIcon icon={BRAND.search} width={15} height={15} />
                 <Text style={styles.suggestionText} numberOfLines={1}>
                   {name}
                 </Text>
@@ -1225,88 +1096,92 @@ const HomeTab = () => {
           </View>
         )}
 
-        {/* Top Banner Slider */}
-        {!searchActive && <BannerSlider slides={banners} screenWidth={width} />}
-
-        {/* Horizontal Collections */}
-        {!searchActive && collections.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: hPad, gap: 10 }}
-            style={{ marginBottom: 20 }}>
-            {collections.map(item => (
-              <ImageBackground
-                key={item.id}
-                source={{ uri: item.image }}
-                style={[styles.collectionCard, { width: collectionCardW, height: collectionCardW * 1.25 }]}
-                imageStyle={{ borderRadius: 12 }}>
-                <View style={styles.collectionOverlay}>
-                  <Text style={styles.collectionTitle}>{item.title}</Text>
-                  {collectionAddingId === item.id ? (
-                    <ActivityIndicator color={styles.buyNowText.color} size="small" />
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.buyNowBtn}
-                      activeOpacity={0.8}
-                      onPress={() => handleCollectionPress(item)}>
-                      <Text style={styles.buyNowText}>{item.subtitle}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </ImageBackground>
-            ))}
-          </ScrollView>
+        {/* Announcement strip — text, colours and link all come from the config.
+            Hidden while a search or category filter is on, so a filtered view
+            shows products only (same as the search results). */}
+        {!searchActive && activeCategory === 'Home' && (
+          <AnnouncementBar sticky={appAnnouncementSticky} />
         )}
 
-        {/* Section Header */}
-        {!searchActive && (
+        {/* Home page: entirely server driven (order / visibility / config). */}
+        {!searchActive && activeCategory === 'Home' ? (
+          <DynamicPage
+            pageType="home"
+            emptyLabel="This store has no sections configured yet."
+            refreshKey={refreshKey}
+          />
+        ) : null}
+
+        {/* Section Header — title is resolved from the matching collection */}
+        {!searchActive && activeCategory !== 'Home' && (
           <View style={[styles.sectionHeader, { paddingHorizontal: hPad }]}>
             <Text style={styles.sectionTitle}>
-              {activeCategory === 'Home'
-                ? 'Premium Fashion for Kids'
-                : `${activeCategory} Collection`}
+              {activeCategoryTitle ||
+                (activeCategory === SHOP_ALL ? 'Shop' : activeCategory)}
             </Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={styles.showAll}>Show all</Text>
-            </TouchableOpacity>
           </View>
         )}
 
-        {/* Product Grid */}
-        {loading ? (
-          <View style={styles.centerBox}>
-            <ActivityIndicator color={theme.colors.primary} size="large" />
-          </View>
-        ) : error ? (
-          <View style={styles.centerBox}>
-            <View style={styles.emptyIcon}>
-              <Text style={styles.emptyIconText}>!</Text>
+        {/* Product grid — only for search results and a picked category.
+            The default home view is rendered by <DynamicPage /> above. */}
+        {isListView &&
+          (loading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator color={theme.colors.primary} size="large" />
             </View>
-            <Text style={styles.emptyTitle}>Oops!</Text>
-            <Text style={styles.emptyMessage}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryBtn}
-              activeOpacity={0.8}
-              onPress={() => fetchProducts(activeCategory)}>
-              <Text style={styles.retryBtnText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : searchActive && !searchQuery.trim() ? null : searchActive ? (
-          filteredProducts.length === 0 ? (
+          ) : error ? (
             <View style={styles.centerBox}>
               <View style={styles.emptyIcon}>
-                <SvgXml xml={SEARCH_SVG} width={28} height={28} />
+                <Text style={styles.emptyIconText}>!</Text>
               </View>
-              <Text style={styles.emptyTitle}>No results found</Text>
+              <Text style={styles.emptyTitle}>Oops!</Text>
+              <Text style={styles.emptyMessage}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                activeOpacity={0.8}
+                onPress={() => fetchProducts(activeCategory)}>
+                <Text style={styles.retryBtnText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : searchActive && !searchQuery.trim() ? null : searchActive ? (
+            filteredProducts.length === 0 ? (
+              <View style={styles.centerBox}>
+                <View style={styles.emptyIcon}>
+                  <BrandIcon icon={BRAND.search} width={28} height={28} />
+                </View>
+                <Text style={styles.emptyTitle}>No results found</Text>
+                <Text style={styles.emptyMessage}>
+                  We couldn't find anything matching "{searchQuery.trim()}". Try a
+                  different keyword.
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
+                {filteredProducts.map(item => (
+                  <ProductCard
+                    key={item.id}
+                    item={item}
+                    cardWidth={productCardW}
+                    onAddToCart={() => handleProductPress(item)}
+                    liked={wishlistIds.has(item.id)}
+                    onToggleWishlist={() => handleToggleWishlist(item.id)}
+                  />
+                ))}
+              </View>
+            )
+          ) : products.length === 0 ? (
+            <View style={styles.centerBox}>
+              <View style={styles.emptyIcon}>
+                <BrandIcon icon={BRAND.box} width={30} height={30} />
+              </View>
+              <Text style={styles.emptyTitle}>No products found</Text>
               <Text style={styles.emptyMessage}>
-                We couldn't find anything matching "{searchQuery.trim()}". Try a
-                different keyword.
+                {`No items available in "${activeCategory === SHOP_ALL ? 'shop' : activeCategory}" right now. Try another category.`}
               </Text>
             </View>
           ) : (
             <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
-              {filteredProducts.map(item => (
+              {products.map(item => (
                 <ProductCard
                   key={item.id}
                   item={item}
@@ -1317,35 +1192,7 @@ const HomeTab = () => {
                 />
               ))}
             </View>
-          )
-        ) : products.length === 0 ? (
-          <View style={styles.centerBox}>
-            <View style={styles.emptyIcon}>
-              <SvgXml xml={BOX_ICON_SVG} width={30} height={30} />
-            </View>
-            <Text style={styles.emptyTitle}>No products found</Text>
-            <Text style={styles.emptyMessage}>
-              {activeCategory === 'Home'
-                ? 'We are updating our catalog. Please check back soon!'
-                : `No items available in "${
-                    activeCategory
-                  }" right now. Try another category.`}
-            </Text>
-          </View>
-        ) : (
-          <View style={[styles.productGrid, { paddingHorizontal: hPad }]}>
-            {products.map(item => (
-              <ProductCard
-                key={item.id}
-                item={item}
-                cardWidth={productCardW}
-                onAddToCart={() => handleProductPress(item)}
-                liked={wishlistIds.has(item.id)}
-                onToggleWishlist={() => handleToggleWishlist(item.id)}
-              />
-            ))}
-          </View>
-        )}
+          ))}
 
         <View style={{ height: 100 + insets.bottom }} />
       </ScrollView>
@@ -1376,6 +1223,7 @@ const HomeTab = () => {
         activeCategory={activeCategory}
         logoWidth={logoWidth}
         logoHeight={logoHeight}
+        onShopNow={handleShopNow}
       />
     </SafeAreaView>
   );

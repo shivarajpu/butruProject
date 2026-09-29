@@ -7,25 +7,30 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
-  ImageBackground,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { useAppTheme } from '../theme/useAppTheme';
+import { FONTS } from '../constants/fonts';
+import { useSelector } from 'react-redux';
+import DynamicWidget from '../widgets/registry';
+import { getWidgetByType, selectFeatures } from '../storefront/selectors';
+import { useStoreConfig } from '../storefront/useStorefront';
 import type { AppTheme } from '../theme/types';
 import AppIconButton from '../components/AppIconButton';
 import {
-  Butruname,
   STAR_FILLED_SVG,
-  HEART_OUTLINE_SVG,
-  HEART_FILLED_SVG,
+  heartOutlineSvg,
+  heartFilledSvg,
   LOCATION_PIN_SVG,
   CHEVRON_DOWN_SVG,
-  CART_WHITE_SVG,
-  ARROW_BACK_ICON,
 } from '../assets/svg';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from '../components/BrandIcon';
+import StoreLogo from '../components/StoreLogo';
+
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
@@ -89,18 +94,12 @@ interface ApiProductDetail {
   isDealOfTheDay: boolean;
   sizeType: string;
   sizeChartUrl: string;
+  productCode?: string;
 }
 
 interface ProductDetailApiResponse {
   success: boolean;
   data: ApiProductDetail;
-}
-
-interface ProductListApiResponse {
-  success: boolean;
-  count: number;
-  total: number;
-  data: ApiProductDetail[];
 }
 
 interface ProductVariant {
@@ -184,6 +183,7 @@ const mapApiProductToUI = (item: ApiProductDetail) => {
     totalInventory: item.totalInventory ?? 0,
     isOutOfStock: item.isOutOfStock ?? false,
     sizeChartUrl: item.sizeChartUrl ?? '',
+    productCode: item.productCode ?? item.sku ?? '',
   };
 };
 
@@ -198,58 +198,6 @@ interface ProductDetailsProps {
 
 type UIProduct = ReturnType<typeof mapApiProductToUI>;
 
-const RelatedProductCard = ({
-  item,
-  liked,
-  onToggleLike,
-  onSelect,
-}: {
-  item: any;
-  liked: boolean;
-  onToggleLike: () => void;
-  onSelect: (prod: any) => void;
-}) => {
-  const theme = useAppTheme();
-  const styles = createStyles(theme);
-
-  return (
-    <View style={styles.relatedCard}>
-      <ImageBackground
-        source={{ uri: item.image }}
-        style={styles.relatedImgArea}
-        imageStyle={{ borderRadius: 10 }}>
-        {item.tag && (
-          <View style={styles.tagBadge}>
-            <Text style={styles.tagText}>{item.tag}</Text>
-          </View>
-        )}
-        <TouchableOpacity
-          style={styles.heartBtn}
-          activeOpacity={0.7}
-          onPress={onToggleLike}>
-          <SvgXml xml={liked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG} width={14} height={14} />
-        </TouchableOpacity>
-      </ImageBackground>
-
-      <Text style={styles.relatedName} numberOfLines={1}>
-        {item.name}
-      </Text>
-
-      <View style={styles.priceRow}>
-        <Text style={styles.relatedPrice}>₹{item.price}</Text>
-        <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-      </View>
-
-      <TouchableOpacity
-        style={styles.relatedBtn}
-        activeOpacity={0.8}
-        onPress={() => onSelect(item)}>
-        <Text style={styles.relatedBtnText}>View Item</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
 const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
@@ -261,13 +209,30 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const [error, setError] = useState('');
   const [variants, setVariants] = useState<ProductVariantCardItem[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariantCardItem | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<(UIProduct & { image: string })[]>([]);
 
   const Navigation = useNavigation();
   const dispatch = useDispatch<AppDispatch>();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const hPad = 16;
+
+  // Server-driven switches: size / colour pickers, COD, delivery window.
+  const features = useSelector(selectFeatures);
+  const storeConfig = useStoreConfig();
+
+  /** Product-page widgets, resolved so a section can be rendered or skipped. */
+  const mediaWidget = getWidgetByType(storeConfig, 'product', 'product_media');
+  const titleWidget = getWidgetByType(storeConfig, 'product', 'product_title');
+  const sizeWidget = getWidgetByType(storeConfig, 'product', 'product_size_picker');
+  const colourWidget = getWidgetByType(storeConfig, 'product', 'product_colour_picker');
+  const alsoLikeWidget = getWidgetByType(storeConfig, 'product', 'product_group');
+  const oosWidget = getWidgetByType(storeConfig, 'oos', 'wa_reply_and_bag');
+
+  const deliveryWindow =
+    features.deliveryMaxDays > 0
+      ? `${features.deliveryMinDays}-${features.deliveryMaxDays} days`
+      : null;
+
 
   const loadProduct = useCallback(async (id: string, showLoader = true) => {
     if (!id) {
@@ -317,28 +282,10 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     }
   }, [productId]);
 
-  const fetchRelatedProducts = useCallback(async () => {
-    try {
-      const response = await apiService.get<ProductListApiResponse>(
-        `${PRODUCT_ENDPOINT}?limit=4&isVisible=true`,
-      );
-      if (response.success && Array.isArray(response.data)) {
-        const mapped = response.data.slice(0, 4).map(p => {
-          const ui = mapApiProductToUI(p);
-          return { ...ui, image: ui.images?.[0] ?? '' };
-        });
-        setRelatedProducts(mapped);
-      }
-    } catch {
-      // Non-fatal — related products section simply stays empty on failure
-    }
-  }, []);
-
   useEffect(() => {
     loadProduct(productId);
     fetchVariants();
-    fetchRelatedProducts();
-  }, [productId, loadProduct, fetchVariants, fetchRelatedProducts]);
+  }, [productId, loadProduct, fetchVariants]);
 
   const product = productData;
   const thumbnails = product?.images?.length ? product.images : [];
@@ -346,6 +293,24 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const [selectedImg, setSelectedImg] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+
+  /** Shape the out-of-stock widgets read. */
+  const oosProductContext = product
+    ? {
+        id: product.id,
+        name: product.name,
+        images: thumbnails,
+        image: selectedImg || thumbnails[0],
+        price: product.price,
+        originalPrice: product.originalPrice,
+        rating: product.rating,
+        reviews: product.reviews,
+        sizes,
+        colors: product.color ? [product.color] : [],
+        isOutOfStock: product.isOutOfStock,
+        selectedSize: selectedSize || null,
+      }
+    : undefined;
   const [sizeError, setSizeError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
@@ -472,13 +437,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const heroHeight = width * 1.1;
 
-  const handleSelectRelated = (item: any) => {
-    const relatedId = item?.id || item?._id;
-    if (relatedId && /^[a-fA-F0-9]{24}$/.test(relatedId)) {
-      navigation?.push('ProductDetails', { product: item });
-    }
-  };
-
   const handleOpenAddAddress = () => {
     setEditingAddress(null);
     setIsAddressModalVisible(false);
@@ -542,7 +500,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             <View style={styles.headerLeftGroup}>
               <AppIconButton
                 style={styles.headerIconBtn}
-                icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                icon={<BrandIcon icon={BRAND.arrowBack} width={15} height={15} />}
                 accessibilityLabel="Go back"
                 onPress={() => navigation?.goBack()}
               />
@@ -564,7 +522,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             <View style={styles.headerLeftGroup}>
               <AppIconButton
                 style={styles.headerIconBtn}
-                icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+                icon={<BrandIcon icon={BRAND.arrowBack} width={15} height={15} />}
                 accessibilityLabel="Go back"
                 onPress={() => navigation?.goBack()}
               />
@@ -593,7 +551,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
           <View style={styles.headerLeftGroup}>
             <AppIconButton
               style={styles.headerIconBtn}
-              icon={<SvgXml xml={ARROW_BACK_ICON} width={15} height={15} />}
+              icon={<BrandIcon icon={BRAND.arrowBack} width={15} height={15} />}
               accessibilityLabel="Go back"
               onPress={() => navigation?.goBack()}
             />
@@ -602,13 +560,9 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               style={styles.locationWrapper}
               activeOpacity={0.7}
               onPress={() => setIsAddressModalVisible(true)}>
-              {Butruname ? (
-                <SvgXml xml={Butruname} width={65} height={24} />
-              ) : (
-                <Text style={styles.logoFallback}>Butru</Text>
-              )}
+              <StoreLogo width={65} height={24} textStyle={styles.logoFallback} />
               <View style={styles.locationRow}>
-                <SvgXml xml={LOCATION_PIN_SVG} width={12} height={12} />
+                <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
                    Delivering to {formatAddressLabel(selectedAddress)}
                  </Text>
@@ -628,7 +582,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Main Content */}
-          <Image source={{ uri: selectedImg || thumbnails[0] }} style={[styles.heroImage, { height: heroHeight }]} />
+          <Image
+            source={{ uri: selectedImg || thumbnails[0] }}
+            style={[styles.heroImage, { height: heroHeight }]}
+            resizeMode={mediaWidget?.config.zoomEnabled ? 'contain' : 'cover'}
+          />
 
           {thumbnails.length > 1 && (
             <ScrollView
@@ -651,28 +609,42 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
           <View style={[styles.section, { paddingHorizontal: hPad }]}>
             <View style={styles.ratingHeartRow}>
-              <View style={styles.ratingRow}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <SvgXml key={s} xml={STAR_FILLED_SVG} width={12} height={12}
-                    style={s <= Math.round(product.rating) ? undefined : { opacity: 0.25 }}
-                  />
-                ))}
-                <Text style={styles.reviewText}>Review ({product.reviews})</Text>
-              </View>
+              {titleWidget?.config.showRating === false ? null : (
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <SvgXml key={s} xml={STAR_FILLED_SVG} width={12} height={12}
+                      style={s <= Math.round(product.rating) ? undefined : { opacity: 0.25 }}
+                    />
+                  ))}
+                  <Text style={styles.reviewText}>Review ({product.reviews})</Text>
+                </View>
+              )}
               <TouchableOpacity onPress={() => handleToggleWishlist()} activeOpacity={0.7}>
                 <SvgXml
-                  xml={isLiked ? HEART_FILLED_SVG : HEART_OUTLINE_SVG}
+                  xml={
+                    isLiked
+                      ? heartFilledSvg(theme.colors.primary)
+                      : heartOutlineSvg(theme.colors.textMuted)
+                  }
                   width={20}
                   height={20}
                 />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.titleText}>{product.name}</Text>
+            {titleWidget?.config.showTitle === false ? null : (
+              <Text style={styles.titleText}>{product.name}</Text>
+            )}
 
-            {variants.length > 0 && (
+            {titleWidget?.config.showSku && product.productCode ? (
+              <Text style={styles.reviewText}>{product.productCode}</Text>
+            ) : null}
+
+            {features.colourEnabled && colourWidget && variants.length > 0 && (
               <>
-                <Text style={styles.sectionLabel}>SELECT COLOR</Text>
+                <Text style={styles.sectionLabel}>
+                  {`SELECT ${(colourWidget.config.label ?? 'COLOR').toUpperCase()}`}
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.variantRow}>
                     {variants.map(variant => {
@@ -702,9 +674,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
            
 
-            {sizes.length > 0 && (
+            {features.sizeEnabled && sizeWidget && sizes.length > 0 && (
               <>
-                <Text style={styles.sectionLabel}>SELECT SIZE</Text>
+                <Text style={styles.sectionLabel}>
+                  {`SELECT ${(sizeWidget.config.label ?? 'SIZE').toUpperCase()}`}
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.sizeRow}>
                     {sizes.map(sz => {
@@ -753,7 +727,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
               <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.8}
                 onPress={handleAddToCart}>
-                <SvgXml xml={CART_WHITE_SVG} width={14} height={14} />
+                <BrandIcon icon={BRAND.cart} width={14} height={14} />
                 <Text style={styles.addCartBtnText}>Add To Cart</Text>
               </TouchableOpacity>
             </View>
@@ -768,12 +742,15 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.deliveryFeatureRow}>
-              <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
-              <Text style={styles.deliveryFeatureText}>
-                Get it in <Text style={styles.boldText}>2-3 days</Text>. Usually ships within a day
-              </Text>
-            </View>
+            {deliveryWindow ? (
+              <View style={styles.deliveryFeatureRow}>
+                <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
+                <Text style={styles.deliveryFeatureText}>
+                  Get it in <Text style={styles.boldText}>{deliveryWindow}</Text>. Usually
+                  ships within a day
+                </Text>
+              </View>
+            ) : null}
 
             {product.returnExchangeCondition ? (
               <View style={styles.deliveryFeatureRow}>
@@ -782,10 +759,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               </View>
             ) : null}
 
-            <View style={styles.deliveryFeatureRow}>
-              <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
-              <Text style={styles.deliveryFeatureText}>Cash On Delivery</Text>
-            </View>
+            {features.codEnabled ? (
+              <View style={styles.deliveryFeatureRow}>
+                <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
+                <Text style={styles.deliveryFeatureText}>Cash On Delivery</Text>
+              </View>
+            ) : null}
           </View>
 
           {/* Accordions */}
@@ -851,28 +830,17 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             </View>
           </View>
 
-          {/* Related Items */}
-          <View style={styles.relatedSection}>
-            <View style={[styles.relatedHeader, { paddingHorizontal: hPad }]}>
-              <Text style={styles.relatedTitle}>You May Also Like</Text>
-              <Text style={styles.relatedSubTitle}>Similar Products</Text>
-            </View>
+          {/* "You may also like this" — order, limit, layout and source all
+              come from the product_page product_group widget. */}
+          {alsoLikeWidget && (
+            <DynamicWidget widget={alsoLikeWidget} />
+          )}
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: hPad, gap: 12 }}>
-              {relatedProducts.map(item => (
-                <RelatedProductCard
-                  key={item.id}
-                  item={item}
-                  liked={wishlistIds.has(item.id)}
-                  onToggleLike={() => handleToggleWishlist(item.id)}
-                  onSelect={handleSelectRelated}
-                />
-              ))}
-            </ScrollView>
-          </View>
+          {/* Out-of-stock CTA (WhatsApp notify + bag link) when the store
+              enables it and the product cannot be bought. */}
+          {product.isOutOfStock && oosWidget && (
+            <DynamicWidget widget={oosWidget} product={oosProductContext} />
+          )}
 
           <View style={{ height: insets.bottom + 30 }} />
         </ScrollView>
@@ -1156,13 +1124,14 @@ const createStyles = (theme: AppTheme) => {
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.primary,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buyNowBtnText: {
     fontSize: 14,
-    fontWeight: '700',
     color: colors.primary,
+    fontFamily: FONTS.poppinsBold,
   },
   addCartBtn: {
     flex: 1,
