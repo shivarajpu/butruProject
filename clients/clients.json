@@ -1,0 +1,90 @@
+{
+  "defaultClient": "butru",
+  "defaultMetroPort": 8081,
+  "clients": {
+    "butru": {
+      "displayName": "Butru",
+      "metroPort": 8081,
+      "description": "Existing production client. Migrated 1:1 — app ID, bundle ID and icon are byte-identical to the pre-flavour build.",
+      "android": {
+        "applicationId": "com.butruproject",
+        "versionCode": 1,
+        "icon": null
+      },
+      "ios": {
+        "bundleId": "com.butruproject",
+        "teamId": "55PCY8WR7N",
+        "icon": null
+      },
+      "api": {
+        "storeSlug": "butru-store",
+        "storeDomain": "butru.in",
+        "storeId": "6a20248bf77d663ca797ce90",
+        "baseUrl": "https://api.butru.in"
+      },
+      "support": {
+        "phone": "8128013130",
+        "email": "hellobutru@gmail.com",
+        "responseTime": "2-4 HRS",
+        "companyName": "BUTRU",
+        "address": "J-811/9F, STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308",
+        "mapQuery": "STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308"
+      },
+      "firebase": {
+        "enabled": false,
+        "androidFile": "clients/firebase/butru/android/google-services.json",
+        "iosFile": "clients/firebase/butru/ios/GoogleService-Info.plist"
+      }
+    },
+    "clienta": {
+      "displayName": "Client A",
+      "metroPort": 8081,
+        "description": "Second white-label client. Same features, different name, icons, colours, app ID and bundle ID. Shares the Butru backend and store; its own storeId scopes the data to this app.",
+      "android": {
+        "applicationId": "com.company.clienta",
+        "versionCode": 1,
+        "icon": "clienta"
+      },
+      "ios": {
+        "bundleId": "com.company.clienta",
+        "teamId": "55PCY8WR7N",
+        "icon": "clienta"
+      },
+        "api": {
+          "storeSlug": "butru-store",
+          "storeDomain": "butru.in",
+          "storeId": "6ac4a42b2128c79004b23610",
+          "baseUrl": "https://api.butru.in"
+        },
+      "support": {
+        "phone": "9000000000",
+        "email": "support@clienta.in",
+        "responseTime": "2-4 HRS",
+        "companyName": "CLIENT A",
+        "address": "Client A registered office address",
+        "mapQuery": "Client A registered office address"
+      },
+      "theme": {
+        "light": {
+          "primary": "#2563EB",
+          "primaryLight": "#DBEAFE",
+          "secondary": "#F59E0B"
+        },
+        "dark": {
+          "primary": "#60A5FA",
+          "primaryLight": "#1E3A8A",
+          "secondary": "#FBBF24"
+        }
+      },
+      "splash": {
+        "background": "#2563EB",
+        "accent": "#F59E0B"
+      },
+      "firebase": {
+        "enabled": false,
+        "androidFile": "clients/firebase/clienta/android/google-services.json",
+        "iosFile": "clients/firebase/clienta/ios/GoogleService-Info.plist"
+      }
+    }
+  }
+}

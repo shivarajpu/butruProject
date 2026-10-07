@@ -41,6 +41,61 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# ── Multi-client (white-label) build artifacts ───────────────────────────────
+# Everything below is written by `npm run clients:sync` and is disposable. The
+# committed source of truth is clients/clients.json; clients/secrets.json holds
+# anything secret. Never hand-edit, never commit.
+#
+#   .env.<client>        per-client env consumed by babel at bundle time
+#   clients/active.json  which client the next build will produce
+#   clients/secrets.json your real API keys
+#
+# NOTE: patterns must start at column 0. gitignore matches the literal line, so
+# an indented ".env" matches nothing at all and your secrets get committed.
+.env
+.env.*
+
+# Per-build resolved client config. Contains only the active client, and is
+# regenerated on every sync / build / CI job.
+src/config/clients/active.ts
+
+# The machine-readable build record that Gradle and Xcode both read.
+clients/active.json
+
+# Real secrets (API keys, tokens). Copy clients/secrets.example.json to fill in.
+clients/secrets.json
+
+# Generated iOS xcconfig for the client currently being built. The per-client
+# source files under ios/Config/Clients/ ARE committed, as are
+# ios/Config/{Shared,Debug,Release}.xcconfig.
+ios/Config/Client.xcconfig
+
+# Generated per-client app iconsets. The source of truth for each is the single
+# committed master at clients/icons/<client>/icon.png; `clients:sync` resizes it
+# into every size. Not committed so that 50 clients do not mean 1,750 PNGs.
+ios/butruProject/Images.xcassets/AppIcon_*.appiconset/
+
+# Generated per-client Android launcher icons (mipmap-*), same reason.
+# The strings.xml / colors.xml in these source sets are tiny, so they ARE
+# committed — a missing app_name should show up in a code review.
+android/app/src/*/res/mipmap-*/
+
+# Firebase config files are per-client and are injected at build time from
+# clients/firebase/<client>/. Keep them out of the repo entirely.
+**/google-services.json
+**/GoogleService-Info.plist
+clients/firebase/
+
+# Android release keystores (debug.keystore stays tracked, see above).
+*.jks
+
+# Fastlane / EAS
+*.p8
+*.p12
+*.mobileprovision
+eas-build-*.log
+
+
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the

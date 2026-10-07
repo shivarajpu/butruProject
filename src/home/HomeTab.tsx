@@ -760,7 +760,7 @@ const HomeTab = () => {
   const { refresh: refreshStorefront } = useStorefront();
   const appAnnouncementSticky = useSelector(
     (state: RootState) =>
-      state.storefront.config?.website.webConfig.appAnnouncement?.sticky === true,
+      state.storefront.config?.website?.webConfig?.appAnnouncement?.sticky === true,
   );
   const isTablet = width >= 768;
   const hPad = width * 0.04;

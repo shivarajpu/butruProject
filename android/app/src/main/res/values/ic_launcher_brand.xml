@@ -9,6 +9,16 @@
   baked into the binary. It matches the compiled-in default in
   `src/config/app_config.ts` so the hand-off from the native window to
   `SplashScreen` does not visibly jump on a fresh install.
+
+  ── OVERRIDDEN PER CLIENT ─────────────────────────────────────────────────
+  Every build is flavoured, and each flavour source set supplies its own
+  `brand_launch_background` in `src/<flavor>/res/values/colors.xml`, generated
+  from the client's `splash.background` (or `theme.light.primary`) in
+  `clients/clients.json`. That per-flavour value wins over this one.
+
+  So for Butru — whose value is identical — this entry is a no-op, and for every
+  other client it is dead. Change the colour in clients/clients.json and run
+  `npm run clients:sync`; editing this file will appear to do nothing.
 -->
 <resources>
     <color name="brand_launch_background">#B12B5B</color>

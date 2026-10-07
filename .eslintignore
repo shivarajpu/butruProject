@@ -1,0 +1,10 @@
+# Generated per-client artifacts — not hand-maintained, so not linted.
+src/config/clients/active.ts
+clients/active.json
+clients/secrets.json
+
+# Build output
+android/app/build/
+android/build/
+ios/build/
+coverage/

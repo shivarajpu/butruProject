@@ -1,6 +1,7 @@
 import { BASE_URL } from '@env';
 import { navigationRef } from '../navigation/rootNavigation';
-import APP_CONFIG from '../config/app_config';
+import APP_CONFIG from '../config/clients';
+import { STORE_ID, STORE_SLUG } from '../config/storeIdentity';
 import { store } from '../store';
 
 type RequestHeaders = Record<string, string>;
@@ -23,18 +24,20 @@ export const handleUnauthorized = () => {
 };
 
 /**
- * All store-tenant headers are now sourced from app_config.ts.
- * To white-label for a new client, change api.* in app_config.ts.
+ * Store-tenant headers. storeId/storeSlug come from the binary's baked-in
+ * identity (see storeIdentity.ts) rather than the Metro-served bundle, so a
+ * client app keeps the right tenant even when another client's Metro serves
+ * 8081. The rest of the api config (domain) comes from app_config.ts.
  */
 const getHeaders = (token?: string, isFormData = false): RequestHeaders => {
   const { api } = APP_CONFIG;
 
   const headers: RequestHeaders = {
     Accept: 'application/json',
-    'x-store-slug': api.storeSlug,
+    'x-store-slug': STORE_SLUG,
     'x-store-domain': api.storeDomain,
     'x-forwarded-host': api.storeDomain,
-    'x-store-id': api.storeId,
+    'x-store-id': STORE_ID,
   };
 
   if (!isFormData) {

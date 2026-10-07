@@ -7,11 +7,11 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Butru</string>
+	<string>$(CLIENT_DISPLAY_NAME)</string>
 	<key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.butruproject</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>1.0</string>
 	<key>CFBundleName</key>
@@ -30,6 +30,12 @@
 		<string>telprompt</string>
 		<string>mailto</string>
 	</array>
+	<key>MetroPort</key>
+	<string>$(RCT_METRO_PORT)</string>
+	<key>ClientStoreId</key>
+	<string>$(CLIENT_STORE_ID)</string>
+	<key>ClientStoreSlug</key>
+	<string>$(CLIENT_STORE_SLUG)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

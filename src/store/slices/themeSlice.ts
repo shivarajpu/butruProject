@@ -11,7 +11,7 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Appearance } from 'react-native';
-import APP_CONFIG from '../../config/app_config';
+import APP_CONFIG from '../../config/clients';
 import { buildTheme, resolveMode } from '../../theme/buildTheme';
 import type { AppConfig, AppTheme, ColorMode } from '../../theme/types';
 

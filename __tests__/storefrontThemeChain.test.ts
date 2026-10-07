@@ -18,7 +18,11 @@ import { applyConfig } from '../src/store/slices/themeSlice';
 import { mapStoreConfigToAppConfig, readableOn, lighten, darken } from '../src/storefront/bridge';
 import { TONE_TOKEN } from '../src/components/BrandIcon';
 import { BRAND } from '../src/assets/svg/brand';
-import APP_CONFIG from '../src/config/app_config';
+// Resolved per-client config (base app_config + the active client's overrides).
+// Importing the resolver rather than the base is what keeps this assertion
+// meaningful in a multi-client codebase: "falls back to the compiled-in default"
+// must mean "this build's default", not "Butru's default, forever".
+import APP_CONFIG from '../src/config/clients';
 import type { StoreConfig } from '../src/storefront/types';
 import themeReducer from '../src/store/slices/themeSlice';
 import storefrontReducer from '../src/store/slices/storefrontSlice';

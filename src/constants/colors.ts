@@ -14,6 +14,6 @@
  * Once all screens are migrated to useAppTheme(), this shim can be deleted.
  */
 
-import APP_CONFIG from '../config/app_config';
+import APP_CONFIG from '../config/clients';
 
 export const COLORS = APP_CONFIG.colors.light;

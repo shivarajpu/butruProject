@@ -22,6 +22,7 @@ import { eyeIcon, emailIcon, loginPagaImage } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
 import BrandIcon from '../components/BrandIcon';
 import StoreLogo from '../components/StoreLogo';
+import { STORE_ID, STORE_SLUG } from '../config/storeIdentity';
 
 import { Callicon, userProfileIcon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
@@ -145,7 +146,13 @@ const SignUpScreen = ({ navigation }: Props) => {
       email: email.trim().toLowerCase(),
       phone: mobile.trim(),
       password: password,
+      storeId: STORE_ID,
+      storeSlug: STORE_SLUG,
     };
+
+    if (__DEV__) {
+      console.log('[auth] register payload', JSON.stringify(payload, null, 2));
+    }
 
     try {
       const response = await apiService.post<RegisterResponse>(REGISTER_ENDPOINT, payload);

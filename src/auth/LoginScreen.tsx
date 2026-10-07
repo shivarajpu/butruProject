@@ -34,6 +34,7 @@ import type { AppTheme } from '../theme/types';
 import { BRAND } from '../assets/svg/brand';
 import BrandIcon from '../components/BrandIcon';
 import StoreLogo from '../components/StoreLogo';
+import { STORE_ID, STORE_SLUG } from '../config/storeIdentity';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -167,14 +168,19 @@ const LoginScreen = ({ navigation }: Props) => {
 
     setIsSubmitting(true);
 
+    const payload = {
+      email: email.trim().toLowerCase(),
+      password: password,
+      storeId: STORE_ID,
+      storeSlug: STORE_SLUG,
+    };
+
+    if (__DEV__) {
+      console.log('[auth] login payload', JSON.stringify(payload, null, 2));
+    }
+
     try {
-      const response = await apiService.post<LoginResponse>(
-        LOGIN_ENDPOINT,
-        {
-          email: email.trim().toLowerCase(),
-          password: password,
-        },
-      );
+      const response = await apiService.post<LoginResponse>(LOGIN_ENDPOINT, payload);
 
       if (!response.success) {
         showErrorModal(

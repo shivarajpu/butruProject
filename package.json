@@ -3,11 +3,22 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
+    "start": "node scripts/run.js metro",
+    "android": "node scripts/run.js android",
+    "android:release": "node scripts/run.js android --release",
+    "ios": "node scripts/run.js ios",
+    "ios:release": "node scripts/run.js ios --release",
+    "clients:sync": "node scripts/sync-clients.js",
+    "clients:list": "node scripts/sync-clients.js --list",
+    "clients:check": "node scripts/sync-clients.js --check",
+    "clients:sync:all": "node scripts/sync-clients-all.js",
+    "android:bundle": "node scripts/run.js android-bundle",
+    "reload": "node scripts/run.js reload",
+    "reload:all": "node scripts/run.js reload-all",
     "lint": "eslint .",
-    "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "pretest": "node scripts/sync-clients.js --quiet",
+    "tsc": "tsc --noEmit"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",

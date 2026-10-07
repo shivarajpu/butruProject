@@ -12,7 +12,7 @@
  */
 
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import APP_CONFIG from '../../config/app_config';
+import APP_CONFIG from '../../config/clients';
 import {
   getStoreConfig,
   readCachedConfig,
