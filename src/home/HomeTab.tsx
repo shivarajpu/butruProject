@@ -327,7 +327,12 @@ const createStyles = (theme: AppTheme) => {
       backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 3,
+      elevation: 5,
+      shadowColor: colors.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      zIndex: 999,
     },
     productInfo: {
       paddingVertical: 6,
@@ -515,7 +520,7 @@ const ProductCard = ({
   const styles = createStyles(theme);
   const dispatch = useDispatch<AppDispatch>();
 
-  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
   const [sizeError, setSizeError] = useState(false);
@@ -555,14 +560,14 @@ const ProductCard = ({
   };
 
   const handleLikePress = async () => {
-    if (wishlistLoading) return;
-    setWishlistLoading(true);
+    if (wishlistLoading === item.id) return;
+    setWishlistLoading(item.id);
     try {
       await onToggleWishlist();
     } catch {
       // no-op — parent handles optimistic update
     } finally {
-      setWishlistLoading(false);
+      setWishlistLoading(null);
     }
   };
 
@@ -579,17 +584,18 @@ const ProductCard = ({
           <View style={styles.tagBadge}>
             <Text style={styles.tagText}>{item.tag}</Text>
           </View>
-          <TouchableOpacity
-            style={styles.heartBtn}
-            activeOpacity={0.7}
-            onPress={handleLikePress}>
-            <SvgXml
-              xml={liked ? heartFilledSvg(theme.colors.primary) : heartOutlineSvg(theme.colors.textMuted)}
-              width={16}
-              height={16}
-            />
-          </TouchableOpacity>
         </ImageBackground>
+        <TouchableOpacity
+          style={styles.heartBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={(e) => { e.stopPropagation(); handleLikePress(); }}>
+          <SvgXml
+            xml={liked ? heartFilledSvg(theme.colors.primary) : heartOutlineSvg(theme.colors.textMuted)}
+            width={16}
+            height={16}
+          />
+        </TouchableOpacity>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onAddToCart} activeOpacity={0.8}>

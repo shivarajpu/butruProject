@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   Alert,
+  Keyboard,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,6 +74,11 @@ const CartScreen = () => {
   // Dynamic States
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
   const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
+
+  // GST number state
+  const [gstInput, setGstInput] = useState('');
+  const [savedGst, setSavedGst] = useState('');
+  const [gstError, setGstError] = useState('');
 
   // Address modals state
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
@@ -302,6 +308,28 @@ const CartScreen = () => {
     dispatch(removeCartItem(cartId));
   };
 
+  const handleGstSubmit = () => {
+    const code = gstInput.trim().toUpperCase();
+    Keyboard.dismiss();
+    if (!code) {
+      setGstError('Please enter a GST number');
+      return;
+    }
+    if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(code)) {
+      setGstError('Enter a valid 15-digit GST number');
+      return;
+    }
+    setGstError('');
+    setSavedGst(code);
+    setGstInput(code);
+  };
+
+  const handleGstRemove = () => {
+    setSavedGst('');
+    setGstInput('');
+    setGstError('');
+  };
+
   const handleApplyCoupon = async (code: string): Promise<ApplyCouponResult> => {
     const trimmed = code.trim();
     if (!trimmed) {
@@ -439,6 +467,66 @@ const CartScreen = () => {
                 {appliedCoupon > 0 ? 'Change Coupon' : 'Apply Coupon'}
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* GST Number Card */}
+          <View style={styles.gstCard}>
+            <View style={styles.gstHeader}>
+              <View style={styles.gstTitleRow}>
+                <SvgXml xml={INFO_ICON_SVG} width={16} height={16} />
+                <Text style={styles.gstTitle}>GST Number</Text>
+              </View>
+              {savedGst.length > 0 && (
+                <TouchableOpacity activeOpacity={0.7} onPress={handleGstRemove}>
+                  <Text style={styles.gstRemoveText}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={styles.gstSub}>
+              Add your GST number to get GST invoice on this order.
+            </Text>
+
+            {savedGst.length > 0 ? (
+              <View style={styles.gstSavedRow}>
+                <View style={styles.gstSavedBadge}>
+                  <Text style={styles.gstSavedText}>{savedGst}</Text>
+                </View>
+                <Text style={styles.gstSavedLabel}>GST added to invoice</Text>
+              </View>
+            ) : (
+              <View style={styles.gstInputRow}>
+                <TextInput
+                  style={[styles.gstInput, gstError.length > 0 && styles.gstInputError]}
+                  value={gstInput}
+                  onChangeText={t => {
+                    setGstInput(t.toUpperCase().slice(0, 15));
+                    if (gstError.length > 0) {
+                      setGstError('');
+                    }
+                  }}
+                  placeholder="22AAAAA0000A1Z5"
+                  placeholderTextColor={theme.colors.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={15}
+                  keyboardType="ascii-capable"
+                  returnKeyType="done"
+                  onSubmitEditing={handleGstSubmit}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.gstSubmitBtn,
+                    gstInput.trim().length < 15 && styles.gstSubmitBtnDisabled,
+                  ]}
+                  activeOpacity={0.8}
+                  disabled={gstInput.trim().length < 15}
+                  onPress={handleGstSubmit}>
+                  <Text style={styles.gstSubmitText}>Submit</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {gstError.length > 0 && <Text style={styles.gstErrorText}>{gstError}</Text>}
           </View>
 
           {/* Dynamic Price Summary */}
@@ -895,6 +983,111 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
+  },
+  gstCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 4,
+  },
+  gstHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  gstTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gstTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  gstRemoveText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  gstSub: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 4,
+    marginBottom: 10,
+    lineHeight: 15,
+  },
+  gstInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gstInput: {
+    flex: 1,
+    height: 42,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 1,
+    color: colors.text,
+    backgroundColor: colors.surfaceVariant,
+  },
+  gstInputError: {
+    borderColor: colors.error,
+  },
+  gstSubmitBtn: {
+    height: 42,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gstSubmitBtnDisabled: {
+    backgroundColor: colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  gstSubmitText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textOnPrimary,
+  },
+  gstErrorText: {
+    fontSize: 10,
+    color: colors.error,
+    marginTop: 6,
+  },
+  gstSavedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gstSavedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success + '1A',
+    borderWidth: 1,
+    borderColor: colors.success,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  gstSavedText: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: colors.success,
+  },
+  gstSavedLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    flex: 1,
   },
   summaryContainer: {
     marginTop: 10,

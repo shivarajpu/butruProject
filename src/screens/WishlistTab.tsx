@@ -295,7 +295,7 @@ const WishlistScreen = () => {
                   
                   {/* Image Container */}
                   <TouchableOpacity
-                    style={{ position: 'relative' }}
+                    style={{ position: 'relative', zIndex: 1 }}
                     activeOpacity={0.8}
                     onPress={() => handleAddToCart(item)}>
                     <Image
@@ -309,13 +309,13 @@ const WishlistScreen = () => {
                         <Text style={styles.tagText}>{item.tag}</Text>
                       </View>
                     ) : null}
-
-                    <TouchableOpacity
-                      style={styles.heartBtn}
-                      onPress={() => removeItem(item.id)}
-                      activeOpacity={0.8}>
-                      <SvgXml xml={heartFilledSvg(theme.colors.primary)} width={16} height={16} />
-                    </TouchableOpacity>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.heartBtn, { zIndex: 1000 }]}
+                    onPress={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                    <SvgXml xml={heartFilledSvg(theme.colors.primary)} width={16} height={16} />
                   </TouchableOpacity>
 
                   <TouchableOpacity activeOpacity={0.8} onPress={() => handleAddToCart(item)}>
@@ -486,11 +486,12 @@ const createStyles = (theme: AppTheme) => {
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
+    elevation: 6,
     shadowColor: colors.text,
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    zIndex: 1000,
   },
   cardDetails: {
     padding: 10,

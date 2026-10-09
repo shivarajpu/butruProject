@@ -18,7 +18,7 @@ import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { apiService } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
-import { eyeIcon, emailIcon, loginPagaImage } from '../assets/svg';
+import { eyeIconSvg, eyeOffIconSvg, emailIcon, loginPagaImage } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
 import BrandIcon from '../components/BrandIcon';
 import StoreLogo from '../components/StoreLogo';
@@ -174,7 +174,7 @@ const SignUpScreen = ({ navigation }: Props) => {
   };
 
   const handleSignIn = () => {
-    navigation.navigate('Login');
+    navigation.replace('Login');
   };
 
   return (
@@ -235,7 +235,7 @@ const SignUpScreen = ({ navigation }: Props) => {
                 ]}
               >
                 <View style={styles.inputIcon}>
-                  <SvgXml xml={userProfileIcon} width={18} height={18} />
+                  <SvgXml xml={userProfileIcon(theme.colors.primary)} width={18} height={18} />
                 </View>
                 <TextInput
                   style={styles.input}
@@ -339,7 +339,15 @@ const SignUpScreen = ({ navigation }: Props) => {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   activeOpacity={0.7}
                 >
-                  <SvgXml xml={eyeIcon} width={18} height={18} />
+                  <SvgXml
+                    xml={
+                      showPassword
+                        ? eyeOffIconSvg(theme.colors.primary)
+                        : eyeIconSvg(theme.colors.textMuted)
+                    }
+                    width={18}
+                    height={18}
+                  />
                 </TouchableOpacity>
               </View>
               {fieldErrors.password && <Text style={styles.errorText}>{fieldErrors.password}</Text>}
@@ -375,7 +383,15 @@ const SignUpScreen = ({ navigation }: Props) => {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   activeOpacity={0.7}
                 >
-                  <SvgXml xml={eyeIcon} width={18} height={18} />
+                  <SvgXml
+                    xml={
+                      showConfirmPassword
+                        ? eyeOffIconSvg(theme.colors.primary)
+                        : eyeIconSvg(theme.colors.textMuted)
+                    }
+                    width={18}
+                    height={18}
+                  />
                 </TouchableOpacity>
               </View>
               {fieldErrors.confirmPassword && (
@@ -424,7 +440,7 @@ const SignUpScreen = ({ navigation }: Props) => {
 
             {/* Sign In Link */}
             <View style={styles.signInRow}>
-              <Text style={styles.signInText}>Don't have an account? </Text>
+              <Text style={styles.signInText}>Already have an account? </Text>
               <TouchableOpacity onPress={handleSignIn} activeOpacity={0.7}>
                 <Text style={styles.signInLink}>Sign In</Text>
               </TouchableOpacity>

@@ -5,12 +5,12 @@ export const editPencilIcon = tintSvg(`<svg width="15" height="15" viewBox="0 0 
 </svg>
 `);
 
-export const userProfileIcon = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const userProfileIcon = tintSvg(`<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="10" cy="10" r="9" stroke="#C23564" stroke-width="1.33"/>
 <path d="M10 9.5C11.3807 9.5 12.5 8.38071 12.5 7C12.5 5.61929 11.3807 4.5 10 4.5C8.61929 4.5 7.5 5.61929 7.5 7C7.5 8.38071 8.61929 9.5 10 9.5Z" stroke="#C23564" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M15.5 16C15.5 13.5 13 12 10 12C7 12 4.5 13.5 4.5 16" stroke="#C23564" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
-`;
+`);
 
 export const lockSecurityIcon = `<svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M13.75 8.75V5.625C13.75 3.55532 12.0697 1.875 10 1.875C7.93032 1.875 6.25 3.55532 6.25 5.625V8.75M5.625 18.125H14.375C15.4105 18.125 16.25 17.2855 16.25 16.25V10.625C16.25 9.58947 15.4105 8.75 14.375 8.75H5.625C4.58947 8.75 3.75 9.58947 3.75 10.625V16.25C3.75 17.2855 4.58947 18.125 5.625 18.125Z" stroke="#888888" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"/>

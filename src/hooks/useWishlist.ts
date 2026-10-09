@@ -46,7 +46,7 @@ export function useWishlist() {
 
   const toggle = useCallback(
     async (productId: string) => {
-      if (busyId) return;
+      if (busyId === productId) return;
       const liked = ids.has(productId);
       setBusyId(productId);
       setIds(previous => {

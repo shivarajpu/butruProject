@@ -245,7 +245,7 @@ const OtpScreen = ({ navigation }: Props) => {
             {/* Sign Up Link */}
             <View style={styles.signUpRow}>
               <Text style={styles.signUpText}>Don't have an account? </Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('SignUp')}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.replace('SignUp')}>
                 <Text style={styles.signUpLink}>Sign Up</Text>
               </TouchableOpacity>
             </View>

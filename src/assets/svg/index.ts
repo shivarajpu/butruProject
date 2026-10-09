@@ -43,6 +43,23 @@ export const eyeIcon = `<svg width="20" height="20" viewBox="0 0 20 20" fill="no
 </svg>
 `;
 
+/** Open eye — password visible. Retints per theme/state. */
+export const eyeIconSvg = (color: string) =>
+  `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M1.6967 10.2683C1.63919 10.0955 1.63919 9.90867 1.6967 9.73583C2.85253 6.25833 6.13336 3.75 10 3.75C13.865 3.75 17.1442 6.25583 18.3025 9.73167C18.3609 9.90417 18.3609 10.0908 18.3025 10.2642C17.1475 13.7417 13.8667 16.25 10 16.25C6.13503 16.25 2.85586 13.7442 1.69753 10.2683H1.6967" stroke="${color}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12.5 10C12.5 11.3798 11.3798 12.5 10 12.5C8.62021 12.5 7.5 11.3798 7.5 10C7.5 8.62021 8.62021 7.5 10 7.5C11.3798 7.5 12.5 8.62021 12.5 10V10" stroke="${color}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+`;
+
+/** Crossed-out eye — password hidden. Retints per theme/state. */
+export const eyeOffIconSvg = (color: string) =>
+  `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M1.6967 10.2683C1.63919 10.0955 1.63919 9.90867 1.6967 9.73583C2.85253 6.25833 6.13336 3.75 10 3.75C13.865 3.75 17.1442 6.25583 18.3025 9.73167C18.3609 9.90417 18.3609 10.0908 18.3025 10.2642C17.1475 13.7417 13.8667 16.25 10 16.25C6.13503 16.25 2.85586 13.7442 1.69753 10.2683H1.6967" stroke="${color}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M12.5 10C12.5 11.3798 11.3798 12.5 10 12.5C8.62021 12.5 7.5 11.3798 7.5 10C7.5 8.62021 8.62021 7.5 10 7.5C11.3798 7.5 12.5 8.62021 12.5 10V10" stroke="${color}" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M3.5 3.5L16.5 16.5" stroke="${color}" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
+`;
+
 export const secureIcon = `<svg width="17" height="18" viewBox="0 0 17 18" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M5.8335 9.19671L7.7085 11.0717L10.8335 6.69671M8.3335 0.833374C6.44661 2.62524 3.93372 3.60802 1.33183 3.57171C1.00086 4.58002 0.832643 5.63463 0.833499 6.69587C0.833499 11.3559 4.02017 15.2709 8.3335 16.3817C12.6468 15.2717 15.8335 11.3567 15.8335 6.69671C15.8335 5.60504 15.6585 4.55421 15.3352 3.57087H15.2085C12.5452 3.57087 10.1252 2.53087 8.3335 0.833374Z" stroke="#E86A8D" stroke-width="1.66667" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

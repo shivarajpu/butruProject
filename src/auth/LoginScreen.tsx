@@ -23,7 +23,8 @@ import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 
 import {
-  eyeIcon,
+  eyeIconSvg,
+  eyeOffIconSvg,
   emailIcon,
   phoneIcon,
   loginPagaImage,
@@ -431,7 +432,11 @@ const LoginScreen = ({ navigation }: Props) => {
                   activeOpacity={0.7}
                 >
                   <SvgXml
-                    xml={eyeIcon}
+                    xml={
+                      showPassword
+                        ? eyeOffIconSvg(theme.colors.primary)
+                        : eyeIconSvg(theme.colors.textMuted)
+                    }
                     width={18}
                     height={18}
                   />
@@ -517,7 +522,7 @@ const LoginScreen = ({ navigation }: Props) => {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() =>
-                  navigation.navigate('SignUp')
+                  navigation.replace('SignUp')
                 }
               >
                 <Text style={styles.signUpLink}>

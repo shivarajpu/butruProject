@@ -124,7 +124,7 @@ export const BRAND = {
   logout: def(LOGOUT_ICON_SVG, 'primary', '#E8006F'),
   camera: def(cameraicon, 'primary', '#C2185B'),
   password: def(passwordIcon, 'primary', '#C23564'),
-  profileOutline: def(userProfileIcon, 'primary', '#C23564'),
+  profileOutline: tintedDef(userProfileIcon, 'primary'),
   secure: def(secureIcon, 'primary', '#E86A8D'),
   reward: def(rewardIcon, 'primary', '#E86A8D'),
   support: def(supporIcon, 'primary', '#E86A8D'),

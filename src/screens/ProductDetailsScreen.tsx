@@ -314,7 +314,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const [sizeError, setSizeError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
-  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
 
@@ -351,10 +351,10 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const handleToggleWishlist = async (id?: string) => {
     const currentId = id || productData?.id;
-    if (!currentId || wishlistLoading) return;
+    if (!currentId || wishlistLoading === currentId) return;
 
     const isCurrentlyLiked = wishlistIds.has(currentId);
-    setWishlistLoading(true);
+    setWishlistLoading(currentId);
 
     // Optimistic UI update
     setWishlistIds(prev => {
@@ -379,7 +379,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         return next;
       });
     } finally {
-      setWishlistLoading(false);
+      setWishlistLoading(null);
     }
   };
 
@@ -619,7 +619,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                   <Text style={styles.reviewText}>Review ({product.reviews})</Text>
                 </View>
               )}
-              <TouchableOpacity onPress={() => handleToggleWishlist()} activeOpacity={0.7}>
+              <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleToggleWishlist(); }} activeOpacity={0.7} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <SvgXml
                   xml={
                     isLiked

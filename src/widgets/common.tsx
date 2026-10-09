@@ -425,19 +425,20 @@ export const ProductTile = ({
               {product.isOutOfStock ? 'Out of stock' : product.tag}
             </Text>
           </View>
-          {onToggleWishlist ? (
-            <TouchableOpacity
-              style={stylesLocal.heartBtn}
-              activeOpacity={0.7}
-              onPress={onToggleWishlist}>
-              <SvgXml
-                xml={wished ? heartFilledSvg(colors.primary) : heartOutlineSvg(colors.textMuted)}
-                width={16}
-                height={16}
-              />
-            </TouchableOpacity>
-          ) : null}
         </ImageBackground>
+        {onToggleWishlist ? (
+          <TouchableOpacity
+            style={stylesLocal.heartBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={(e) => { e.stopPropagation(); onToggleWishlist?.(); }}>
+            <SvgXml
+              xml={wished ? heartFilledSvg(colors.primary) : heartOutlineSvg(colors.textMuted)}
+              width={16}
+              height={16}
+            />
+          </TouchableOpacity>
+        ) : null}
       </TouchableOpacity>
 
       <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
@@ -569,7 +570,13 @@ const stylesLocal = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    elevation: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    zIndex: 999,
   },
   productInfo: {
     paddingVertical: 6,

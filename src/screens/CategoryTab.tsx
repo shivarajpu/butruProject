@@ -360,11 +360,12 @@ const createStyles = (theme: AppTheme) => {
       borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 2,
+      zIndex: 999,
       shadowColor: colors.text,
-      shadowOpacity: 0.1,
+      shadowOpacity: 0.15,
       shadowRadius: 2,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 3,
     },
 
     /* New Arrivals (side scroll) */
@@ -453,7 +454,7 @@ const CategoryTab = () => {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [newArrivals, setNewArrivals] = useState<NewArrivalProduct[]>([]);
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
-  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -496,10 +497,10 @@ const CategoryTab = () => {
   );
 
   const handleToggleWishlist = async (productId: string) => {
-    if (!productId || wishlistLoading) return;
+    if (!productId || wishlistLoading === productId) return;
 
     const isCurrentlyLiked = wishlistIds.has(productId);
-    setWishlistLoading(true);
+    setWishlistLoading(productId);
 
     // Optimistic UI update
     setWishlistIds(prev => {
@@ -521,10 +522,10 @@ const CategoryTab = () => {
         const next = new Set(prev);
         if (isCurrentlyLiked) next.add(productId);
         else next.delete(productId);
-        return next;
-      });
+          return next;
+        });
     } finally {
-      setWishlistLoading(false);
+      setWishlistLoading(null);
     }
   };
 
@@ -671,7 +672,7 @@ const CategoryTab = () => {
                     style={styles.newArrivalCard}
                     activeOpacity={0.9}
                     onPress={() => handleProductPress(item)}>
-                    <View style={styles.newArrivalImgArea}>
+                    <View style={[styles.newArrivalImgArea, { zIndex: 1, position: 'relative' }]}>
                       {item.tag ? (
                         <View style={styles.newArrivalBadge}>
                           <Text style={styles.smallBadgeText}>{item.tag}</Text>
@@ -681,9 +682,10 @@ const CategoryTab = () => {
                         <Image source={{ uri: item.image }} style={styles.newArrivalImg} />
                       ) : null}
                       <TouchableOpacity
-                        style={styles.heartBtn}
+                        style={[styles.heartBtn, { zIndex: 1000 }]}
                         activeOpacity={0.7}
-                        onPress={() => handleToggleWishlist(item.id)}>
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        onPress={(e) => { e.stopPropagation(); handleToggleWishlist(item.id); }}>
                         <SvgXml
                           xml={wishlistIds.has(item.id)
                             ? heartFilledSvg(theme.colors.primary)

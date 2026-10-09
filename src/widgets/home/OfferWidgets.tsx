@@ -29,6 +29,9 @@ import { fetchProductsForSource, formatPrice, type StoreProduct } from '../../st
 import { useStoreConfig } from '../../storefront/useStorefront';
 import type { StoreWidget, WidgetConfig } from '../../storefront/types';
 import { useWidgetActions, useWidgetData, useWidgetLayout, GRID_GAP } from '../common';
+import { useWishlist } from '../../hooks/useWishlist';
+import { SvgXml } from 'react-native-svg';
+import { heartFilledSvg, heartOutlineSvg } from '../../assets/svg';
 
 type Props = { widget: StoreWidget };
 
@@ -97,6 +100,22 @@ const stylesLocal = StyleSheet.create({
   countValue: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   countLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 8 },
   separator: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  heartBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    zIndex: 1000,
+  },
 });
 
 // ─── Deal of the day ───────────────────────────────────────────────────────────
@@ -119,6 +138,7 @@ const DealOfTheDayWidget = ({ widget }: Props) => {
   const { config } = widget;
 
   const dealsEnabled = storeConfig?.theme?.saleEventVisible !== false;
+  const wishlist = useWishlist();
 
   const { data, loading } = useWidgetData<StoreProduct[]>(
     () =>
@@ -176,7 +196,7 @@ const DealOfTheDayWidget = ({ widget }: Props) => {
             activeOpacity={0.85}
             style={{ width: tileWidth }}
             onPress={() => navigation.navigate('ProductDetails', { product })}>
-            <View>
+            <View style={{ position: 'relative' }}>
               <Image
                 source={{ uri: product.image }}
                 style={[styles.dealImage, { backgroundColor: theme.colors.surfaceVariant }]}
@@ -188,6 +208,22 @@ const DealOfTheDayWidget = ({ widget }: Props) => {
                 </View>
               )}
               {product.dealEndAt && <Countdown target={product.dealEndAt} />}
+              <TouchableOpacity
+                style={[
+                  stylesLocal.heartBtn,
+                  { backgroundColor: theme.colors.surface },
+                ]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                onPress={(e) => { e.stopPropagation(); wishlist.toggle(product.id); }}>
+                <SvgXml
+                  xml={wishlist.isWishlisted(product.id)
+                    ? heartFilledSvg(theme.colors.primary)
+                    : heartOutlineSvg(theme.colors.textMuted)}
+                  width={16}
+                  height={16}
+                />
+              </TouchableOpacity>
             </View>
             <Text numberOfLines={1} style={styles.dealName}>
               {product.name}

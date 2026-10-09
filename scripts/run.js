@@ -515,6 +515,30 @@ function launchClientApps(resolved) {
 }
 
 /**
+ * The app identifiers this client may legitimately report over Metro.
+ *
+ * A debug Android build carries an `applicationIdSuffix ".debug"`, so its
+ * package id is `<applicationId>.debug` while the registry records the store
+ * id. Comparing a connected app against the iOS bundle id alone therefore
+ * mislabels every Android debug app as foreign — the exact false "different
+ * client" alarm the ownership check exists to avoid. iOS debug builds keep the
+ * plain bundle id.
+ */
+function clientAppIds(resolved) {
+  const ids = [resolved.ios.bundleId, resolved.android.applicationId];
+  for (const id of [resolved.ios.bundleId, resolved.android.applicationId]) {
+    if (!id) continue;
+    ids.push(`${id}.debug`);
+  }
+  return ids;
+}
+
+/** True when a connected app id belongs to this client (debug suffix included). */
+function appBelongsToClient(resolved, appId) {
+  return clientAppIds(resolved).includes(appId);
+}
+
+/**
  * Reloads one client end to end: bundler up, app attached, reload broadcast.
  *
  * Every failure mode of the naive `r` keypress is handled explicitly, because
@@ -584,7 +608,7 @@ async function reloadClient(resolved, registry, { header = true, port: portOverr
     throw new Error(`[reload] metro ${port} did not accept the reload request.`);
   }
 
-  const wrong = names.filter(n => n !== resolved.ios.bundleId);
+  const wrong = names.filter(n => !appBelongsToClient(resolved, n));
   log(`  reloaded ${names.join(', ')} on metro ${port}`);
   if (wrong.length) {
     // Possible when two clients' apps are both attached; the per-client port is
@@ -631,7 +655,7 @@ async function reportDevices(port, resolved, registry) {
     apps.forEach(app => {
       const appId = app.appId || app.title || 'unknown app';
       const device = app.deviceName ? ` on ${app.deviceName}` : '';
-      const mine = appId === resolved.ios.bundleId ? '' : '   ← different client';
+      const mine = appBelongsToClient(resolved, appId) ? '' : '   ← different client';
       lines.push(`  ${appId}${device}${mine}`);
     });
   }
