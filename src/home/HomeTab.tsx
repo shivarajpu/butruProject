@@ -13,6 +13,7 @@ import {
   Keyboard,
   TextInput,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -911,6 +912,22 @@ const HomeTab = () => {
       searchInputRef.current?.blur();
       Keyboard.dismiss();
       fetchWishlistItems();
+
+      const onBackPress = () => {
+        Alert.alert(
+          'Exit App',
+          'Are you sure you want to close the app?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'OK', style: 'destructive', onPress: () => BackHandler.exitApp() },
+          ],
+        );
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => subscription.remove();
     }, []),
   );
 

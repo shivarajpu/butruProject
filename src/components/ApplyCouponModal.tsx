@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { fetchCoupons, type StoreCoupon } from '../storefront/coupons';
@@ -111,6 +112,7 @@ export default function ApplyCouponModal({
 }: ApplyCouponModalProps) {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
   // The store's currency, so a tenant billing in something other than INR
   // renders ₹-prefixed thresholds from its own config.
   const currency = useSelector(selectCurrency);
@@ -191,7 +193,12 @@ export default function ApplyCouponModal({
       {/* Backdrop: Clicking outside closes the modal */}
       <Pressable style={styles.backdrop} onPress={handleClose}>
         {/* Modal Container */}
-        <Pressable style={styles.modalContent} onPress={e => e.stopPropagation()}>
+        <Pressable
+          style={[
+            styles.modalContent,
+            { paddingBottom: 20 + Math.max(insets.bottom, 16) },
+          ]}
+          onPress={e => e.stopPropagation()}>
           {/* Top Handle Bar */}
           <View style={styles.dragIndicator} />
 

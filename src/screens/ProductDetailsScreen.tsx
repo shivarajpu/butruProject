@@ -5,10 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Image,
   useWindowDimensions,
   ActivityIndicator,
   Alert,
+  Share,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -39,15 +43,21 @@ import type { AppDispatch } from '../store';
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import APP_CONFIG from '../config/clients';
 
 // Custom SVGs
 const SHARE_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8C19.6569 8 21 6.65685 21 5C21 3.34315 19.6569 2 18 2C16.3431 2 15 3.34315 15 5C15 6.65685 16.3431 8 18 8Z" stroke="#1A1A1A" stroke-width="2"/><path d="M6 15C7.65685 15 9 13.6569 9 12C9 10.3431 7.6569 9 6 9C4.34315 9 3 10.3431 3 12C3 13.6569 4.34315 15 6 15Z" stroke="#1A1A1A" stroke-width="2"/><path d="M18 22C19.6569 22 21 20.6569 21 19C21 17.3431 19.6569 16 18 16C16.3431 16 15 17.3431 15 19C15 20.6569 16.3431 22 18 22Z" stroke="#1A1A1A" stroke-width="2"/><path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49" stroke="#1A1A1A" stroke-width="2"/></svg>`;
+const STAR_SVG_PATH = 'M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z';
+const getReviewAvatarSvg = (color: string, initial: string) => `<svg width="34" height="34" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="${color}"/><text x="20" y="25" font-size="15" font-family="Poppins-Bold, Arial, sans-serif" fill="#FFFFFF" text-anchor="middle">${initial}</text></svg>`;
+const getDetailCheckSvg = (color: string) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="${color}" opacity="0.14"/><path d="M8 12l3 3 5-6" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHECK_GREEN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHEVRON_UP_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 15L12 9L6 15" stroke="#666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const PRODUCT_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
+const REVIEWS_ENDPOINT = '/api/reviews';
+const MY_ORDERS_ENDPOINT = '/api/storefront/orders/my?limit=200&page=1';
 
 interface ProductSku {
   size: string;
@@ -100,6 +110,66 @@ interface ApiProductDetail {
 interface ProductDetailApiResponse {
   success: boolean;
   data: ApiProductDetail;
+}
+
+interface ApiReview {
+  _id?: string;
+  productId?: string;
+  orderId?: string;
+  userName?: string;
+  name?: string;
+  user?: { name?: string } | string;
+  userPhoto?: string;
+  rating?: number;
+  stars?: number;
+  title?: string;
+  comment?: string;
+  review?: string;
+  images?: string[];
+  createdAt?: string;
+  date?: string;
+}
+
+interface ReviewItem {
+  id: string;
+  name: string;
+  photo: string;
+  rating: number;
+  title: string;
+  comment: string;
+  images: string[];
+  date: string;
+}
+
+interface ProductReviewsResponse {
+  success: boolean;
+  data?: ApiReview[];
+  reviews?: ApiReview[];
+  count?: number;
+  total?: number;
+  message?: string;
+}
+
+interface SubmitReviewResponse {
+  success: boolean;
+  message?: string;
+  data?: unknown;
+}
+
+interface OrderLookupItem {
+  _id: string;
+  productId: string | { _id?: string; id?: string };
+}
+
+interface OrderLookup {
+  _id: string;
+  id?: string;
+  items?: OrderLookupItem[];
+}
+
+interface OrdersLookupResponse {
+  success: boolean;
+  data?: OrderLookup[];
 }
 
 interface ProductVariant {
@@ -185,6 +255,65 @@ const mapApiProductToUI = (item: ApiProductDetail) => {
     sizeChartUrl: item.sizeChartUrl ?? '',
     productCode: item.productCode ?? item.sku ?? '',
   };
+};
+
+const formatReviewDate = (value: string): string => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const mapApiReview = (item: ApiReview): ReviewItem => {
+  let name = '';
+  if (typeof item?.user === 'string') {
+    name = item.user;
+  } else {
+    name = item?.user?.name || item?.name || item?.userName || 'Customer';
+  }
+  const rawRating = Number(item?.rating ?? item?.stars ?? 0);
+  return {
+    id: item?._id || '',
+    name: name.trim() ? name.trim() : 'Customer',
+    photo: item?.userPhoto || '',
+    rating: Math.min(5, Math.max(1, Math.round(rawRating))),
+    title: item?.title || '',
+    comment: item?.comment || item?.review || '',
+    images: Array.isArray(item?.images) ? item.images : [],
+    date: item?.createdAt || item?.date || '',
+  };
+};
+
+/**
+ * The review endpoint demands an `orderId` (it verifies the customer actually
+ * bought the product). The product page has no order context, so the order
+ * that contains this product is found by scanning the user's orders.
+ */
+const findOrderIdForProduct = async (productIdValue: string): Promise<string> => {
+  if (!productIdValue) {
+    return '';
+  }
+  try {
+    const response = await apiService.get<OrdersLookupResponse>(MY_ORDERS_ENDPOINT);
+    const orders = response?.data ?? [];
+    if (!Array.isArray(orders)) {
+      return '';
+    }
+    for (const order of orders) {
+      const items = order.items ?? [];
+      const matched = items.some(item =>
+        typeof item.productId === 'object' && item.productId
+          ? (item.productId._id || item.productId.id) === productIdValue
+          : item.productId === productIdValue,
+      );
+      if (matched) {
+        return order._id || order.id || '';
+      }
+    }
+  } catch {
+    // Non-fatal — no order context means the review cannot be submitted here
+  }
+  return '';
 };
 
 interface ProductDetailsProps {
@@ -282,10 +411,31 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     }
   }, [productId]);
 
+  const fetchReviews = useCallback(async (id: string) => {
+    if (!id) {
+      return;
+    }
+    setReviewsLoading(true);
+    try {
+      const response = await apiService.get<ProductReviewsResponse>(
+        `${REVIEWS_ENDPOINT}?productId=${encodeURIComponent(id)}`,
+      );
+      const list = response?.data ?? response?.reviews ?? [];
+      if (response?.success && Array.isArray(list)) {
+        setReviews(list.map(mapApiReview));
+      }
+    } catch {
+      // Non-fatal — the reviews section simply stays empty on failure
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadProduct(productId);
     fetchVariants();
-  }, [productId, loadProduct, fetchVariants]);
+    fetchReviews(productId);
+  }, [productId, loadProduct, fetchVariants, fetchReviews]);
 
   const product = productData;
   const thumbnails = product?.images?.length ? product.images : [];
@@ -317,6 +467,15 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     const firstImage = productData?.images?.[0];
@@ -543,6 +702,96 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     );
   }
 
+  const handleShare = async () => {
+    const code = product?.productCode || '';
+    const path = code ? `${code}-${productId}` : productId;
+    const shareUrl = `https://${APP_CONFIG.api.storeDomain}/products/${path}`;
+    const message = `${product?.name || 'Check this product on Butru'}\n\n${shareUrl}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // Share was dismissed or failed — nothing to do.
+    }
+  };
+
+  const averageRating = reviews.length
+    ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+    : product?.rating || 0;
+  const roundedAvg = Math.round(averageRating);
+
+  const openReviewForm = () => {
+    setReviewRating(0);
+    setReviewTitle('');
+    setReviewComment('');
+    setReviewError('');
+    setReviewModalOpen(true);
+  };
+
+  const closeReviewForm = () => {
+    setReviewModalOpen(false);
+  };
+
+  const submitReview = async () => {
+    if (submittingReview) {
+      return;
+    }
+    if (reviewRating < 1) {
+      setReviewError('Please select a star rating');
+      return;
+    }
+    if (!reviewTitle.trim()) {
+      setReviewError('Please add a title to your review');
+      return;
+    }
+    if (!reviewComment.trim()) {
+      setReviewError('Please write a few words about the product');
+      return;
+    }
+    setReviewError('');
+    setSubmittingReview(true);
+    try {
+      const orderIdValue = await findOrderIdForProduct(productId);
+      if (!orderIdValue) {
+        Alert.alert(
+          'Order not found',
+          'We could not find this product in your recent orders. Please review it from your orders.',
+        );
+        return;
+      }
+      const response = await apiService.post<SubmitReviewResponse>(
+        REVIEWS_ENDPOINT,
+        {
+          productId,
+          orderId: orderIdValue,
+          rating: reviewRating,
+          title: reviewTitle.trim(),
+          comment: reviewComment.trim(),
+          images: [],
+        },
+      );
+      if (response?.success) {
+        Alert.alert(
+          'Thank you!',
+          response.message || 'Your review has been submitted and will appear shortly.',
+        );
+        setReviewModalOpen(false);
+        fetchReviews(productId);
+      } else {
+        Alert.alert('Could not submit', response?.message || 'Something went wrong. Please try again.');
+      }
+    } catch (err) {
+      Alert.alert(
+        'Could not submit',
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const starIcon = (filled: boolean, size: number, color: string) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" ${filled ? `fill="${color}"` : 'fill="none"'}${filled ? '' : ` stroke="${color}" stroke-width="1.5"`}><path d="${STAR_SVG_PATH}"/></svg>`;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -574,7 +823,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             <TouchableOpacity
               style={styles.headerIconBtn}
               activeOpacity={0.7}
-              onPress={() => setIsAddressModalVisible(true)}>
+              onPress={handleShare}>
               <SvgXml xml={SHARE_SVG} width={18} height={18} />
             </TouchableOpacity>
           </View>
@@ -737,9 +986,9 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
           <View style={[styles.deliveryCard, { marginHorizontal: hPad }]}>
             <View style={styles.deliveryHeader}>
               <Text style={styles.deliveryTitle}>Delivery</Text>
-              <TouchableOpacity style={styles.pincodeBtn}>
+              {/* <TouchableOpacity style={styles.pincodeBtn}>
                 <Text style={styles.pincodeBtnText}>Check Pincode</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
             </View>
 
             {deliveryWindow ? (
@@ -775,11 +1024,15 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <Text style={styles.accordionTitle}>PRODUCT DETAILS</Text>
               <SvgXml xml={detailsOpen ? CHEVRON_UP_SVG : CHEVRON_DOWN_SVG} width={14} height={14} />
             </TouchableOpacity>
-            {detailsOpen && product.description ? (
-              <Text style={styles.accordionContent}>{product.description}</Text>
-            ) : detailsOpen ? (
-              <Text style={styles.accordionContent}>No additional details available.</Text>
-            ) : null}
+            {detailsOpen && (
+              <View style={styles.detailsInner}>
+                {product.description ? (
+                  <Text style={styles.detailDescription}>{product.description}</Text>
+                ) : (
+                  <Text style={styles.detailDescription}>No additional details available.</Text>
+                )}
+              </View>
+            )}
 
             <View style={styles.divider} />
 
@@ -791,20 +1044,42 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             </TouchableOpacity>
             {moreInfoOpen && (
               <View>
-                {product.color ? (
-                  <Text style={styles.accordionContent}>• Color: {product.color}</Text>
+{product.color ? (
+                  <View style={styles.detailItemRow}>
+                    <SvgXml xml={getDetailCheckSvg(theme.colors.primary)} width={13} height={13} />
+                    <Text style={styles.detailItemText}>
+                      <Text style={styles.detailItemLabel}>Color: </Text>
+                      {product.color}
+                    </Text>
+                  </View>
                 ) : null}
                 {product.attributes?.length > 0 ? (
-                  product.attributes.map((attr) => (
-                    <Text key={attr._id} style={styles.accordionContent}>
-                      • {attr.attribute}: {attr.value}
-                    </Text>
+                  product.attributes.map(attr => (
+                    <View key={attr._id} style={styles.detailItemRow}>
+                      <SvgXml xml={getDetailCheckSvg(theme.colors.primary)} width={13} height={13} />
+                      <Text style={styles.detailItemText}>
+                        <Text style={styles.detailItemLabel}>{attr.attribute}: </Text>
+                        {attr.value}
+                      </Text>
+                    </View>
                   ))
                 ) : null}
                 {product.categoryPath?.length > 0 ? (
-                  <Text style={styles.accordionContent}>• Category: {product.categoryPath.join(' > ')}</Text>
+                  <View style={styles.detailItemRow}>
+                    <SvgXml xml={getDetailCheckSvg(theme.colors.primary)} width={13} height={13} />
+                    <Text style={styles.detailItemText}>
+                      <Text style={styles.detailItemLabel}>Category: </Text>
+                      {product.categoryPath.join(' > ')}
+                    </Text>
+                  </View>
                 ) : null}
-                <Text style={styles.accordionContent}>• Country of Origin: India</Text>
+                <View style={styles.detailItemRow}>
+                  <SvgXml xml={getDetailCheckSvg(theme.colors.primary)} width={13} height={13} />
+                  <Text style={styles.detailItemText}>
+                    <Text style={styles.detailItemLabel}>Country of Origin: </Text>
+                    India
+                  </Text>
+                </View>
               </View>
             )}
           </View>
@@ -828,6 +1103,102 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                 <Text style={styles.loveFeatureSub}>Quality Checked</Text>
               </View>
             </View>
+          </View>
+
+          {/* Ratings & Reviews */}
+          <View style={[styles.reviewSection, { marginHorizontal: hPad }]}>
+            <View style={styles.reviewHeaderRow}>
+              <View style={styles.reviewHeaderLeft}>
+                <Text style={styles.reviewHeading}>Ratings & Reviews</Text>
+                <View style={styles.reviewSummaryRow}>
+                  <Text style={styles.reviewAvg}>{averageRating.toFixed(1)}</Text>
+                  <View style={styles.reviewStarsRow}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <SvgXml
+                        key={i}
+                        xml={starIcon(i <= roundedAvg, 16, '#FFB400')}
+                        width={14}
+                        height={14}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.reviewCount}>({reviews.length})</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.writeReviewBtn}
+                activeOpacity={0.8}
+                onPress={openReviewForm}>
+                <Text style={styles.writeReviewText}>Write a Review</Text>
+              </TouchableOpacity>
+            </View>
+
+            {reviewsLoading ? (
+              <View style={styles.reviewsLoadingBox}>
+                <ActivityIndicator color={theme.colors.primary} size="small" />
+              </View>
+            ) : reviews.length === 0 ? (
+              <View style={styles.emptyReviewsBox}>
+                <Text style={styles.emptyReviewsText}>
+                  No reviews yet. Be the first to review this product!
+                </Text>
+              </View>
+            ) : (
+              reviews.map(r => (
+                <View key={r.id || `${r.name}-${r.date}`} style={styles.reviewCard}>
+                  <View style={styles.reviewCardHeader}>
+                    {r.photo ? (
+                      <Image source={{ uri: r.photo }} style={styles.reviewAvatar} />
+                    ) : (
+                      <SvgXml
+                        xml={getReviewAvatarSvg(theme.colors.primary, (r.name || 'C').charAt(0).toUpperCase())}
+                        width={34}
+                        height={34}
+                      />
+                    )}
+                    <View style={styles.reviewUserInfo}>
+                      <Text style={styles.reviewName} numberOfLines={1}>{r.name}</Text>
+                      {r.date ? (
+                        <Text style={styles.reviewDate}>{formatReviewDate(r.date)}</Text>
+                      ) : null}
+                    </View>
+                    <View style={styles.reviewStarsRow}>
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <SvgXml
+                          key={i}
+                          xml={starIcon(i <= r.rating, 14, '#FFB400')}
+                          width={12}
+                          height={12}
+                        />
+                      ))}
+                    </View>
+                  </View>
+
+                  {r.title ? (
+                    <Text style={styles.reviewTitle}>{r.title}</Text>
+                  ) : null}
+                  {r.comment ? (
+                    <Text style={styles.reviewBody}>{r.comment}</Text>
+                  ) : null}
+
+                  {r.images.length > 0 ? (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.reviewImagesRow}>
+                      {r.images.map((img, idx) => (
+                        <Image
+                          key={idx}
+                          source={{ uri: img }}
+                          style={styles.reviewImage}
+                        />
+                      ))}
+                    </ScrollView>
+                  ) : null}
+                </View>
+              ))
+            )}
           </View>
 
           {/* "You may also like this" — order, limit, layout and source all
@@ -864,13 +1235,106 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
           onClose={() => setIsAddAddressModalVisible(false)}
           onSaved={handleAddressSaved}
         />
+
+        {/* 3. WRITE A REVIEW MODAL */}
+        <Modal
+          visible={reviewModalOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={closeReviewForm}>
+          <TouchableWithoutFeedback onPress={closeReviewForm}>
+            <View style={styles.reviewModalOverlay}>
+              <TouchableWithoutFeedback>
+                <View
+                  style={[
+                    styles.reviewModalContent,
+                    { paddingBottom: 24 + Math.max(insets.bottom, 16) },
+                  ]}>
+                  <View style={styles.reviewModalDrag} />
+
+                  <View style={styles.reviewModalHeader}>
+                    <Text style={styles.reviewModalTitle}>Write a Review</Text>
+                    <TouchableOpacity
+                      style={styles.reviewModalClose}
+                      onPress={closeReviewForm}>
+                      <BrandIcon icon={BRAND.close} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView showsVerticalScrollIndicator={false}>
+                    <Text style={styles.reviewFieldLabel}>Your Rating</Text>
+                    <View style={styles.reviewStarPicker}>
+                      {[1, 2, 3, 4, 5].map(i => (
+                        <TouchableOpacity
+                          key={i}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                          onPress={() => {
+                            setReviewRating(i);
+                            setReviewError('');
+                          }}>
+                          <SvgXml
+                            xml={starIcon(i <= reviewRating, 30, '#FFB400')}
+                            width={30}
+                            height={30}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {!!reviewError && (
+                      <Text style={styles.reviewErrorText}>{reviewError}</Text>
+                    )}
+
+                    <Text style={styles.reviewFieldLabel}>Title</Text>
+                    <TextInput
+                      style={styles.reviewInput}
+                      placeholder="e.g. Super soft fabric!"
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={reviewTitle}
+                      onChangeText={setReviewTitle}
+                      maxLength={80}
+                    />
+
+                    <Text style={styles.reviewFieldLabel}>Your Review</Text>
+                    <TextInput
+                      style={[styles.reviewInput, styles.reviewTextArea]}
+                      placeholder="Share your experience about this product…"
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={reviewComment}
+                      onChangeText={setReviewComment}
+                      multiline
+                      maxLength={600}
+                      textAlignVertical="top"
+                    />
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitReviewBtn,
+                        submittingReview && styles.submitReviewBtnDisabled,
+                      ]}
+                      activeOpacity={0.8}
+                      disabled={submittingReview}
+                      onPress={submitReview}>
+                      {submittingReview ? (
+                        <ActivityIndicator color={theme.colors.textOnPrimary} />
+                      ) : (
+                        <Text style={styles.submitReviewText}>Submit Review</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 };
 
 const createStyles = (theme: AppTheme) => {
-  const { colors } = theme;
+  const { colors, fontFamily } = theme;
 
   return StyleSheet.create({
   safeArea: {
@@ -1223,6 +1687,41 @@ const createStyles = (theme: AppTheme) => {
     height: 1,
     backgroundColor: colors.divider,
     marginVertical: 10,
+  },
+
+  /* Product details makeover */
+  detailsInner: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceVariant,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  detailDescription: {
+    fontSize: 12,
+    color: colors.text,
+    lineHeight: 20,
+    fontFamily: fontFamily.regular,
+  },
+  detailItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border + '15',
+  },
+  detailItemText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    fontFamily: fontFamily.regular,
+  },
+  detailItemLabel: {
+    color: colors.text,
+    fontFamily: FONTS.poppinsSemiBold,
   },
 
   /* Love Banner */
@@ -1635,6 +2134,223 @@ const createStyles = (theme: AppTheme) => {
     marginBottom: 8,
   },
   saveBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textOnPrimary,
+  },
+
+  /* Ratings & Reviews */
+  reviewSection: {
+    marginTop: 22,
+  },
+  reviewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  reviewHeaderLeft: {
+    flex: 1,
+  },
+  reviewHeading: {
+    fontSize: 16,
+    fontFamily: FONTS.poppinsBold,
+    color: colors.text,
+  },
+  reviewSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  reviewAvg: {
+    fontSize: 18,
+    fontFamily: FONTS.poppinsBold,
+    color: colors.text,
+  },
+  reviewStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: FONTS.poppinsRegular,
+  },
+  writeReviewBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  writeReviewText: {
+    fontSize: 12,
+    fontFamily: FONTS.poppinsSemiBold,
+    color: colors.textOnPrimary,
+  },
+  reviewsLoadingBox: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyReviewsBox: {
+    paddingVertical: 22,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceVariant,
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  emptyReviewsText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.regular,
+    textAlign: 'center',
+    paddingHorizontal: 14,
+    lineHeight: 18,
+  },
+  reviewCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  reviewUserInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  reviewName: {
+    fontSize: 13,
+    fontFamily: FONTS.poppinsSemiBold,
+    color: colors.text,
+  },
+  reviewDate: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontFamily: fontFamily.regular,
+    marginTop: 1,
+  },
+  reviewTitle: {
+    fontSize: 13,
+    fontFamily: FONTS.poppinsSemiBold,
+    color: colors.text,
+    marginTop: 10,
+  },
+  reviewBody: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.regular,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  reviewImagesRow: {
+    gap: 8,
+    marginTop: 10,
+  },
+  reviewImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceVariant,
+  },
+
+  /* Write a Review modal */
+  reviewModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  reviewModalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    maxHeight: '80%',
+  },
+  reviewModalDrag: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginBottom: 12,
+  },
+  reviewModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  reviewModalTitle: {
+    fontSize: 17,
+    fontFamily: FONTS.poppinsBold,
+    color: colors.text,
+  },
+  reviewModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceVariant,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewFieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  reviewStarPicker: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  reviewErrorText: {
+    fontSize: 11,
+    color: colors.error,
+    marginTop: 6,
+    fontFamily: fontFamily.regular,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceVariant,
+    fontSize: 12,
+    color: colors.text,
+    paddingHorizontal: 12,
+    height: 42,
+  },
+  reviewTextArea: {
+    height: 100,
+    paddingTop: 10,
+  },
+  submitReviewBtn: {
+    backgroundColor: colors.primary,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 8,
+  },
+  submitReviewBtnDisabled: {
+    opacity: 0.6,
+  },
+  submitReviewText: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.textOnPrimary,

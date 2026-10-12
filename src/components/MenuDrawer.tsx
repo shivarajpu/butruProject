@@ -263,7 +263,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                   onClose();
                   onShopNow();
                 }}>
-                <Text style={styles.shopNowText}>Shop Now →</Text>
+                <Text style={styles.shopNowText}>Shop Now</Text>
               </TouchableOpacity>
               <SvgXml xml={Sidebaarimage} />
             </View>

@@ -158,7 +158,7 @@ const PartyPosterWidget = ({ widget }: Props) => {
             </Text>
             {!!banner.ctaText && (
               <View style={styles.posterCta}>
-                <Text style={styles.posterCtaText}>{banner.ctaText} →</Text>
+                <Text style={styles.posterCtaText}>{banner.ctaText}</Text>
               </View>
             )}
           </TouchableOpacity>

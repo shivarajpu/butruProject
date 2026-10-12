@@ -82,7 +82,7 @@ const ProductGroupWidget = ({ widget }: Props) => {
           activeOpacity={0.7}
           hitSlop={8}
           onPress={() => onLink(widgetConfig.viewAllUrl)}>
-          <Text style={styles.viewAll}>View all →</Text>
+          <Text style={styles.viewAll}>View all</Text>
         </TouchableOpacity>
       )}
     </View>

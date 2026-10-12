@@ -322,7 +322,7 @@ export const WidgetHeader = ({
       </View>
       {onViewAll && (
         <TouchableOpacity activeOpacity={0.7} onPress={onViewAll} hitSlop={8}>
-          <Text style={styles.viewAll}>{viewAllLabel} →</Text>
+          <Text style={styles.viewAll}>{viewAllLabel}</Text>
         </TouchableOpacity>
       )}
     </View>

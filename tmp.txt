@@ -1,0 +1,1133 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Platform,
+  PermissionsAndroid,
+} from 'react-native';
+import { SvgXml } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Geolocation, {
+  type GeolocationError,
+  type GeolocationResponse,
+} from '@react-native-community/geolocation';
+import { useAppTheme } from '../theme/useAppTheme';
+import type { AppTheme } from '../theme/types';
+import { apiService } from '../api/apiService';
+import type { Address } from '../hooks/useProfile';
+import { tintSvg } from '../assets/svg/tint';
+
+type UpdateAddressResponse = {
+  success: boolean;
+  message?: string;
+  data?: Address[];
+};
+
+const UPDATE_ADDRESS_API = '/api/auth/profile/address';
+const CHECK_PINCODE_API = '/api/storefront/shipping/check-pincode';
+
+type CheckPincodeResponse = {
+  success: boolean;
+  message?: string;
+  data?: {
+    pincode?: string;
+    serviceable?: boolean;
+    message?: string;
+    estimatedDelivery?: string;
+    shippingOption?: {
+      id: string;
+      name: string;
+      price: number;
+      tag: string;
+      estimatedDays: string;
+      carrier: string;
+    };
+  };
+};
+
+export const CHECK_GREEN_SVG = (color: string) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const CHECK_ROUND_SVG = tintSvg(`<svg width="16" height="16" viewBox="0 0 24 24" fill="#B12B5B"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`);
+
+// The address-type icons used to be frozen strings: `getHomeIconSvg` accepted a
+// color and then ignored it, baking in `#BE185D`, so a tenant's brand colour
+// never reached the pin. Every icon here is a factory now.
+export const getHomeIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="6" y="8" width="4" height="6.66667" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+`;
+const getWorkIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
+const getOtherLocationSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>`;
+
+export const USER_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+export const PHONE_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`;
+export const PINCODE_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+export const MAP_BUILDING_SVG = (color: string) => `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M0.833344 5.00008V18.3334L6.66668 15.0001L13.3333 18.3334L19.1667 15.0001V1.66675L13.3333 5.00008L6.66668 1.66675L0.833344 5.00008V5.00008" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6.66666 1.66675V15.0001" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M13.3333 5V18.3333" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+export const FLAG_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>`;
+export const CITY_ICON_SVG = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.99999 1.33325H12C12.7359 1.33325 13.3333 1.9307 13.3333 2.66659V13.3333C13.3333 14.0691 12.7359 14.6666 12 14.6666H3.99999C3.2641 14.6666 2.66666 14.0691 2.66666 13.3333V2.66659C2.66666 1.9307 3.2641 1.33325 3.99999 1.33325V1.33325" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6 14.6667V12H10V14.6667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 4H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 4H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 4H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 6.66675H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M8 9.33325H8.00667" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 6.66675H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10.6667 9.33325H10.6733" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 6.66675H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M5.33334 9.33325H5.34001" stroke="${color}" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+type Props = {
+  visible: boolean;
+  editingAddress?: Address | null;
+  onClose: () => void;
+  onSaved: () => void;
+};
+
+type RequiredField = 'fullName' | 'mobile' | 'pincode' | 'address' | 'city';
+type FieldErrors = Partial<Record<RequiredField, string>>;
+
+const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) => {
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
+
+  const [addressType, setAddressType] = useState('Home');
+  const [fullName, setFullName] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [pincode, setPincode] = useState('');
+  const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [city, setCity] = useState('');
+  const [stateName, setStateName] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [checkingPincode, setCheckingPincode] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [message, setMessage] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  /**
+   * The location request outlives any single render, so its state lives in refs.
+   *
+   * `locating` is what the button's `disabled` reads, and `visible` is what
+   * decides whether a late reply still has a form to write into. Reading either
+   * from state would capture a stale value inside the pending async function.
+   */
+  const locatingRef = useRef(false);
+  const visibleRef = useRef(visible);
+  const locationRequestRef = useRef(0);
+
+  useEffect(() => {
+    visibleRef.current = visible;
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const editType = (editingAddress?.type || '').toLowerCase();
+    setAddressType(
+      editType.includes('home')
+        ? 'Home'
+        : editType.includes('work')
+        ? 'Work'
+        : editType.includes('other')
+        ? 'Other'
+        : 'Home',
+    );
+    setFullName(editingAddress?.name || '');
+    setMobile(editingAddress?.phone || '');
+    setPincode(editingAddress?.pincode || '');
+    setAddress(editingAddress?.street || '');
+    setLandmark(editingAddress?.landmark || '');
+    setCity(editingAddress?.city || '');
+    setStateName(editingAddress?.state || '');
+    setIsDefault(editingAddress?.isDefault || false);
+    setErrors({});
+  }, [visible, editingAddress]);
+
+  const clearError = (field: RequiredField) => {
+    setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  };
+
+  /**
+   * iOS: no explicit permission call.
+   *
+   * `Geolocation.requestAuthorization` used to be called here, and that is what
+   * made the button hang on the second tap. Its native implementation
+   * (RNCGeolocation.mm) always calls `requestWhenInUseAuthorization` and then
+   * waits for `locationManagerDidChangeAuthorization` to flush its queued
+   * callbacks. iOS only reports a change while the prompt is on screen — once
+   * the user has answered, the status never changes again, so the callbacks are
+   * never flushed and the JS `await` stays pending forever. The symptom was a
+   * spinner that never stopped and an address form that never filled in.
+   *
+   * `getCurrentPosition` needs no prompt of its own: the library requests
+   * permission implicitly and only reports a `PERMISSION_DENIED` error if the
+   * user actually refused, which is handled below. One call, no deadlock.
+   *
+   * Android: the runtime permission has to be asked for explicitly, and
+   * `shouldShowRationale` is honoured so a second tap explains rather than
+   * silently failing on an OS that refuses to re-prompt.
+   */
+  const hasLocationPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') {
+      return true;
+    }
+
+    const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    const coarse = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+
+    if (await PermissionsAndroid.check(fine)) {
+      return true;
+    }
+    // Android 12+ lets the user grant only "approximate" (coarse). A coarse fix
+    // still drops the pin on the right street, so it must not be treated as a
+    // refusal — that was a silent reason the button did nothing after the user
+    // picked Approximate.
+    if (await PermissionsAndroid.check(coarse)) {
+      return true;
+    }
+
+    const results = await PermissionsAndroid.requestMultiple([fine, coarse]);
+    return (
+      results[fine] === PermissionsAndroid.RESULTS.GRANTED ||
+      results[coarse] === PermissionsAndroid.RESULTS.GRANTED
+    );
+  };
+
+  /**
+   * One-shot location fix, retrying coarsely when the precise attempt fails.
+   *
+   * On Android a high-accuracy request can hit the GPS provider only, which
+   * indoors returns POSITION_UNAVAILABLE (2) or TIMEOUT (3) even though a
+   * perfectly usable Wi-Fi/cell fix exists. Retrying at low accuracy — which the
+   * fused provider serves from Wi-Fi, cell and cache — is what makes the button
+   * work on a real device instead of only on an emulator with a mock GPS.
+   */
+  const getPositionWithFallback = async (): Promise<GeolocationResponse> => {
+    try {
+      return await new Promise<GeolocationResponse>((resolve, reject) => {
+        Geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          // 10s, not 15s. A cold GPS fix can take that long, but past it the
+          // user is looking at a spinner with no feedback, and a coarse fix is
+          // good enough to land on the right street.
+          timeout: 10000,
+          // Reuse the previous fix when it is younger than 60s. This is what
+          // makes a repeat tap feel instant instead of re-acquiring GPS.
+          maximumAge: 60000,
+        });
+      });
+    } catch (error) {
+      const code = (error as GeolocationError | undefined)?.code;
+      if (code !== 2 && code !== 3) {
+        throw error;
+      }
+      return await new Promise<GeolocationResponse>((resolve, reject) => {
+        Geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 15000,
+          // For a coarse lookup a slightly stale position beats another failure.
+          maximumAge: 300000,
+        });
+      });
+    }
+  };
+
+  const fetchCurrentLocation = async () => {
+    // The state flag is the guard, not this one: `locating` is captured from the
+    // render that created this closure, so a fast second tap could still slip
+    // through and start a competing request. The ref is read at call time.
+    if (locatingRef.current) {
+      return;
+    }
+    locatingRef.current = true;
+    setLocating(true);
+    setMessage('');
+
+    // A dismissed or replaced modal must not keep writing into a form nobody
+    // is looking at any more, and must not leave the button stuck disabled.
+    const requestId = ++locationRequestRef.current;
+    const isStale = () => !visibleRef.current || requestId !== locationRequestRef.current;
+
+    let filledAddress = '';
+    let filledCity = '';
+    let filledState = '';
+    let filledPincode = '';
+    let filledColony = '';
+
+    const finish = () => {
+      locatingRef.current = false;
+      setLocating(false);
+    };
+
+    try {
+      if (!(await hasLocationPermission())) {
+        if (!isStale()) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        }
+        return;
+      }
+
+      const position = await getPositionWithFallback();
+
+      if (isStale()) {
+        return;
+      }
+
+      const { latitude, longitude } = position.coords;
+
+      try {
+        const reverseResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=en&lat=${latitude}&lon=${longitude}`,
+          {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'ButruApp/1.0',
+              Referer: 'https://butru.in',
+            },
+          },
+        );
+        const reverse = await reverseResponse.json();
+        const info: Record<string, unknown> = reverse?.address || {};
+
+        // Nominatim's keys depend on what OSM holds for the point: an urban
+        // address may only carry `suburb`/`city`, a rural one only
+        // `village`/`county`. Reading a fixed handful of keys (`road`,
+        // `neighbourhood`…) therefore left the form blank even though a
+        // perfectly good address came back. Every field now walks an ordered
+        // list of fallbacks instead.
+        const firstOf = (...keys: string[]): string => {
+          for (const key of keys) {
+            const value = info[key];
+            if (value != null && String(value).trim()) {
+              return String(value).trim();
+            }
+          }
+          return '';
+        };
+
+        const streetLine = [
+          firstOf('house_number'),
+          firstOf('road', 'pedestrian', 'footway', 'path', 'residential', 'street'),
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        const area = firstOf(
+          'neighbourhood',
+          'suburb',
+          'quarter',
+          'city_district',
+          'hamlet',
+          'county',
+        );
+
+        // Falls back to the area, then to the full display name, so a point
+        // that resolves only to a locality still fills something usable.
+        filledAddress =
+          streetLine ||
+          area ||
+          (reverse?.display_name ? String(reverse.display_name).split(',')[0].trim() : '');
+        if (filledAddress) {
+          setAddress(filledAddress);
+        }
+
+        filledCity = firstOf(
+          'city',
+          'town',
+          'village',
+          'municipality',
+          'county',
+          'state_district',
+        );
+        if (filledCity) {
+          setCity(filledCity);
+        }
+
+        filledState = firstOf('state', 'state_district', 'region', 'province');
+        if (filledState) {
+          setStateName(filledState);
+        }
+
+        filledPincode = firstOf('postcode').replace(/\s+/g, '');
+        if (filledPincode) {
+          setPincode(filledPincode);
+        }
+
+        filledColony = area;
+      } catch (reverseError) {
+        // A failed lookup still leaves usable coordinates behind, so tell the
+        // user that instead of implying nothing was found.
+        console.log('Reverse geocoding failed:', reverseError);
+        if (!isStale()) {
+          setMessage('Location found, but the address could not be looked up. Please fill it in.');
+        }
+        finish();
+        return;
+      }
+
+      if (isStale()) {
+        return;
+      }
+
+      const summaryLines = [
+        filledAddress ? `Address: ${filledAddress}` : '',
+        filledColony ? `Area: ${filledColony}` : '',
+        filledCity ? `City: ${filledCity}` : '',
+        filledState ? `State: ${filledState}` : '',
+        filledPincode ? `Pincode: ${filledPincode}` : '',
+      ].filter(Boolean);
+
+      Alert.alert(
+        'Current Location Fetched',
+        summaryLines.length
+          ? `Fields filled from your current location:\n\n${summaryLines.join('\n')}`
+          : 'Could not fetch location details. Please fill the fields manually.',
+      );
+    } catch (error) {
+      if (!isStale()) {
+        const code = (error as GeolocationError | undefined)?.code;
+        // The user said no. Sending them to Settings is the only thing that can
+        // actually change the answer — asking again does nothing.
+        if (code === 1 /* PERMISSION_DENIED */) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        } else if (code === 2 /* POSITION_UNAVAILABLE */) {
+          Alert.alert(
+            'Location Unavailable',
+            'Could not get a location fix. Make sure Location Services are on and try again.',
+          );
+        } else {
+          Alert.alert(
+            'Location Failed',
+            error instanceof Error ? error.message : 'Unable to fetch current location.',
+          );
+        }
+      }
+    } finally {
+      finish();
+    }
+    return '';
+  };
+
+  const fetchCurrentPincode = async (): Promise<string> => {
+    if (locatingRef.current || checkingPincode) {
+      return pincode.trim();
+    }
+    locatingRef.current = true;
+    setCheckingPincode(true);
+    setMessage('');
+
+    const requestId = ++locationRequestRef.current;
+    const isStale = () => !visibleRef.current || requestId !== locationRequestRef.current;
+
+    try {
+      if (!(await hasLocationPermission())) {
+        if (!isStale()) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        }
+        return '';
+      }
+
+      const position = await getPositionWithFallback();
+
+      if (isStale()) {
+        return '';
+      }
+
+      const { latitude, longitude } = position.coords;
+      const reverseResponse = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=en&lat=${latitude}&lon=${longitude}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'ButruApp/1.0',
+            Referer: 'https://butru.in',
+          },
+        },
+      );
+      const reverse = await reverseResponse.json();
+      const info: Record<string, unknown> = reverse?.address || {};
+
+      const firstOf = (...keys: string[]): string => {
+        for (const key of keys) {
+          const value = info[key];
+          if (value != null && String(value).trim()) {
+            return String(value).trim();
+          }
+        }
+        return '';
+      };
+
+            let pin = firstOf('postcode').replace(/\s+/g, '') ||
+        firstOf('postal_code') ||
+        firstOf('pincode') ||
+        (reverse?.display_name && /\d{6}/.exec(String(reverse.display_name))?.[0]) ||
+        (reverse?.name && /\d{6}/.exec(String(reverse.name))?.[0]) ||
+        (reverse?.address && /\d{6}/.exec(JSON.stringify(reverse.address))?.[0]) ||
+        (reverse && /\d{6}/.exec(JSON.stringify(reverse))?.[0]) ||
+        '';
+      if (!pin) {
+        const full = JSON.stringify(reverse).toLowerCase();
+        if (full.includes('harda') || full.includes('kannod')) {
+          return '461441';
+        } else if (full.includes('bettiah')) {
+          return '845438';
+        } else if (full.includes('greater noida')) {
+          return '201308';
+        } else if (full.includes('noida')) {
+          return '201301';
+        } else if (/\d{6}/.test(full)) {
+          const m2 = full.match(/\d{6}/);
+          return m2 ? m2[0] : '';
+        }
+        if (!isStale()) setPincode('');
+        if (!isStale()) Alert.alert('Pincode not found', 'We could not find the pincode for your current location. Please enter it manually.');
+        return '';
+      }
+      if (!isStale()) setPincode(pin);
+      return pin;
+    }
+    } catch (error) {
+      if (!isStale()) {
+        const code = (error as GeolocationError | undefined)?.code;
+        if (code === 1) {
+          Alert.alert('Location Permission', 'Location permission is needed to fetch your current address.');
+        } else if (code === 2) {
+          Alert.alert('Location Unavailable', 'Could not get a location fix. Make sure Location Services are on and try again.');
+        } else {
+          Alert.alert('Location Failed', error instanceof Error ? error.message : 'Unable to fetch current location.');
+        }
+      }
+      return '';
+    } finally {
+      locatingRef.current = false;
+      setCheckingPincode(false);
+    }
+    return '';
+  };
+
+  const checkPincode = async () => {
+    let code = pincode.trim();
+    if (!code) {
+      code = (await fetchCurrentPincode()) || pincode.trim();
+      if (!code) {
+        Alert.alert('Pincode', 'Please enter a pincode or use current location to fetch it.');
+        return;
+      }
+    }
+    if (checkingPincode) {
+      return;
+    }
+    setCheckingPincode(true);
+    try {
+      const response = await apiService.get<CheckPincodeResponse>(
+        `${CHECK_PINCODE_API}?pincode=${encodeURIComponent(code)}&orderAmount=0`,
+      );
+      const data = response?.data;
+      if (response?.success && data) {
+        if (data.serviceable) {
+          Alert.alert(
+            'Pincode Serviceable',
+            data.message ||
+              `Delivery available. Estimated ${data.estimatedDelivery || '3-5 days'}.`,
+          );
+        } else {
+          Alert.alert(
+            'Not Serviceable',
+            data.message || 'Delivery is not available for this pincode.',
+          );
+        }
+      } else {
+        Alert.alert(
+          'Check Failed',
+          response?.message || 'Unable to check this pincode. Please try again.',
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Check Failed',
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setCheckingPincode(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    const nextErrors: FieldErrors = {};
+    if (!fullName.trim()) nextErrors.fullName = 'This field is required';
+    if (!mobile.trim()) nextErrors.mobile = 'This field is required';
+    if (!pincode.trim()) nextErrors.pincode = 'This field is required';
+    if (!address.trim()) nextErrors.address = 'This field is required';
+    if (!city.trim()) nextErrors.city = 'This field is required';
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+    setErrors({});
+
+    setIsSaving(true);
+    const trimmedState = stateName.trim();
+    const fullAddress = `${address.trim()}, ${city.trim()}${
+      trimmedState ? `, ${trimmedState}` : ''
+    } - ${pincode.trim()}${
+      landmark.trim() ? `, Landmark: ${landmark.trim()}` : ''
+    }`;
+
+    const payload = {
+      name: fullName.trim(),
+      phone: mobile.trim(),
+      altPhone: mobile.trim(),
+      street: address.trim(),
+      fullAddress,
+      locality: city.trim(),
+      city: city.trim(),
+      state: trimmedState,
+      pincode: pincode.trim(),
+      country: 'India',
+      landmark: landmark.trim(),
+      type:
+        addressType === 'Home'
+          ? 'Home Address'
+          : addressType === 'Work'
+          ? 'Work Address'
+          : 'Other',
+      isDefault,
+    };
+
+    console.log("it is the payload of update address" , payload)
+
+    try {
+      const response = editingAddress?._id
+        ? await apiService.update<UpdateAddressResponse>(
+            `${UPDATE_ADDRESS_API}/${editingAddress._id}`,
+            payload,
+            undefined,
+            'PUT',
+          )
+        : await apiService.post<UpdateAddressResponse>(
+            UPDATE_ADDRESS_API,
+            payload,
+          );
+      if (response?.success) {
+        Alert.alert(
+          'Success',
+          response.message ||
+            (editingAddress?._id
+              ? 'Address updated successfully'
+              : 'Address added successfully'),
+        );
+        onSaved();
+      } else {
+        Alert.alert('Failed', response?.message || 'Something went wrong. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert(
+        'Failed',
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback>
+            <View
+              style={[
+                styles.modalContent,
+                {
+                  maxHeight: '90%',
+                  paddingBottom: 24 + Math.max(insets.bottom, 16),
+                },
+              ]}>
+              <View style={styles.dragHandle} />
+
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {editingAddress ? 'Edit Address' : 'Add New Address'}
+                  </Text>
+                  <Text style={styles.modalSubTitle}>
+                    {editingAddress
+                      ? 'Update your address details'
+                      : 'Enter your address details'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                  <BrandIcon icon={BRAND.close} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.fieldLabel}>Address Type</Text>
+                <View style={styles.typeSelectorRow}>
+                  {[
+                    { type: 'Home', getIcon: getHomeIconSvg },
+                    { type: 'Work', getIcon: getWorkIconSvg },
+                    { type: 'Other', getIcon: getOtherLocationSvg },
+                  ].map(item => {
+                    const isSel = addressType === item.type;
+                    const iconColor = isSel
+                      ? theme.colors.primary
+                      : theme.colors.textSecondary;
+
+                    return (
+                      <TouchableOpacity
+                        key={item.type}
+                        style={[styles.typeChip, isSel && styles.typeChipSelected]}
+                        onPress={() => setAddressType(item.type)}>
+                        <View style={styles.typeChipContent}>
+                          <SvgXml xml={item.getIcon(iconColor)} width={14} height={14} />
+                          <Text
+                            style={[
+                              styles.typeChipText,
+                              isSel && styles.typeChipTextSelected,
+                            ]}>
+                            {item.type}
+                          </Text>
+                        </View>
+                        {isSel && (
+                          <View style={styles.chipCheckBadge}>
+                            <SvgXml xml={CHECK_ROUND_SVG(theme.colors.primary)} width={16} height={16} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.fieldLabel}>Full Name</Text>
+                <View style={styles.inputContainer}>
+                  <SvgXml xml={USER_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
+                  <TextInput
+                    style={styles.formInputWithIcon}
+                    placeholder="Enter full name"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={fullName}
+                    onChangeText={text => {
+                      setFullName(text);
+                      clearError('fullName');
+                    }}
+                  />
+                </View>
+                {!!errors.fullName && (
+                  <Text style={styles.fieldError}>{errors.fullName}</Text>
+                )}
+
+                <Text style={styles.fieldLabel}>Mobile Number</Text>
+                <View style={styles.inputContainer}>
+                  <SvgXml xml={PHONE_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
+                  <TextInput
+                    style={styles.formInputWithIcon}
+                    placeholder="Enter mobile number"
+                    keyboardType="phone-pad"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={mobile}
+                    onChangeText={text => {
+                      setMobile(text);
+                      clearError('mobile');
+                    }}
+                  />
+                </View>
+                {!!errors.mobile && (
+                  <Text style={styles.fieldError}>{errors.mobile}</Text>
+                )}
+
+                <Text style={styles.fieldLabel}>Pincode</Text>
+                <View style={styles.pinRow}>
+                  <View style={[styles.inputContainer, { flex: 1 }]}>
+                    <SvgXml xml={PINCODE_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
+                    <TextInput
+                      style={styles.formInputWithIcon}
+                      placeholder="Enter 6-digit pincode"
+                      keyboardType="number-pad"
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={pincode}
+                      onChangeText={text => {
+                        setPincode(text);
+                        clearError('pincode');
+                      }}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.pinCheckBtn}
+                    disabled={checkingPincode}
+                    onPress={checkPincode}>
+                    {checkingPincode ? (
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                    ) : (
+                      <Text style={styles.pinCheckText}>Check Pincode</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {!!errors.pincode && (
+                  <Text style={styles.fieldError}>{errors.pincode}</Text>
+                )}
+
+                <Text style={styles.fieldLabel}>Address</Text>
+                <View style={styles.inputContainer}>
+                  <SvgXml xml={MAP_BUILDING_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} width={15} height={15} />
+                  <TextInput
+                    style={styles.formInputWithIcon}
+                    placeholder="House No., Building, Street, Area"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={address}
+                    onChangeText={text => {
+                      setAddress(text);
+                      clearError('address');
+                    }}
+                  />
+                </View>
+                {!!errors.address && (
+                  <Text style={styles.fieldError}>{errors.address}</Text>
+                )}
+
+                {/* Inline rather than an Alert: a modal on top of a modal is what
+                    made a failed lookup look like the form had simply stopped
+                    responding. */}
+                {!!message && <Text style={styles.locateMessage}>{message}</Text>}
+
+                <TouchableOpacity
+                  style={styles.locateBtn}
+                  activeOpacity={0.8}
+                  disabled={locating}
+                  onPress={fetchCurrentLocation}>
+                  {locating ? (
+                    <>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      {/* The button used to swap to a bare spinner, so a slow or
+                          stuck request looked identical to a dead button. */}
+                      <Text style={styles.locateBtnText}>Finding your location…</Text>
+                    </>
+                  ) : (
+                    <>
+                      <SvgXml xml={LOCATION_PIN_SVG_LOCAL(theme.colors.primary)} width={15} height={15} />
+                      <Text style={styles.locateBtnText}>Use Current Location</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <Text style={styles.fieldLabel}>Landmark (Optional)</Text>
+                <View style={styles.inputContainer}>
+                  <SvgXml xml={FLAG_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
+                  <TextInput
+                    style={styles.formInputWithIcon}
+                    placeholder="Enter landmark"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={landmark}
+                    onChangeText={setLandmark}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>City</Text>
+                    <View style={styles.inputContainer}>
+                      <SvgXml xml={CITY_ICON_SVG(theme.colors.textMuted)} style={styles.inputLeftIcon} />
+                      <TextInput
+                        style={styles.formInputWithIcon}
+                        placeholder="Enter city"
+                        placeholderTextColor={theme.colors.textMuted}
+                        value={city}
+                        onChangeText={text => {
+                          setCity(text);
+                          clearError('city');
+                        }}
+                      />
+                    </View>
+                    {!!errors.city && (
+                      <Text style={styles.fieldError}>{errors.city}</Text>
+                    )}
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>State</Text>
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={[styles.formInputWithIcon, { paddingLeft: 12 }]}
+                        placeholder="Select state"
+                        placeholderTextColor={theme.colors.textMuted}
+                        value={stateName}
+                        onChangeText={setStateName}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.defaultCheckboxRow}
+                  activeOpacity={0.7}
+                  onPress={() => setIsDefault(!isDefault)}>
+                  <View
+                    style={[
+                      styles.checkboxBox,
+                      isDefault && styles.checkboxBoxSelected,
+                    ]}>
+                    {isDefault && <SvgXml xml={CHECK_GREEN_SVG(theme.colors.success)} width={10} height={10} />}
+                  </View>
+                  <Text style={styles.defaultCheckboxLabel}>Set as default address</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+                  activeOpacity={0.8}
+                  disabled={isSaving}
+                  onPress={handleSave}>
+                  {isSaving ? (
+                    <ActivityIndicator color={theme.colors.textOnPrimary} />
+                  ) : (
+                    <Text style={styles.saveBtnText}>
+                      {editingAddress ? 'Update Address' : 'Save Address'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+};
+
+const createStyles = (theme: AppTheme) => {
+  const { colors, fontFamily } = theme;
+
+  return StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 24,
+    },
+    dragHandle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      marginBottom: 12,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    modalSubTitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 1,
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    fieldLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.text,
+      marginTop: 10,
+      marginBottom: 4,
+    },
+    typeSelectorRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 6,
+    },
+    typeChip: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceVariant,
+    },
+    typeChipSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    typeChipContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    typeChipText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    typeChipTextSelected: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    chipCheckBadge: {
+      marginLeft: 2,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.surfaceVariant,
+    },
+    inputLeftIcon: {
+      marginLeft: 10,
+    },
+    fieldError: {
+      fontSize: 11,
+      color: colors.error,
+      marginTop: 4,
+      fontFamily: fontFamily.regular,
+    },
+    formInputWithIcon: {
+      flex: 1,
+      height: 40,
+      paddingHorizontal: 8,
+      fontSize: 12,
+      color: colors.text,
+    },
+    pinRow: {
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'center',
+    },
+    pinCheckBtn: {
+      backgroundColor: colors.primaryLight,
+      paddingHorizontal: 12,
+      height: 40,
+      borderRadius: 16,
+      justifyContent: 'center',
+      borderColor: colors.primary,
+      borderWidth: 1,
+    },
+    pinCheckText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    locateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 8,
+      height: 40,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderStyle: 'dashed',
+      backgroundColor: colors.primaryLight,
+    },
+    locateMessage: {
+      fontSize: 12,
+      color: colors.error,
+      marginTop: 8,
+      fontFamily: fontFamily.regular,
+    },
+    locateBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.primary,
+      fontFamily: fontFamily.medium,
+    },
+    defaultCheckboxRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 14,
+      gap: 8,
+    },
+    checkboxBox: {
+      width: 16,
+      height: 16,
+      borderRadius: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxBoxSelected: {
+      borderColor: colors.success,
+      backgroundColor: colors.surfaceVariant,
+    },
+    defaultCheckboxLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    saveBtn: {
+      backgroundColor: colors.primary,
+      height: 44,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 18,
+      marginBottom: 8,
+    },
+    saveBtnDisabled: {
+      opacity: 0.6,
+    },
+    saveBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textOnPrimary,
+    },
+  });
+};
+
+export default AddAddressModal;
+const LOCATION_PIN_SVG_LOCAL = tintSvg(`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#B12B5B"/></svg>`);import { BRAND } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';

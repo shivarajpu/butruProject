@@ -398,7 +398,6 @@ const AccountTab = () => {
             activeOpacity={0.7}
             onPress={() => navigation.getParent()?.navigate('MyOrders' as never)}>
             <Text style={styles.viewAllText}>View All</Text>
-            <BrandIcon icon={BRAND.chevronRightAccent} width={12} height={12} />
           </TouchableOpacity>
         </View>
 
@@ -640,7 +639,11 @@ const AccountTab = () => {
         <TouchableWithoutFeedback onPress={() => setIsProfileModalVisible(false)}>
           <View style={styles.modalOverlay1}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalContent1}>
+              <View
+                style={[
+                  styles.modalContent1,
+                  { paddingBottom: 24 + Math.max(insets.bottom, 16) },
+                ]}>
                 <View style={styles.dragHandle1} />
 
                 <View style={styles.modalHeader1}>
@@ -748,7 +751,14 @@ const AccountTab = () => {
         <TouchableWithoutFeedback onPress={() => setIsLogoutModalVisible(false)}>
           <View style={styles.modalOverlay1}>
             <TouchableWithoutFeedback>
-              <View style={[styles.modalContent1, { maxHeight: '50%' }]}>
+              <View
+                style={[
+                  styles.modalContent1,
+                  {
+                    maxHeight: '50%',
+                    paddingBottom: 24 + Math.max(insets.bottom, 16),
+                  },
+                ]}>
                 <View style={styles.dragHandle1} />
 
                 {logoutStatus === 'loading' && (

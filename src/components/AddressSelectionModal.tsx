@@ -9,6 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import type { Address } from '../hooks/useProfile';
@@ -57,6 +58,7 @@ const AddressSelectionModal = ({
 }: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const handleSelect = (address: Address) => {
     onSelect(address);
@@ -72,7 +74,11 @@ const AddressSelectionModal = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.modalContent}>
+            <View
+              style={[
+                styles.modalContent,
+                { paddingBottom: 24 + Math.max(insets.bottom, 16) },
+              ]}>
               <View style={styles.dragHandle} />
 
               <View style={styles.modalHeader}>

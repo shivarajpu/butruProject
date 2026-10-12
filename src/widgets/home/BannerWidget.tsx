@@ -187,7 +187,7 @@ const HeroCardsWidget = ({ widget }: Props) => {
                 {!!(banner.ctaText || config.ctaText) && (
                   <View style={styles.cardCta}>
                     <Text style={styles.cardCtaText}>
-                      {banner.ctaText || config.ctaText} →
+                      {banner.ctaText || config.ctaText}
                     </Text>
                   </View>
                 )}

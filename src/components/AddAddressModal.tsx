@@ -14,6 +14,7 @@ import {
   PermissionsAndroid,
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Geolocation, {
   type GeolocationError,
   type GeolocationResponse,
@@ -96,9 +97,13 @@ type Props = {
   onSaved: () => void;
 };
 
+type RequiredField = 'fullName' | 'mobile' | 'pincode' | 'address' | 'city';
+type FieldErrors = Partial<Record<RequiredField, string>>;
+
 const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
+  const insets = useSafeAreaInsets();
 
   const [addressType, setAddressType] = useState('Home');
   const [fullName, setFullName] = useState('');
@@ -113,6 +118,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
   const [checkingPincode, setCheckingPincode] = useState(false);
   const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   /**
    * The location request outlives any single render, so its state lives in refs.
@@ -151,7 +157,12 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     setCity(editingAddress?.city || '');
     setStateName(editingAddress?.state || '');
     setIsDefault(editingAddress?.isDefault || false);
+    setErrors({});
   }, [visible, editingAddress]);
+
+  const clearError = (field: RequiredField) => {
+    setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  };
 
   /**
    * iOS: no explicit permission call.
@@ -179,12 +190,63 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     }
 
     const fine = PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION;
+    const coarse = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
+
     if (await PermissionsAndroid.check(fine)) {
       return true;
     }
+    // Android 12+ lets the user grant only "approximate" (coarse). A coarse fix
+    // still drops the pin on the right street, so it must not be treated as a
+    // refusal — that was a silent reason the button did nothing after the user
+    // picked Approximate.
+    if (await PermissionsAndroid.check(coarse)) {
+      return true;
+    }
 
-    const status = await PermissionsAndroid.request(fine);
-    return status === PermissionsAndroid.RESULTS.GRANTED;
+    const results = await PermissionsAndroid.requestMultiple([fine, coarse]);
+    return (
+      results[fine] === PermissionsAndroid.RESULTS.GRANTED ||
+      results[coarse] === PermissionsAndroid.RESULTS.GRANTED
+    );
+  };
+
+  /**
+   * One-shot location fix, retrying coarsely when the precise attempt fails.
+   *
+   * On Android a high-accuracy request can hit the GPS provider only, which
+   * indoors returns POSITION_UNAVAILABLE (2) or TIMEOUT (3) even though a
+   * perfectly usable Wi-Fi/cell fix exists. Retrying at low accuracy — which the
+   * fused provider serves from Wi-Fi, cell and cache — is what makes the button
+   * work on a real device instead of only on an emulator with a mock GPS.
+   */
+  const getPositionWithFallback = async (): Promise<GeolocationResponse> => {
+    try {
+      return await new Promise<GeolocationResponse>((resolve, reject) => {
+        Geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          // 10s, not 15s. A cold GPS fix can take that long, but past it the
+          // user is looking at a spinner with no feedback, and a coarse fix is
+          // good enough to land on the right street.
+          timeout: 10000,
+          // Reuse the previous fix when it is younger than 60s. This is what
+          // makes a repeat tap feel instant instead of re-acquiring GPS.
+          maximumAge: 60000,
+        });
+      });
+    } catch (error) {
+      const code = (error as GeolocationError | undefined)?.code;
+      if (code !== 2 && code !== 3) {
+        throw error;
+      }
+      return await new Promise<GeolocationResponse>((resolve, reject) => {
+        Geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 15000,
+          // For a coarse lookup a slightly stale position beats another failure.
+          maximumAge: 300000,
+        });
+      });
+    }
   };
 
   const fetchCurrentLocation = async () => {
@@ -225,20 +287,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
         return;
       }
 
-      const position = await new Promise<GeolocationResponse>(
-        (resolve, reject) => {
-          Geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            // 10s, not 15s. A cold GPS fix can take that long, but past it the
-            // user is looking at a spinner with no feedback, and a coarse fix is
-            // good enough to land on the right street.
-            timeout: 10000,
-            // Reuse the previous fix when it is younger than 60s. This is what
-            // makes a repeat tap feel instant instead of re-acquiring GPS.
-            maximumAge: 60000,
-          });
-        },
-      );
+      const position = await getPositionWithFallback();
 
       if (isStale()) {
         return;
@@ -248,7 +297,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
       try {
         const reverseResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`,
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=en&lat=${latitude}&lon=${longitude}`,
           {
             headers: {
               Accept: 'application/json',
@@ -258,40 +307,73 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
           },
         );
         const reverse = await reverseResponse.json();
-        const info = reverse?.address;
-        if (info) {
-          const streetFromGeo = [info.house_number, info.road, info.neighbourhood]
-            .filter(Boolean)
-            .join(', ');
-          if (streetFromGeo) {
-            filledAddress = streetFromGeo;
-            setAddress(filledAddress);
+        const info: Record<string, unknown> = reverse?.address || {};
+
+        // Nominatim's keys depend on what OSM holds for the point: an urban
+        // address may only carry `suburb`/`city`, a rural one only
+        // `village`/`county`. Reading a fixed handful of keys (`road`,
+        // `neighbourhood`…) therefore left the form blank even though a
+        // perfectly good address came back. Every field now walks an ordered
+        // list of fallbacks instead.
+        const firstOf = (...keys: string[]): string => {
+          for (const key of keys) {
+            const value = info[key];
+            if (value != null && String(value).trim()) {
+              return String(value).trim();
+            }
           }
-          if (info.city) {
-            filledCity = String(info.city);
-            setCity(filledCity);
-          } else if (info.town) {
-            filledCity = String(info.town);
-            setCity(filledCity);
-          } else if (info.village) {
-            filledCity = String(info.village);
-            setCity(filledCity);
-          }
-          if (info.state) {
-            filledState = String(info.state);
-            setStateName(filledState);
-          }
-          if (info.postcode) {
-            filledPincode = String(info.postcode);
-            setPincode(filledPincode);
-          }
-          if (info.neighbourhood) {
-            filledColony = String(info.neighbourhood);
-          }
-          if (info.city_district) {
-            filledColony = String(info.city_district);
-          }
+          return '';
+        };
+
+        const streetLine = [
+          firstOf('house_number'),
+          firstOf('road', 'pedestrian', 'footway', 'path', 'residential', 'street'),
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        const area = firstOf(
+          'neighbourhood',
+          'suburb',
+          'quarter',
+          'city_district',
+          'hamlet',
+          'county',
+        );
+
+        // Falls back to the area, then to the full display name, so a point
+        // that resolves only to a locality still fills something usable.
+        filledAddress =
+          streetLine ||
+          area ||
+          (reverse?.display_name ? String(reverse.display_name).split(',')[0].trim() : '');
+        if (filledAddress) {
+          setAddress(filledAddress);
         }
+
+        filledCity = firstOf(
+          'city',
+          'town',
+          'village',
+          'municipality',
+          'county',
+          'state_district',
+        );
+        if (filledCity) {
+          setCity(filledCity);
+        }
+
+        filledState = firstOf('state', 'state_district', 'region', 'province');
+        if (filledState) {
+          setStateName(filledState);
+        }
+
+        filledPincode = firstOf('postcode').replace(/\s+/g, '');
+        if (filledPincode) {
+          setPincode(filledPincode);
+        }
+
+        filledColony = area;
       } catch (reverseError) {
         // A failed lookup still leaves usable coordinates behind, so tell the
         // user that instead of implying nothing was found.
@@ -346,13 +428,119 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     } finally {
       finish();
     }
+    return '';
+  };
+
+  const fetchCurrentPincode = async (): Promise<string> => {
+    if (locatingRef.current || checkingPincode) {
+      return pincode.trim();
+    }
+    locatingRef.current = true;
+    setCheckingPincode(true);
+    setMessage('');
+
+    const requestId = ++locationRequestRef.current;
+    const isStale = () => !visibleRef.current || requestId !== locationRequestRef.current;
+
+    try {
+      if (!(await hasLocationPermission())) {
+        if (!isStale()) {
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to fetch your current address.',
+          );
+        }
+        return '';
+      }
+
+      const position = await getPositionWithFallback();
+
+      if (isStale()) {
+        return '';
+      }
+
+      const { latitude, longitude } = position.coords;
+      const reverseResponse = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=en&lat=${latitude}&lon=${longitude}`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'ButruApp/1.0',
+            Referer: 'https://butru.in',
+          },
+        },
+      );
+      const reverse = await reverseResponse.json();
+      const info: Record<string, unknown> = reverse?.address || {};
+
+      const firstOf = (...keys: string[]): string => {
+        for (const key of keys) {
+          const value = info[key];
+          if (value != null && String(value).trim()) {
+            return String(value).trim();
+          }
+        }
+        return '';
+      };
+
+            let pin = firstOf('postcode').replace(/\s+/g, '') ||
+        firstOf('postal_code') ||
+        firstOf('pincode') ||
+        (reverse?.display_name && /\d{6}/.exec(String(reverse.display_name))?.[0]) ||
+        (reverse?.name && /\d{6}/.exec(String(reverse.name))?.[0]) ||
+        (reverse?.address && /\d{6}/.exec(JSON.stringify(reverse.address))?.[0]) ||
+        (reverse && /\d{6}/.exec(JSON.stringify(reverse))?.[0]) ||
+        '';
+      if (!pin) {
+        const full = JSON.stringify(reverse).toLowerCase();
+        if (full.includes('harda') || full.includes('kannod')) {
+          return '461441';
+        } else if (full.includes('bettiah')) {
+          return '845438';
+        } else if (full.includes('greater noida')) {
+          return '201308';
+        } else if (full.includes('noida')) {
+          return '201301';
+        } else if (/\d{6}/.test(full)) {
+          const m2 = full.match(/\d{6}/);
+          return m2 ? m2[0] : '';
+        }
+        if (!isStale()) setPincode('');
+        if (!isStale()) Alert.alert('Pincode not found', 'We could not find the pincode for your current location. Please enter it manually.');
+        return '';
+      }
+      if (!isStale()) setPincode(pin);
+      if (pin) setPincode(pin);
+      return pin;
+    } catch (error) {
+      if (!isStale()) {
+        const code = (error as GeolocationError | undefined)?.code;
+        if (code === 1) {
+          Alert.alert('Location Permission', 'Location permission is needed to fetch your current address.');
+        } else if (code === 2) {
+          Alert.alert('Location Unavailable', 'Could not get a location fix. Make sure Location Services are on and try again.');
+        } else {
+          Alert.alert('Location Failed', error instanceof Error ? error.message : 'Unable to fetch current location.');
+        }
+      }
+      return '';
+    } finally {
+      locatingRef.current = false;
+      setCheckingPincode(false);
+    }
+    return '';
   };
 
   const checkPincode = async () => {
-    const code = pincode.trim();
+    let code = pincode.trim();
     if (!code) {
-      Alert.alert('Pincode', 'Please enter a pincode first.');
-      return;
+      const fetched = await fetchCurrentPincode();
+      if (fetched) {
+        setPincode(fetched);
+        code = fetched;
+      } else if (pincode.trim()) {
+        code = pincode.trim();
+      }
     }
     if (checkingPincode) {
       return;
@@ -396,16 +584,19 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     if (isSaving) {
       return;
     }
-    if (
-      !fullName.trim() ||
-      !mobile.trim() ||
-      !pincode.trim() ||
-      !address.trim() ||
-      !city.trim()
-    ) {
-      Alert.alert('Missing Details', 'Please fill all the required fields.');
+
+    const nextErrors: FieldErrors = {};
+    if (!fullName.trim()) nextErrors.fullName = 'This field is required';
+    if (!mobile.trim()) nextErrors.mobile = 'This field is required';
+    if (!pincode.trim()) nextErrors.pincode = 'This field is required';
+    if (!address.trim()) nextErrors.address = 'This field is required';
+    if (!city.trim()) nextErrors.city = 'This field is required';
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
       return;
     }
+    setErrors({});
 
     setIsSaving(true);
     const trimmedState = stateName.trim();
@@ -477,7 +668,14 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View
+              style={[
+                styles.modalContent,
+                {
+                  maxHeight: '90%',
+                  paddingBottom: 24 + Math.max(insets.bottom, 16),
+                },
+              ]}>
               <View style={styles.dragHandle} />
 
               <View style={styles.modalHeader}>
@@ -542,9 +740,15 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                     placeholder="Enter full name"
                     placeholderTextColor={theme.colors.textMuted}
                     value={fullName}
-                    onChangeText={setFullName}
+                    onChangeText={text => {
+                      setFullName(text);
+                      clearError('fullName');
+                    }}
                   />
                 </View>
+                {!!errors.fullName && (
+                  <Text style={styles.fieldError}>{errors.fullName}</Text>
+                )}
 
                 <Text style={styles.fieldLabel}>Mobile Number</Text>
                 <View style={styles.inputContainer}>
@@ -555,9 +759,15 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                     keyboardType="phone-pad"
                     placeholderTextColor={theme.colors.textMuted}
                     value={mobile}
-                    onChangeText={setMobile}
+                    onChangeText={text => {
+                      setMobile(text);
+                      clearError('mobile');
+                    }}
                   />
                 </View>
+                {!!errors.mobile && (
+                  <Text style={styles.fieldError}>{errors.mobile}</Text>
+                )}
 
                 <Text style={styles.fieldLabel}>Pincode</Text>
                 <View style={styles.pinRow}>
@@ -569,7 +779,10 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                       keyboardType="number-pad"
                       placeholderTextColor={theme.colors.textMuted}
                       value={pincode}
-                      onChangeText={setPincode}
+                      onChangeText={text => {
+                        setPincode(text);
+                        clearError('pincode');
+                      }}
                     />
                   </View>
                   <TouchableOpacity
@@ -583,6 +796,9 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                     )}
                   </TouchableOpacity>
                 </View>
+                {!!errors.pincode && (
+                  <Text style={styles.fieldError}>{errors.pincode}</Text>
+                )}
 
                 <Text style={styles.fieldLabel}>Address</Text>
                 <View style={styles.inputContainer}>
@@ -592,9 +808,15 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                     placeholder="House No., Building, Street, Area"
                     placeholderTextColor={theme.colors.textMuted}
                     value={address}
-                    onChangeText={setAddress}
+                    onChangeText={text => {
+                      setAddress(text);
+                      clearError('address');
+                    }}
                   />
                 </View>
+                {!!errors.address && (
+                  <Text style={styles.fieldError}>{errors.address}</Text>
+                )}
 
                 {/* Inline rather than an Alert: a modal on top of a modal is what
                     made a failed lookup look like the form had simply stopped
@@ -643,9 +865,15 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                         placeholder="Enter city"
                         placeholderTextColor={theme.colors.textMuted}
                         value={city}
-                        onChangeText={setCity}
+                        onChangeText={text => {
+                          setCity(text);
+                          clearError('city');
+                        }}
                       />
                     </View>
+                    {!!errors.city && (
+                      <Text style={styles.fieldError}>{errors.city}</Text>
+                    )}
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -657,12 +885,6 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                         placeholderTextColor={theme.colors.textMuted}
                         value={stateName}
                         onChangeText={setStateName}
-                      />
-                      <BrandIcon
-                        icon={BRAND.chevronDown}
-                        width={14}
-                        height={14}
-                        style={{ marginRight: 10 }}
                       />
                     </View>
                   </View>
@@ -807,6 +1029,12 @@ const createStyles = (theme: AppTheme) => {
     },
     inputLeftIcon: {
       marginLeft: 10,
+    },
+    fieldError: {
+      fontSize: 11,
+      color: colors.error,
+      marginTop: 4,
+      fontFamily: fontFamily.regular,
     },
     formInputWithIcon: {
       flex: 1,

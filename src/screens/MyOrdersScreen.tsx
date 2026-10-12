@@ -13,7 +13,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -1052,6 +1052,7 @@ const MyOrdersScreen = ({ navigation }: Props) => {
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const insets = useSafeAreaInsets();
 
   // Navigation Flow States: 'LIST' | 'TRACK' | 'DETAILS'
   const [currentScreen, setCurrentScreen] = useState<'LIST' | 'TRACK' | 'DETAILS'>('LIST');
@@ -1694,7 +1695,11 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
       {/* FILTER BOTTOM SHEET MODAL */}
       <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View
+            style={[
+              styles.modalSheet,
+              { paddingBottom: 20 + Math.max(insets.bottom, 16) },
+            ]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <View>
@@ -1762,7 +1767,11 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
   animationType="slide"
   onRequestClose={() => setCancelModalVisible(false)}>
   <View style={styles.modalOverlay1}>
-    <View style={styles.cancelModalSheet}>
+    <View
+      style={[
+        styles.cancelModalSheet,
+        { paddingBottom: 28 + Math.max(insets.bottom, 16) },
+      ]}>
       <View style={styles.modalHandle1} />
 
       {/* Modal Header */}

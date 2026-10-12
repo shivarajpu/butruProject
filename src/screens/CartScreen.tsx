@@ -13,6 +13,7 @@ import {
   Alert,
   Keyboard,
   useWindowDimensions,
+  Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -38,6 +39,7 @@ import AddAddressModal from '../components/AddAddressModal';
 import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
 import { apiService } from '../api/apiService';
 import { tintSvg } from '../assets/svg/tint';
+import APP_CONFIG from '../config/clients';
 
 // Custom SVGs
 const TAG_ICON_SVG = tintSvg(`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`);
@@ -97,6 +99,16 @@ const CartScreen = () => {
 
   const selectedAddress =
     addresses.find(a => (a._id || '') === selectedAddressId) || null;
+
+  const handleShare = async () => {
+    const shareUrl = `https://${APP_CONFIG.api.storeDomain}`;
+    const message = `Check out ${APP_CONFIG.appName}\n\n${shareUrl}`;
+    try {
+      await Share.share({ message });
+    } catch {
+      // Share was dismissed or failed — nothing to do.
+    }
+  };
 
   const handleSelectAddress = (address: Address) => {
     setSelectedAddressId(address._id || '0');
@@ -398,7 +410,7 @@ const CartScreen = () => {
             <TouchableOpacity
               style={styles.headerIconBtn}
               activeOpacity={0.7}
-              onPress={() => setIsAddressModalVisible(true)}>
+              onPress={handleShare}>
               <SvgXml xml={SHARE_SVG} width={16} height={16} />
             </TouchableOpacity>
           </View>
@@ -631,7 +643,14 @@ const CartScreen = () => {
           <TouchableWithoutFeedback onPress={handleClosePaymentModal}>
             <View style={styles.sheetOverlay}>
               <TouchableWithoutFeedback>
-                <View style={[styles.sheetContent, { maxHeight: '90%' }]}>
+                <View
+                  style={[
+                    styles.sheetContent,
+                    {
+                      maxHeight: '90%',
+                      paddingBottom: 30 + Math.max(insets.bottom, 16),
+                    },
+                  ]}>
                   {!isPaymentSuccess ? (
                     <ScrollView showsVerticalScrollIndicator={false}>
                       <View style={styles.sheetDragHandle} />

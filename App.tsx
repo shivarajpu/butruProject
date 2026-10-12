@@ -6,11 +6,12 @@
  */
 
 import React, { useEffect } from 'react';
-import { StatusBar, View, StyleSheet } from 'react-native';
+import { StatusBar, View, StyleSheet, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider, useDispatch, useSelector } from 'react-redux';
+import Geolocation from '@react-native-community/geolocation';
 
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
@@ -57,6 +58,21 @@ function AppNavigator() {
       dispatch(hydrateCart(saved));
     });
   }, [dispatch]);
+
+  // Android-only: point the geolocation module at the Play Services fused
+  // provider. Its default raw-LocationManager path turns a high-accuracy
+  // request into a GPS-only request, so on a real phone indoors "Use Current
+  // Location" failed with POSITION_UNAVAILABLE even though a Wi-Fi/cell fix
+  // existed. The fused provider blends GPS, Wi-Fi and cell and falls back
+  // gracefully. Set once, before any screen can request a position.
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      Geolocation.setRNConfiguration({
+        locationProvider: 'playServices',
+        skipPermissionRequests: false,
+      });
+    }
+  }, []);
 
   // Wait until the persisted session has been read before deciding which
   // screen to show, so a logged-in user never sees the Login flash. The

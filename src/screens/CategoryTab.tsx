@@ -117,6 +117,9 @@ interface WishlistResponse {
   data: WishlistData;
 }
 
+/** How many cards to show before the "Show more" / "View all" affordance. */
+const PREVIEW_COUNT = 4;
+
 const mapApiProductToItem = (item: ApiProductListItem): NewArrivalProduct => {
   const sku = item.skus?.[0];
   const sellingPrice = sku?.sellingPrice ?? item.price ?? 0;
@@ -444,6 +447,44 @@ const createStyles = (theme: AppTheme) => {
       fontFamily: fontFamily.regular,
       paddingHorizontal: 16,
     },
+
+    /* Show more / View all */
+    previewBtnWrapper: {
+      alignItems: 'flex-end',
+      paddingHorizontal: 16,
+      marginBottom: 4,
+    },
+    previewBtn: {
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+    },
+    previewBtnText: {
+      fontSize: 12,
+      fontFamily: FONTS.poppinsSemiBold,
+      color: colors.primary,
+    },
+    viewAllCard: {
+      width: 150,
+      height: 180,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    viewAllPill: {
+      paddingHorizontal: 18,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
+    },
   });
 };
 
@@ -457,6 +498,8 @@ const CategoryTab = () => {
   const [wishlistLoading, setWishlistLoading] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [showAllArrivals, setShowAllArrivals] = useState(false);
 
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -530,6 +573,16 @@ const CategoryTab = () => {
   };
 
   const filteredCategories = filterByQuery(categories, searchQuery);
+
+  const visibleCategories = showAllCategories
+    ? filteredCategories
+    : filteredCategories.slice(0, PREVIEW_COUNT);
+  const hasMoreCategories = filteredCategories.length > PREVIEW_COUNT;
+
+  const visibleArrivals = showAllArrivals
+    ? newArrivals
+    : newArrivals.slice(0, PREVIEW_COUNT);
+  const hasMoreArrivals = newArrivals.length > PREVIEW_COUNT;
 
   const handleBackPress = () => {
     if (navigation.canGoBack()) {
@@ -605,7 +658,7 @@ const CategoryTab = () => {
             ) : filteredCategories.length === 0 ? (
               <Text style={styles.loadingText}>No categories found</Text>
             ) : (
-              filteredCategories.map(cat => (
+              visibleCategories.map(cat => (
                 <TouchableOpacity
                   key={cat.slug}
                   style={[styles.categoryCard, { width: cardW, marginBottom: gap }]}
@@ -635,15 +688,28 @@ const CategoryTab = () => {
             )}
           </View>
 
+          {/* Show more / less categories */}
+          {!loading && hasMoreCategories && (
+            <View style={styles.previewBtnWrapper}>
+              <TouchableOpacity
+                style={styles.previewBtn}
+                activeOpacity={0.8}
+                onPress={() => setShowAllCategories(v => !v)}>
+                <Text style={styles.previewBtnText}>
+                  {showAllCategories ? 'Show less' : 'Show more'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* New Arrivals Promo Banner */}
           <View style={[styles.promoBanner, { marginHorizontal: hPad }]}>
             <View style={styles.promoLeft}>
               <Text style={styles.promoTag}>New Arrivals</Text>
               <Text style={styles.promoTitle}>{'Fresh Styles Just\nFor Your Little Ones'}</Text>
-              <TouchableOpacity style={styles.promoBtn} activeOpacity={0.85}>
+              <View style={styles.promoBtn}>
                 <Text style={styles.promoBtnText}>New Arrivals</Text>
-                <SvgXml xml={getArrowRightSvg(theme.colors.textOnPrimary)} width={10} height={10} />
-              </TouchableOpacity>
+              </View>
             </View>
 
             <Image
@@ -666,7 +732,7 @@ const CategoryTab = () => {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: hPad, gap: 12 }}>
-                {newArrivals.map(item => (
+                {visibleArrivals.map(item => (
                   <TouchableOpacity
                     key={item.id}
                     style={styles.newArrivalCard}
@@ -705,6 +771,28 @@ const CategoryTab = () => {
                     </View>
                   </TouchableOpacity>
                 ))}
+
+                {hasMoreArrivals && !showAllArrivals && (
+                  <TouchableOpacity
+                    style={styles.viewAllCard}
+                    activeOpacity={0.85}
+                    onPress={() => setShowAllArrivals(true)}>
+                    <View style={styles.viewAllPill}>
+                      <Text style={styles.previewBtnText}>View all</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+
+                {hasMoreArrivals && showAllArrivals && (
+                  <TouchableOpacity
+                    style={styles.viewAllCard}
+                    activeOpacity={0.85}
+                    onPress={() => setShowAllArrivals(false)}>
+                    <View style={styles.viewAllPill}>
+                      <Text style={styles.previewBtnText}>Show less</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
               </ScrollView>
             )}
           </View>
