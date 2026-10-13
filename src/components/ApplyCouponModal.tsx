@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FONTS } from '../constants/fonts';
 import { useSelector } from 'react-redux';
 import {
@@ -13,6 +13,8 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,6 +96,220 @@ const CloseIcon = ({ color = '#999' }: CloseIconProps) => (
   </Svg>
 );
 
+// --- Apply Feedback Overlay (celebration / error) ---
+const CONFETTI_COLORS = ['#F59E0B', '#EF4444', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899'];
+const CONFETTI_COUNT = 16;
+const CONFETTI_BOX = 240;
+
+interface ConfettiPieceProps {
+  delay: number;
+  tx: number;
+  ty: number;
+  rotation: number;
+  color: string;
+  size: number;
+}
+
+/** One burst particle: flies out from the badge centre, spins, then fades. */
+const ConfettiPiece = ({ delay, tx, ty, rotation, color, size }: ConfettiPieceProps) => {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: 1100,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [progress, delay]);
+
+  const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, tx] });
+  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, ty] });
+  const rotate = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${rotation}deg`] });
+  const opacity = progress.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 1, 0] });
+  const scale = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: CONFETTI_BOX / 2 - size / 2,
+        top: CONFETTI_BOX / 2 - (size * 0.6) / 2,
+        width: size,
+        height: size * 0.6,
+        borderRadius: 2,
+        backgroundColor: color,
+        opacity,
+        transform: [{ translateX }, { translateY }, { rotate }, { scale }],
+      }}
+    />
+  );
+};
+
+interface FeedbackOverlayProps {
+  type: 'success' | 'error';
+  title: string;
+  message: string;
+  theme: AppTheme;
+  onFinish: () => void;
+}
+
+/**
+ * Covers the sheet for a beat after tapping Apply so the outcome is unmissable:
+ * success bursts confetti around a drawn checkmark, failure shakes a red X.
+ * `useNativeDriver` is off for the stroke draw because SVG props can't animate
+ * on the native driver.
+ */
+const FeedbackOverlay = ({ type, title, message, theme, onFinish }: FeedbackOverlayProps) => {
+  const { colors, fontFamily } = theme;
+  const styles = useMemo(() => createFeedbackStyles(colors, fontFamily), [colors, fontFamily]);
+  const isSuccess = type === 'success';
+
+  const fade = useRef(new Animated.Value(0)).current;
+  const badgeScale = useRef(new Animated.Value(0)).current;
+  const checkOffset = useRef(new Animated.Value(44)).current;
+  const shake = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
+  const ringScale = useRef(new Animated.Value(0)).current;
+
+  const confetti = useMemo(
+    () =>
+      Array.from({ length: CONFETTI_COUNT }, (_, i) => {
+        const angle = (i / CONFETTI_COUNT) * Math.PI * 2 + Math.random() * 0.6;
+        const distance = 64 + Math.random() * 76;
+        return {
+          id: i,
+          tx: Math.cos(angle) * distance,
+          ty: Math.sin(angle) * distance - 8,
+          rotation: 180 + Math.random() * 360,
+          color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+          size: 7 + Math.random() * 5,
+          delay: 120 + i * 32 + Math.random() * 90,
+        };
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    // Run-once mount animation for the overlay; every animated value here is a
+    // stable ref, so listing them would not change behaviour.
+    Animated.timing(fade, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+    Animated.spring(badgeScale, {
+      toValue: 1,
+      friction: 4,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+
+    if (isSuccess) {
+      Animated.parallel([
+        Animated.timing(checkOffset, {
+          toValue: 0,
+          duration: 450,
+          delay: 260,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }),
+        Animated.timing(textOpacity, { toValue: 1, duration: 300, delay: 360, useNativeDriver: true }),
+        Animated.timing(ringOpacity, { toValue: 0.5, duration: 680, delay: 150, useNativeDriver: true }),
+        Animated.timing(ringScale, { toValue: 1.75, duration: 680, delay: 150, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.sequence([
+        Animated.timing(textOpacity, { toValue: 1, duration: 200, delay: 260, useNativeDriver: true }),
+        Animated.timing(shake, { toValue: 1, duration: 70, useNativeDriver: true }),
+        Animated.timing(shake, { toValue: -1, duration: 70, useNativeDriver: true }),
+        Animated.timing(shake, { toValue: 0.7, duration: 60, useNativeDriver: true }),
+        Animated.timing(shake, { toValue: -0.5, duration: 60, useNativeDriver: true }),
+        Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
+      ]).start();
+    }
+
+    const timer = setTimeout(onFinish, isSuccess ? 1900 : 1600);
+    return () => clearTimeout(timer);
+    // Mount-only: the overlay is remounted per outcome, so the captured
+    // `isSuccess`/`onFinish` are stable for its lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const translateX = shake.interpolate({ inputRange: [-1, 0, 1], outputRange: [-14, 0, 14] });
+  const DrawPath = Animated.createAnimatedComponent(Path);
+
+  return (
+    <Animated.View style={[styles.overlay, { opacity: fade }]}>
+      <Animated.View style={[styles.card, { transform: [{ scale: badgeScale }, { translateX }] }]}>
+        <View style={styles.badgeArea}>
+          {isSuccess && confetti.map(piece => (
+            <ConfettiPiece
+              key={piece.id}
+              delay={piece.delay}
+              tx={piece.tx}
+              ty={piece.ty}
+              rotation={piece.rotation}
+              color={piece.color}
+              size={piece.size}
+            />
+          ))}
+          {isSuccess && (
+            <Animated.View
+              style={[
+                styles.ring,
+                {
+                  backgroundColor: colors.success,
+                  opacity: ringOpacity,
+                  transform: [{ scale: ringScale }],
+                },
+              ]}
+            />
+          )}
+          <Animated.View
+            style={[
+              styles.badge,
+              { backgroundColor: isSuccess ? colors.success : colors.error },
+            ]}>
+            {isSuccess ? (
+              <Svg
+                width={46}
+                height={46}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <DrawPath
+                  d="M4.5 12.5l5 5L19.5 6.5"
+                  strokeDasharray={44}
+                  strokeDashoffset={checkOffset}
+                />
+              </Svg>
+            ) : (
+              <Svg
+                width={46}
+                height={46}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <Path d="M6 6l12 12M18 6L6 18" />
+              </Svg>
+            )}
+          </Animated.View>
+        </View>
+
+        <Animated.View style={{ opacity: textOpacity }}>
+          <Text style={styles.title}>{title}</Text>
+          {!!message && <Text style={styles.message}>{message}</Text>}
+        </Animated.View>
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
 export interface ApplyCouponResult {
   success: boolean;
   message: string;
@@ -122,6 +338,8 @@ export default function ApplyCouponModal({
   const [messageType, setMessageType] = useState<'error' | 'success'>('error');
   const [applying, setApplying] = useState(false);
   const [coupons, setCoupons] = useState<StoreCoupon[] | null>(null);
+  const [feedback, setFeedback] = useState<'success' | 'error' | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
 
   /**
    * The ticket list is fetched per open, not once on mount: the sheet is only
@@ -138,6 +356,8 @@ export default function ApplyCouponModal({
   useEffect(() => {
     if (visible) {
       loadCoupons();
+      setFeedback(null);
+      setFeedbackMessage('');
     }
   }, [visible, loadCoupons]);
 
@@ -150,6 +370,11 @@ export default function ApplyCouponModal({
   };
 
   const handleClose = () => {
+    // During the celebration/error overlay a tap on the backdrop or X must not
+    // cut the feedback short — it dismisses itself via `handleFeedbackFinish`.
+    if (feedback) {
+      return;
+    }
     setMessage('');
     onClose();
   };
@@ -168,18 +393,33 @@ export default function ApplyCouponModal({
     setMessage('');
     try {
       const result = await onApplyCoupon(code);
-      setMessageType(result.success ? 'success' : 'error');
-      setMessage(result.message);
       if (result.success) {
         setCouponInput('');
         setSelectedCouponId(null);
-        onClose();
+        setFeedback('success');
+        setFeedbackMessage(result.message);
+      } else {
+        setMessage(result.message);
+        setFeedback('error');
+        setFeedbackMessage(result.message);
       }
     } catch {
-      setMessageType('error');
-      setMessage('Something went wrong. Please try again.');
+      const errorMessage = 'Something went wrong. Please try again.';
+      setMessage(errorMessage);
+      setFeedback('error');
+      setFeedbackMessage(errorMessage);
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleFeedbackFinish = (type: 'success' | 'error') => {
+    setFeedback(null);
+    setFeedbackMessage('');
+    // Success closes the sheet now that the celebration has played; the error
+    // overlay hides but the sheet stays open so the failure reason remains.
+    if (type === 'success') {
+      onClose();
     }
   };
 
@@ -313,10 +553,85 @@ export default function ApplyCouponModal({
             />
           )}
         </Pressable>
+
+        {/* Apply feedback — celebration on success, shake + X on failure */}
+        {feedback && (
+          <FeedbackOverlay
+            type={feedback}
+            title={feedback === 'success' ? 'Coupon Applied!' : 'Coupon Not Applied'}
+            message={feedbackMessage}
+            theme={theme}
+            onFinish={() => handleFeedbackFinish(feedback)}
+          />
+        )}
       </Pressable>
     </Modal>
   );
 }
+
+const createFeedbackStyles = (colors: AppTheme['colors'], fontFamily: AppTheme['fontFamily']) =>
+  StyleSheet.create({
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.overlay,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 20,
+    },
+    card: {
+      alignItems: 'center',
+      width: 270,
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+      paddingVertical: 28,
+      paddingHorizontal: 22,
+    },
+    badgeArea: {
+      width: CONFETTI_BOX,
+      height: CONFETTI_BOX,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: -22,
+    },
+    badge: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    ring: {
+      position: 'absolute',
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+    },
+    title: {
+      fontSize: 19,
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'center',
+      fontFamily: fontFamily.heading,
+      marginBottom: 6,
+    },
+    message: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 19,
+      fontFamily: fontFamily.regular,
+      paddingHorizontal: 4,
+    },
+  });
 
 const createStyles = (theme: AppTheme) => {
   const { colors, fontFamily } = theme;
