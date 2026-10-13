@@ -21,3 +21,24 @@ jest.mock('@react-native-community/geolocation', () => {
 
   return module;
 });
+
+jest.mock('react-native-html-to-pdf', () => ({
+  __esModule: true,
+  generatePDF: jest.fn(async () => ({
+    filePath: '/tmp/invoice.pdf',
+    numberOfPages: 1,
+  })),
+}));
+
+jest.mock('react-native-blob-util', () => {
+  const actionViewIntent = jest.fn(async () => true);
+  const openDocument = jest.fn(async () => undefined);
+
+  return {
+    __esModule: true,
+    default: {
+      ios: { openDocument },
+      android: { actionViewIntent },
+    },
+  };
+});

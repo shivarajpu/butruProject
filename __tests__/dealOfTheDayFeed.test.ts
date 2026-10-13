@@ -17,7 +17,7 @@ jest.mock('../src/api/apiService', () => ({
 }));
 
 import { apiService } from '../src/api/apiService';
-import { clearCatalogCache, fetchProductsForSource } from '../src/storefront/catalog';
+import { clearCatalogCache, fetchProductsByCategoryName, fetchProductsForSource } from '../src/storefront/catalog';
 import { gridTileWidth } from '../src/widgets/common';
 import type { WidgetConfig } from '../src/storefront/types';
 
@@ -71,6 +71,50 @@ describe('deal of the day feed', () => {
     const products = await fetchProductsForSource({ source: 'new_arrivals' });
 
     expect(products.map(product => product.name)).toEqual(['hoodie']);
+  });
+});
+
+// ─── Category listing (banner CTA feed) & whole-catalogue sort ────────────────
+
+describe('category listing feed', () => {
+  beforeEach(() => {
+    clearCatalogCache();
+    mockedGet.mockReset();
+  });
+
+  it('queries the products endpoint by websiteCategory, newest first', async () => {
+    respondWith([{ _id: 'tee', name: 'Red Cotton T-Shirt', price: 399 }]);
+
+    await fetchProductsByCategoryName('Clothing', [], 9);
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      expect.stringContaining('websiteCategory=Clothing'),
+    );
+    expect(mockedGet).toHaveBeenCalledWith(
+      expect.stringContaining('sortBy=createdAt&sortOrder=desc'),
+    );
+    expect(mockedGet).toHaveBeenCalledWith(
+      expect.stringContaining('limit=9&page=1'),
+    );
+  });
+
+  it('sorts the whole-catalogue feed newest-first, like the admin grid', async () => {
+    respondWith([apiProduct('hoodie', true, 'hoodie')]);
+
+    await fetchProductsForSource({ source: 'all' });
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      expect.stringContaining('sortBy=createdAt&sortOrder=desc'),
+    );
+  });
+
+  it('falls back to client-side collection matching when the type is unknown', async () => {
+    respondWith([]);
+
+    const products = await fetchProductsByCategoryName('New Arrivals', [], 24);
+
+    expect(products).toEqual([]);
+    expect(mockedGet).toHaveBeenCalledTimes(2);
   });
 });
 

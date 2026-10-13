@@ -3,8 +3,8 @@
  *
  *   GET /api/storefront/coupons?slug=<storeSlug>
  *
- * Applying a code is a different endpoint and already lives with the cart
- * (`CartScreen` → POST /api/storefront/coupons/apply). This one only backs the
+*  Applying a code is a different endpoint and already lives with the cart
+ *  (`CartScreen` → POST /api/coupons/apply). This one only backs the
  * "Available Coupons" ticket list, so the shopper taps a coupon instead of
  * typing its code — the list is a convenience, the cart still does the real
  * validation and is what decides whether a discount actually applies.

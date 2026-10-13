@@ -1090,7 +1090,7 @@ const HomeTab = () => {
             ) : undefined
           }
           style={styles.searchInput}
-          placeholder="Search for styles, clothes & more"
+          placeholder="Search by product name"
           value={searchQuery}
           onChangeText={setSearchQuery}
           onFocus={() => setSearchActive(true)}

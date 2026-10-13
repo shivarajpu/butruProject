@@ -10,7 +10,7 @@ export type RootStackParamList = {
   ForgotPassword: undefined;
   Home: undefined;
   ProductDetails: { product: any };
-  CartScreen: undefined;
+  CartScreen: { mode?: 'buyNow' } | undefined;
   MyOrders: undefined;
   Notification: undefined;
   HelpSupport:

@@ -52,6 +52,28 @@ describe('view all link resolution', () => {
     });
   });
 
+  it('routes a category query param from any of the endpoint aliases', () => {
+    expect(resolveLink('/collections?type=Clothing', { config })).toEqual({
+      type: 'category',
+      category: 'Clothing',
+    });
+    expect(resolveLink('/collections?category=Clothing', { config })).toEqual({
+      type: 'category',
+      category: 'Clothing',
+    });
+    expect(resolveLink('/collections?websiteCategory=Clothing', { config })).toEqual({
+      type: 'category',
+      category: 'Clothing',
+    });
+  });
+
+  it('resolves the misspelled collections slug to the default product type', () => {
+    expect(resolveLink('/colllections', { config })).toEqual({
+      type: 'category',
+      category: 'Clothing',
+    });
+  });
+
   it('treats a bare "#" and "/" as no-ops', () => {
     expect(resolveLink('#')).toEqual({ type: 'none' });
     expect(resolveLink('/')).toEqual({ type: 'none' });

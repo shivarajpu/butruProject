@@ -252,11 +252,16 @@ export const clearCatalogCache = () => {
  * Products for a HomeTab category filter, by *name*.
  *
  * The drawer and the banner CTAs both address categories by title, and the
- * endpoint's `category` filter only understands the product type
- * (`websiteCategory`: `Clothing`, `Shoes`, `Accessories`) — for a collection
- * title such as `New Arrivals` it returns nothing. So the type filter is tried
- * first, and a collection title falls back to the same wide fetch plus
- * `matchesCollection` narrowing that `fetchProductsForSource` uses.
+ * endpoint's `websiteCategory` filter only understands the product type
+ * (`Clothing`, `Shoes`, `Accessories`) — for a collection title such as
+ * `New Arrivals` it returns nothing. So the type filter is tried first, and a
+ * collection title falls back to the same wide fetch plus `matchesCollection`
+ * narrowing that `fetchProductsForSource` uses.
+ *
+ * The type query asks the endpoint for newest-first (`sortBy=createdAt&
+ * sortOrder=desc`) paginated results — the same feed as the admin's product
+ * grid — so a banner CTA tagged with `websiteCategory=Clothing` shows exactly
+ * those products.
  */
 export const fetchProductsByCategoryName = async (
   category: string,
@@ -271,7 +276,7 @@ export const fetchProductsByCategoryName = async (
   if (!isCollection) {
     try {
       const response = await apiService.get<ApiProductsResponse>(
-        `${PRODUCTS_ENDPOINT}?isVisible=true&category=${encodeURIComponent(category)}`,
+        `${PRODUCTS_ENDPOINT}?isVisible=true&limit=${limit}&page=1&sortBy=createdAt&sortOrder=desc&websiteCategory=${encodeURIComponent(category)}`,
       );
       const products = (response?.data ?? []).map(mapApiProduct);
       if (products.length) return products;
@@ -324,6 +329,9 @@ export const fetchProductsForSource = async ({
     'isVisible=true',
     `limit=${requestLimit}`,
     ...Object.entries(query).map(([k, v]) => `${k}=${encodeURIComponent(v)}`),
+    // The whole-catalogue feed mirrors the admin's product grid (newest first).
+    // Flag-based feeds keep the endpoint's own ordering.
+    ...(source === 'all' ? ['page=1', 'sortBy=createdAt', 'sortOrder=desc'] : []),
   ].join('&');
 
   let remote: StoreProduct[] | null = null;

@@ -116,6 +116,9 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
   const [isDefault, setIsDefault] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [checkingPincode, setCheckingPincode] = useState(false);
+  const [pincodeStatus, setPincodeStatus] = useState<{ ok: boolean; message: string } | null>(
+    null,
+  );
   const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -158,6 +161,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     setStateName(editingAddress?.state || '');
     setIsDefault(editingAddress?.isDefault || false);
     setErrors({});
+    setPincodeStatus(null);
   }, [visible, editingAddress]);
 
   const clearError = (field: RequiredField) => {
@@ -431,150 +435,48 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     return '';
   };
 
-  const fetchCurrentPincode = async (): Promise<string> => {
-    if (locatingRef.current || checkingPincode) {
-      return pincode.trim();
-    }
-    locatingRef.current = true;
-    setCheckingPincode(true);
-    setMessage('');
-
-    const requestId = ++locationRequestRef.current;
-    const isStale = () => !visibleRef.current || requestId !== locationRequestRef.current;
-
-    try {
-      if (!(await hasLocationPermission())) {
-        if (!isStale()) {
-          Alert.alert(
-            'Location Permission',
-            'Location permission is needed to fetch your current address.',
-          );
-        }
-        return '';
-      }
-
-      const position = await getPositionWithFallback();
-
-      if (isStale()) {
-        return '';
-      }
-
-      const { latitude, longitude } = position.coords;
-      const reverseResponse = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=en&lat=${latitude}&lon=${longitude}`,
-        {
-          headers: {
-            Accept: 'application/json',
-            'User-Agent': 'ButruApp/1.0',
-            Referer: 'https://butru.in',
-          },
-        },
-      );
-      const reverse = await reverseResponse.json();
-      const info: Record<string, unknown> = reverse?.address || {};
-
-      const firstOf = (...keys: string[]): string => {
-        for (const key of keys) {
-          const value = info[key];
-          if (value != null && String(value).trim()) {
-            return String(value).trim();
-          }
-        }
-        return '';
-      };
-
-            let pin = firstOf('postcode').replace(/\s+/g, '') ||
-        firstOf('postal_code') ||
-        firstOf('pincode') ||
-        (reverse?.display_name && /\d{6}/.exec(String(reverse.display_name))?.[0]) ||
-        (reverse?.name && /\d{6}/.exec(String(reverse.name))?.[0]) ||
-        (reverse?.address && /\d{6}/.exec(JSON.stringify(reverse.address))?.[0]) ||
-        (reverse && /\d{6}/.exec(JSON.stringify(reverse))?.[0]) ||
-        '';
-      if (!pin) {
-        const full = JSON.stringify(reverse).toLowerCase();
-        if (full.includes('harda') || full.includes('kannod')) {
-          return '461441';
-        } else if (full.includes('bettiah')) {
-          return '845438';
-        } else if (full.includes('greater noida')) {
-          return '201308';
-        } else if (full.includes('noida')) {
-          return '201301';
-        } else if (/\d{6}/.test(full)) {
-          const m2 = full.match(/\d{6}/);
-          return m2 ? m2[0] : '';
-        }
-        if (!isStale()) setPincode('');
-        if (!isStale()) Alert.alert('Pincode not found', 'We could not find the pincode for your current location. Please enter it manually.');
-        return '';
-      }
-      if (!isStale()) setPincode(pin);
-      if (pin) setPincode(pin);
-      return pin;
-    } catch (error) {
-      if (!isStale()) {
-        const code = (error as GeolocationError | undefined)?.code;
-        if (code === 1) {
-          Alert.alert('Location Permission', 'Location permission is needed to fetch your current address.');
-        } else if (code === 2) {
-          Alert.alert('Location Unavailable', 'Could not get a location fix. Make sure Location Services are on and try again.');
-        } else {
-          Alert.alert('Location Failed', error instanceof Error ? error.message : 'Unable to fetch current location.');
-        }
-      }
-      return '';
-    } finally {
-      locatingRef.current = false;
-      setCheckingPincode(false);
-    }
-    return '';
-  };
-
   const checkPincode = async () => {
-    let code = pincode.trim();
-    if (!code) {
-      const fetched = await fetchCurrentPincode();
-      if (fetched) {
-        setPincode(fetched);
-        code = fetched;
-      } else if (pincode.trim()) {
-        code = pincode.trim();
-      }
+    const code = pincode.trim();
+    if (code.length !== 6) {
+      setPincodeStatus({ ok: false, message: 'Please enter a valid 6-digit pincode.' });
+      return;
     }
     if (checkingPincode) {
       return;
     }
     setCheckingPincode(true);
+    setPincodeStatus(null);
     try {
       const response = await apiService.get<CheckPincodeResponse>(
-        `${CHECK_PINCODE_API}?pincode=${encodeURIComponent(code)}&orderAmount=0`,
+        `${CHECK_PINCODE_API}?pincode=${encodeURIComponent(code)}`,
       );
       const data = response?.data;
       if (response?.success && data) {
         if (data.serviceable) {
-          Alert.alert(
-            'Pincode Serviceable',
-            data.message ||
+          setPincodeStatus({
+            ok: true,
+            message:
+              data.message ||
               `Delivery available. Estimated ${data.estimatedDelivery || '3-5 days'}.`,
-          );
+          });
         } else {
-          Alert.alert(
-            'Not Serviceable',
-            data.message || 'Delivery is not available for this pincode.',
-          );
+          setPincodeStatus({
+            ok: false,
+            message: data.message || 'Delivery is not available for this pincode.',
+          });
         }
       } else {
-        Alert.alert(
-          'Check Failed',
-          response?.message || 'Unable to check this pincode. Please try again.',
-        );
+        setPincodeStatus({
+          ok: false,
+          message: response?.message || 'Unable to check this pincode. Please try again.',
+        });
       }
     } catch (error) {
-      Alert.alert(
-        'Check Failed',
-        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
-      );
+      setPincodeStatus({
+        ok: false,
+        message:
+          error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      });
     } finally {
       setCheckingPincode(false);
     }
@@ -589,6 +491,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
     if (!fullName.trim()) nextErrors.fullName = 'This field is required';
     if (!mobile.trim()) nextErrors.mobile = 'This field is required';
     if (!pincode.trim()) nextErrors.pincode = 'This field is required';
+    else if (pincode.trim().length !== 6) nextErrors.pincode = 'Enter a valid 6-digit pincode';
     if (!address.trim()) nextErrors.address = 'This field is required';
     if (!city.trim()) nextErrors.city = 'This field is required';
 
@@ -779,9 +682,11 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                       keyboardType="number-pad"
                       placeholderTextColor={theme.colors.textMuted}
                       value={pincode}
+                      maxLength={6}
                       onChangeText={text => {
-                        setPincode(text);
+                        setPincode(text.replace(/\D/g, '').slice(0, 6));
                         clearError('pincode');
+                        setPincodeStatus(null);
                       }}
                     />
                   </View>
@@ -799,6 +704,15 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                 {!!errors.pincode && (
                   <Text style={styles.fieldError}>{errors.pincode}</Text>
                 )}
+                {pincodeStatus ? (
+                  <Text
+                    style={[
+                      styles.pinStatusText,
+                      pincodeStatus.ok ? styles.pinStatusSuccess : styles.pinStatusError,
+                    ]}>
+                    {pincodeStatus.message}
+                  </Text>
+                ) : null}
 
                 <Text style={styles.fieldLabel}>Address</Text>
                 <View style={styles.inputContainer}>
@@ -1035,6 +949,17 @@ const createStyles = (theme: AppTheme) => {
       color: colors.error,
       marginTop: 4,
       fontFamily: fontFamily.regular,
+    },
+    pinStatusText: {
+      fontSize: 11,
+      marginTop: 4,
+      fontFamily: fontFamily.medium,
+    },
+    pinStatusSuccess: {
+      color: colors.success,
+    },
+    pinStatusError: {
+      color: colors.error,
     },
     formInputWithIcon: {
       flex: 1,

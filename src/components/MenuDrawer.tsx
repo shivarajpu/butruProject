@@ -241,7 +241,12 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                     style={[styles.drawerItem, isActive && styles.drawerItemActive]}
                     activeOpacity={0.7}
                     onPress={() => handleItemPress(item)}>
-                    <BrandIcon icon={item.icon} width={21} height={21} />
+                    <BrandIcon
+                      icon={item.icon}
+                      width={21}
+                      height={21}
+                      color={isActive ? theme.colors.primary : theme.colors.textMuted}
+                    />
                     <Text
                       style={[
                         styles.drawerItemText,

@@ -26,10 +26,17 @@ export interface CartItem {
 
 export interface CartState {
   items: CartItem[];
+  /**
+   * Single product reserved by "Buy Now" for an immediate checkout.
+   * Lives separately from the saved cart so a Buy Now order never mixes
+   * with the user's existing bag items. Transient — not persisted.
+   */
+  buyNowItem: CartItem | null;
 }
 
 const initialState: CartState = {
   items: [],
+  buyNowItem: null,
 };
 
 export const loadCartState = async (): Promise<CartState> => {
@@ -49,7 +56,7 @@ export const loadCartState = async (): Promise<CartState> => {
 
 export const persistCartState = async (state: CartState) => {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ items: state.items }));
   } catch {
     // Ignore storage write failures.
   }
@@ -109,6 +116,33 @@ const cartSlice = createSlice({
       state.items = [];
       persistCartState(state);
     },
+    setBuyNowItem(
+      state,
+      action: PayloadAction<
+        Omit<CartItem, 'cartId' | 'quantity'> & {
+          quantity?: number;
+        }
+      >,
+    ) {
+      const incoming = action.payload;
+      state.buyNowItem = {
+        ...incoming,
+        cartId: `${incoming.productId}:${incoming.size || 'default'}`,
+        quantity: incoming.quantity ?? 1,
+      };
+    },
+    updateBuyNowQty(state, action: PayloadAction<{ delta: number }>) {
+      if (!state.buyNowItem) {
+        return;
+      }
+      state.buyNowItem = {
+        ...state.buyNowItem,
+        quantity: Math.max(1, state.buyNowItem.quantity + action.payload.delta),
+      };
+    },
+    clearBuyNowItem(state) {
+      state.buyNowItem = null;
+    },
   },
 });
 
@@ -119,6 +153,9 @@ export const {
   decrement,
   removeItem,
   clearCart,
+  setBuyNowItem,
+  updateBuyNowQty,
+  clearBuyNowItem,
 } = cartSlice.actions;
 
 /** Total units across all cart lines (used for the bag badge). */

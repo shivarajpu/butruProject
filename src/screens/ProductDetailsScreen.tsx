@@ -5,14 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   Image,
   useWindowDimensions,
   ActivityIndicator,
   Alert,
   Share,
-  Modal,
-  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -38,7 +35,7 @@ import StoreLogo from '../components/StoreLogo';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
+import { addItem as addCartItem, setBuyNowItem } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
@@ -57,7 +54,6 @@ const PRODUCT_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
 const WISHLIST_ITEMS_ENDPOINT = '/api/storefront/wishlist/items';
 const REVIEWS_ENDPOINT = '/api/reviews';
-const MY_ORDERS_ENDPOINT = '/api/storefront/orders/my?limit=200&page=1';
 
 interface ProductSku {
   size: string;
@@ -148,28 +144,6 @@ interface ProductReviewsResponse {
   count?: number;
   total?: number;
   message?: string;
-}
-
-interface SubmitReviewResponse {
-  success: boolean;
-  message?: string;
-  data?: unknown;
-}
-
-interface OrderLookupItem {
-  _id: string;
-  productId: string | { _id?: string; id?: string };
-}
-
-interface OrderLookup {
-  _id: string;
-  id?: string;
-  items?: OrderLookupItem[];
-}
-
-interface OrdersLookupResponse {
-  success: boolean;
-  data?: OrderLookup[];
 }
 
 interface ProductVariant {
@@ -282,38 +256,6 @@ const mapApiReview = (item: ApiReview): ReviewItem => {
     images: Array.isArray(item?.images) ? item.images : [],
     date: item?.createdAt || item?.date || '',
   };
-};
-
-/**
- * The review endpoint demands an `orderId` (it verifies the customer actually
- * bought the product). The product page has no order context, so the order
- * that contains this product is found by scanning the user's orders.
- */
-const findOrderIdForProduct = async (productIdValue: string): Promise<string> => {
-  if (!productIdValue) {
-    return '';
-  }
-  try {
-    const response = await apiService.get<OrdersLookupResponse>(MY_ORDERS_ENDPOINT);
-    const orders = response?.data ?? [];
-    if (!Array.isArray(orders)) {
-      return '';
-    }
-    for (const order of orders) {
-      const items = order.items ?? [];
-      const matched = items.some(item =>
-        typeof item.productId === 'object' && item.productId
-          ? (item.productId._id || item.productId.id) === productIdValue
-          : item.productId === productIdValue,
-      );
-      if (matched) {
-        return order._id || order.id || '';
-      }
-    }
-  } catch {
-    // Non-fatal — no order context means the review cannot be submitted here
-  }
-  return '';
 };
 
 interface ProductDetailsProps {
@@ -470,12 +412,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [reviewRating, setReviewRating] = useState(0);
-  const [reviewTitle, setReviewTitle] = useState('');
-  const [reviewComment, setReviewComment] = useState('');
-  const [reviewError, setReviewError] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   useEffect(() => {
     const firstImage = productData?.images?.[0];
@@ -574,6 +511,28 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       }),
     );
     Navigation.navigate('CartScreen' as never);
+  };
+
+  const handleBuyNow = () => {
+    if (!productData) return;
+    if (sizes.length > 0 && !selectedSize) {
+      setSizeError(true);
+      return;
+    }
+    dispatch(
+      setBuyNowItem({
+        productId: productData.id,
+        name: productData.name,
+        price: selectedVariant ? selectedVariant.price : productData.price,
+        originalPrice: productData.originalPrice,
+        image: selectedImg || productData.images?.[0] || '',
+        size: selectedSize,
+        color: selectedVariant?.color ?? productData.color ?? '',
+        productCode: (productData as { productCode?: string }).productCode || '',
+        quantity: 1,
+      }),
+    );
+    (Navigation as any).navigate('CartScreen', { mode: 'buyNow' });
   };
 
   // Modals state
@@ -718,76 +677,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
     : product?.rating || 0;
   const roundedAvg = Math.round(averageRating);
-
-  const openReviewForm = () => {
-    setReviewRating(0);
-    setReviewTitle('');
-    setReviewComment('');
-    setReviewError('');
-    setReviewModalOpen(true);
-  };
-
-  const closeReviewForm = () => {
-    setReviewModalOpen(false);
-  };
-
-  const submitReview = async () => {
-    if (submittingReview) {
-      return;
-    }
-    if (reviewRating < 1) {
-      setReviewError('Please select a star rating');
-      return;
-    }
-    if (!reviewTitle.trim()) {
-      setReviewError('Please add a title to your review');
-      return;
-    }
-    if (!reviewComment.trim()) {
-      setReviewError('Please write a few words about the product');
-      return;
-    }
-    setReviewError('');
-    setSubmittingReview(true);
-    try {
-      const orderIdValue = await findOrderIdForProduct(productId);
-      if (!orderIdValue) {
-        Alert.alert(
-          'Order not found',
-          'We could not find this product in your recent orders. Please review it from your orders.',
-        );
-        return;
-      }
-      const response = await apiService.post<SubmitReviewResponse>(
-        REVIEWS_ENDPOINT,
-        {
-          productId,
-          orderId: orderIdValue,
-          rating: reviewRating,
-          title: reviewTitle.trim(),
-          comment: reviewComment.trim(),
-          images: [],
-        },
-      );
-      if (response?.success) {
-        Alert.alert(
-          'Thank you!',
-          response.message || 'Your review has been submitted and will appear shortly.',
-        );
-        setReviewModalOpen(false);
-        fetchReviews(productId);
-      } else {
-        Alert.alert('Could not submit', response?.message || 'Something went wrong. Please try again.');
-      }
-    } catch (err) {
-      Alert.alert(
-        'Could not submit',
-        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
-      );
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
 
   const starIcon = (filled: boolean, size: number, color: string) =>
     `<svg width="${size}" height="${size}" viewBox="0 0 24 24" ${filled ? `fill="${color}"` : 'fill="none"'}${filled ? '' : ` stroke="${color}" stroke-width="1.5"`}><path d="${STAR_SVG_PATH}"/></svg>`;
@@ -970,7 +859,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <TouchableOpacity
                 style={styles.buyNowBtn}
                 activeOpacity={0.8}
-                onPress={handleAddToCart}>
+                onPress={handleBuyNow}>
                 <Text style={styles.buyNowBtnText}>Buy Now</Text>
               </TouchableOpacity>
 
@@ -1125,13 +1014,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                   <Text style={styles.reviewCount}>({reviews.length})</Text>
                 </View>
               </View>
-
-              <TouchableOpacity
-                style={styles.writeReviewBtn}
-                activeOpacity={0.8}
-                onPress={openReviewForm}>
-                <Text style={styles.writeReviewText}>Write a Review</Text>
-              </TouchableOpacity>
             </View>
 
             {reviewsLoading ? (
@@ -1145,7 +1027,8 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                 </Text>
               </View>
             ) : (
-              reviews.map(r => (
+              <>
+                {(showAllReviews ? reviews : reviews.slice(0, 2)).map(r => (
                 <View key={r.id || `${r.name}-${r.date}`} style={styles.reviewCard}>
                   <View style={styles.reviewCardHeader}>
                     {r.photo ? (
@@ -1197,7 +1080,20 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
                     </ScrollView>
                   ) : null}
                 </View>
-              ))
+              ))}
+                {reviews.length > 2 && (
+                  <TouchableOpacity
+                    style={styles.showMoreReviewsBtn}
+                    activeOpacity={0.8}
+                    onPress={() => setShowAllReviews(prev => !prev)}>
+                    <Text style={styles.showMoreReviewsText}>
+                      {showAllReviews
+                        ? 'Show less'
+                        : `Show more (${reviews.length - 2})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
 
@@ -1235,99 +1131,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
           onClose={() => setIsAddAddressModalVisible(false)}
           onSaved={handleAddressSaved}
         />
-
-        {/* 3. WRITE A REVIEW MODAL */}
-        <Modal
-          visible={reviewModalOpen}
-          transparent
-          animationType="slide"
-          onRequestClose={closeReviewForm}>
-          <TouchableWithoutFeedback onPress={closeReviewForm}>
-            <View style={styles.reviewModalOverlay}>
-              <TouchableWithoutFeedback>
-                <View
-                  style={[
-                    styles.reviewModalContent,
-                    { paddingBottom: 24 + Math.max(insets.bottom, 16) },
-                  ]}>
-                  <View style={styles.reviewModalDrag} />
-
-                  <View style={styles.reviewModalHeader}>
-                    <Text style={styles.reviewModalTitle}>Write a Review</Text>
-                    <TouchableOpacity
-                      style={styles.reviewModalClose}
-                      onPress={closeReviewForm}>
-                      <BrandIcon icon={BRAND.close} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text style={styles.reviewFieldLabel}>Your Rating</Text>
-                    <View style={styles.reviewStarPicker}>
-                      {[1, 2, 3, 4, 5].map(i => (
-                        <TouchableOpacity
-                          key={i}
-                          activeOpacity={0.7}
-                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                          onPress={() => {
-                            setReviewRating(i);
-                            setReviewError('');
-                          }}>
-                          <SvgXml
-                            xml={starIcon(i <= reviewRating, 30, '#FFB400')}
-                            width={30}
-                            height={30}
-                          />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {!!reviewError && (
-                      <Text style={styles.reviewErrorText}>{reviewError}</Text>
-                    )}
-
-                    <Text style={styles.reviewFieldLabel}>Title</Text>
-                    <TextInput
-                      style={styles.reviewInput}
-                      placeholder="e.g. Super soft fabric!"
-                      placeholderTextColor={theme.colors.textMuted}
-                      value={reviewTitle}
-                      onChangeText={setReviewTitle}
-                      maxLength={80}
-                    />
-
-                    <Text style={styles.reviewFieldLabel}>Your Review</Text>
-                    <TextInput
-                      style={[styles.reviewInput, styles.reviewTextArea]}
-                      placeholder="Share your experience about this product…"
-                      placeholderTextColor={theme.colors.textMuted}
-                      value={reviewComment}
-                      onChangeText={setReviewComment}
-                      multiline
-                      maxLength={600}
-                      textAlignVertical="top"
-                    />
-
-                    <TouchableOpacity
-                      style={[
-                        styles.submitReviewBtn,
-                        submittingReview && styles.submitReviewBtnDisabled,
-                      ]}
-                      activeOpacity={0.8}
-                      disabled={submittingReview}
-                      onPress={submitReview}>
-                      {submittingReview ? (
-                        <ActivityIndicator color={theme.colors.textOnPrimary} />
-                      ) : (
-                        <Text style={styles.submitReviewText}>Submit Review</Text>
-                      )}
-                    </TouchableOpacity>
-                  </ScrollView>
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -2178,16 +1981,19 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textSecondary,
     fontFamily: FONTS.poppinsRegular,
   },
-  writeReviewBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  showMoreReviewsBtn: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
-  writeReviewText: {
+  showMoreReviewsText: {
     fontSize: 12,
     fontFamily: FONTS.poppinsSemiBold,
-    color: colors.textOnPrimary,
+    color: colors.primary,
   },
   reviewsLoadingBox: {
     paddingVertical: 24,
@@ -2264,96 +2070,6 @@ const createStyles = (theme: AppTheme) => {
     height: 72,
     borderRadius: 10,
     backgroundColor: colors.surfaceVariant,
-  },
-
-  /* Write a Review modal */
-  reviewModalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  reviewModalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    maxHeight: '80%',
-  },
-  reviewModalDrag: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: 12,
-  },
-  reviewModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  reviewModalTitle: {
-    fontSize: 17,
-    fontFamily: FONTS.poppinsBold,
-    color: colors.text,
-  },
-  reviewModalClose: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewFieldLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  reviewStarPicker: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  reviewErrorText: {
-    fontSize: 11,
-    color: colors.error,
-    marginTop: 6,
-    fontFamily: fontFamily.regular,
-  },
-  reviewInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceVariant,
-    fontSize: 12,
-    color: colors.text,
-    paddingHorizontal: 12,
-    height: 42,
-  },
-  reviewTextArea: {
-    height: 100,
-    paddingTop: 10,
-  },
-  submitReviewBtn: {
-    backgroundColor: colors.primary,
-    height: 44,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 18,
-    marginBottom: 8,
-  },
-  submitReviewBtnDisabled: {
-    opacity: 0.6,
-  },
-  submitReviewText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textOnPrimary,
   },
   });
 };

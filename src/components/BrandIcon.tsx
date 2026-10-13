@@ -35,6 +35,11 @@ export type BrandIconProps = Omit<SvgProps, 'xml' | 'style'> & {
   /** A registry entry from `assets/svg/brand`. */
   icon: BrandIconDef;
   /**
+   * Overrides the registry tone with an explicit colour (e.g. an
+   * active/inactive state). Falls back to `icon.tone` when omitted.
+   */
+  color?: string;
+  /**
    * react-native-svg types `style` against its own narrower CSS-ish object —
    * it rejects values a `ViewStyle` legitimately allows, such as
    * `overflow: 'scroll'`. Call sites should not have to know that, so the
@@ -43,12 +48,12 @@ export type BrandIconProps = Omit<SvgProps, 'xml' | 'style'> & {
   style?: StyleProp<ViewStyle>;
 };
 
-export function BrandIcon({ icon, style, ...rest }: BrandIconProps) {
+export function BrandIcon({ icon, color, style, ...rest }: BrandIconProps) {
   const { colors } = useAppTheme();
 
   const xml = useMemo(
-    () => icon.svg(colors[TONE_TOKEN[icon.tone]]),
-    [icon, colors],
+    () => icon.svg(color ?? colors[TONE_TOKEN[icon.tone]]),
+    [icon, color, colors],
   );
 
   return <SvgXml xml={xml} style={style as SvgProps['style']} {...rest} />;

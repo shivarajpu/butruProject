@@ -11,16 +11,21 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Clipboard,
+  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import { generatePDF } from 'react-native-html-to-pdf';
+import BlobUtil from 'react-native-blob-util';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { FONTS } from '../constants/fonts';
 import { apiService } from '../api/apiService';
+import APP_CONFIG from '../config/clients';
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 
@@ -69,10 +74,14 @@ const gearIcon = (color: string) =>
 const truckIcon = (color: string) =>
   `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="1" y="3" width="15" height="13" stroke="${color}" stroke-width="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="${color}" stroke-width="2"/><circle cx="5.5" cy="18.5" r="2.5" fill="${color}"/><circle cx="18.5" cy="18.5" r="2.5" fill="${color}"/></svg>`;
 
+const starIcon = (filled: boolean, size: number, color: string) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" ${filled ? `fill="${color}"` : 'fill="none"'}${filled ? '' : ` stroke="${color}" stroke-width="1.5"`}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01L12 2z"/></svg>`;
+
 // ─── Types & API Contracts ────────────────────────────────────────────────────
 
 type ProductItem = {
   id: string;
+  productId: string;
   code?: string;
   name: string;
   size: string;
@@ -194,6 +203,7 @@ type CancellationReasonsResponse = {
 const MY_ORDERS_ENDPOINT = '/api/storefront/orders/my?limit=200&page=1';
 const CANCEL_ORDER_ENDPOINT = '/api/storefront/orders';
 const CANCELLATION_REASONS_ENDPOINT = '/api/storefront/orders/cancellation-reasons';
+const REVIEWS_ENDPOINT = '/api/reviews';
 
 const MONTHS = [
   'Jan',
@@ -239,6 +249,7 @@ const mapApiOrder = (order: ApiOrder): OrderType => {
       item.productName;
     return {
       id: item._id || productId,
+      productId: productId || '',
       code: item.productCode || item.sku,
       name: productName,
       size: item.size || item.sku || '',
@@ -283,6 +294,120 @@ const getOrderBucket = (order: OrderType): string => {
     return 'Delivered';
   }
   return 'On the way';
+};
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const money = (value: number): string => `Rs. ${(value || 0).toFixed(2)}`;
+
+const buildInvoiceHtml = (order: OrderType, appName: string): string => {
+  const items =
+    order.items
+      .map(
+        item => `<tr>
+        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;">${escapeHtml(item.name)}<br/><span style="font-size:10px;color:#888;">${escapeHtml(item.code || '')}</span></td>
+        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:center;">${escapeHtml(item.size || '-')}</td>
+        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:center;">${item.qty}</td>
+        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:right;">${money(item.price)}</td>
+        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:right;">${money(item.price * item.qty)}</td>
+      </tr>`,
+      )
+      .join('') ||
+    '<tr><td colspan="5" style="padding:8px;text-align:center;color:#888;">No items</td></tr>';
+
+  const address = order.shippingAddress
+    ? [
+        order.shippingAddress.name,
+        order.shippingAddress.street,
+        [order.shippingAddress.city, order.shippingAddress.state]
+          .filter(Boolean)
+          .join(', '),
+        order.shippingAddress.pincode,
+        order.shippingAddress.country,
+        order.shippingAddress.phone,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .map(line => `<div>${escapeHtml(line)}</div>`)
+        .join('')
+    : 'Not provided';
+
+  const statusText = `${order.status}${order.trackingStatus ? ` - ${order.trackingStatus}` : ''}`;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; color: #222; }
+    .page { padding: 24px 28px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #837BA2; padding-bottom: 14px; margin-bottom: 18px; }
+    .store { font-size: 24px; font-weight: bold; color: #837BA2; }
+    .doc-title { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    h3 { margin: 16px 0 8px; font-size: 14px; color: #555; text-transform: uppercase; }
+    .meta { font-size: 12px; color: #444; }
+    .meta td { padding: 2px 0; }
+    table.items { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+    table.items th { background: #f3f0fa; color: #555; font-size: 11px; text-align: left; padding: 8px 6px; text-transform: uppercase; }
+    .totals { width: 260px; margin-left: auto; margin-top: 14px; font-size: 13px; }
+    .totals td { padding: 3px 0; }
+    .totals tr.total td { border-top: 2px solid #837BA2; font-weight: bold; font-size: 15px; padding-top: 8px; }
+    .address-box { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #333; }
+    .footer { margin-top: 26px; text-align: center; font-size: 10px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <div class="store">${escapeHtml(appName || 'Store')}</div>
+        <div class="doc-title">Tax Invoice / Order Summary</div>
+      </div>
+      <table class="meta">
+        <tr><td>Order ID</td><td><b>${escapeHtml(order.orderId)}</b></td></tr>
+        <tr><td>Order Date</td><td><b>${escapeHtml(order.date)}</b></td></tr>
+        <tr><td>Status</td><td><b>${escapeHtml(statusText)}</b></td></tr>
+      </table>
+    </div>
+
+    <h3>Order Summary</h3>
+    <table class="items">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th style="text-align:center;">Size</th>
+          <th style="text-align:center;">Qty</th>
+          <th style="text-align:right;">Price</th>
+          <th style="text-align:right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${items}</tbody>
+    </table>
+
+    <table class="totals">
+      <tr><td>Subtotal</td><td style="text-align:right;">${money(order.subtotal)}</td></tr>
+      <tr><td>Shipping</td><td style="text-align:right;">${money(order.shippingCharges)}</td></tr>
+      <tr><td>Discount</td><td style="text-align:right;">- ${money(order.discount)}</td></tr>
+      <tr><td>Tax (GST)</td><td style="text-align:right;">${money(order.tax)}</td></tr>
+      <tr class="total"><td>TOTAL</td><td style="text-align:right;">${money(order.totalAmount)}</td></tr>
+    </table>
+
+    <h3>Delivery Address</h3>
+    <div class="address-box">${address}</div>
+
+    <h3>Payment Method</h3>
+    <div style="font-size:13px;">${escapeHtml(order.paymentMethod || 'COD')}</div>
+
+    <div class="footer">Thank you for shopping with ${escapeHtml(appName)}</div>
+  </div>
+</body>
+</html>`;
 };
 
 // ─── StyleSheet Factory (Theme-aware) ─────────────────────────────────────────
@@ -951,6 +1076,70 @@ closeBtnCircle: {
   justifyContent: 'center',
   alignItems: 'center',
 },
+
+/* Write a Review */
+writeReviewBtn: {
+  backgroundColor: colors.primary,
+  borderRadius: 12,
+  paddingVertical: 13,
+  alignItems: 'center',
+  marginTop: 14,
+},
+writeReviewBtnText: {
+  color: colors.textOnPrimary,
+  fontSize: 14,
+  fontFamily: FONTS.poppinsSemiBold,
+},
+reviewModalSheet: {
+  backgroundColor: '#FFFFFF',
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  paddingHorizontal: 20,
+  paddingBottom: 28,
+  paddingTop: 10,
+  maxHeight: '88%',
+},
+reviewFieldLabel: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#374151',
+  marginTop: 14,
+  marginBottom: 8,
+},
+reviewStarPicker: {
+  flexDirection: 'row',
+  gap: 10,
+},
+reviewErrorText: {
+  color: '#DC2626',
+  fontSize: 12,
+  marginTop: 8,
+},
+reviewInput: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  fontSize: 14,
+  color: '#111827',
+  backgroundColor: '#F9FAFB',
+},
+reviewTextArea: {
+  minHeight: 96,
+},
+reviewSubmitBtn: {
+  backgroundColor: colors.primary,
+  borderRadius: 12,
+  paddingVertical: 14,
+  alignItems: 'center',
+  marginTop: 20,
+},
+reviewSubmitBtnText: {
+  color: '#FFFFFF',
+  fontSize: 15,
+  fontWeight: '700',
+},
 dropdownContainer: {
   borderWidth: 1,
   borderColor: '#E5E7EB',
@@ -1067,11 +1256,21 @@ const MyOrdersScreen = ({ navigation }: Props) => {
   const [selectedStatus, setSelectedStatus] = useState('All statuses');
   const [selectedTime, setSelectedTime] = useState('Anytime');
   const [activeTab, setActiveTab] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 const [cancelModalVisible, setCancelModalVisible] = useState(false);
 const [isDropdownOpen, setIsDropdownOpen] = useState(true);
 const [selectedReason, setSelectedReason] = useState<string | null>(null);
 const [cancelling, setCancelling] = useState(false);
 const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
+const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
+  // Write-a-Review (delivered items only)
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const selectedOrder =
     orders.find(o => o.id === selectedOrderId) || orders[0] || null;
@@ -1082,12 +1281,48 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
         .includes('cancel')
     : false;
 
+  const isDelivered = selectedOrder
+    ? getOrderBucket(selectedOrder) === 'Delivered'
+    : false;
+
   const filteredOrders = useMemo(() => {
-    if (activeTab === 'All') {
-      return orders;
+    const query = searchQuery.trim().toLowerCase();
+    const matchesStatus = (order: OrderType) =>
+      activeTab === 'All' || getOrderBucket(order) === activeTab;
+    const matchesTime = (order: OrderType) => {
+      if (selectedTime === 'Anytime' || !order.rawDate) {
+        return true;
+      }
+      const placedAt = new Date(order.rawDate).getTime();
+      if (Number.isNaN(placedAt)) {
+        return true;
+      }
+      const now = Date.now();
+      const days =
+        selectedTime === 'Last 30 days' ? 30 : selectedTime === 'Last 6 months' ? 180 : 365;
+      return now - placedAt <= days * 24 * 60 * 60 * 1000;
+    };
+    if (!query) {
+      return orders.filter(order => matchesStatus(order) && matchesTime(order));
     }
-    return orders.filter(order => getOrderBucket(order) === activeTab);
-  }, [orders, activeTab]);
+    return orders.filter(order => {
+      if (!matchesStatus(order) || !matchesTime(order)) {
+        return false;
+      }
+      const idMatch =
+        order.orderId.toLowerCase().includes(query) ||
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.id.toLowerCase().includes(query);
+      if (idMatch) {
+        return true;
+      }
+      return order.items.some(
+        item =>
+          item.name.toLowerCase().includes(query) ||
+          (item.code || '').toLowerCase().includes(query),
+      );
+    });
+  }, [orders, activeTab, searchQuery, selectedTime]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -1134,6 +1369,42 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
       navigation.canGoBack() && navigation.goBack();
     }
   };
+
+  const handleCopyOrderId = useCallback((orderId: string) => {
+    Clipboard.setString(orderId.replace(/^#/, ''));
+  }, []);
+
+  const handleDownloadInvoice = useCallback(async () => {
+    if (!selectedOrder) {
+      return;
+    }
+    setDownloadingInvoice(true);
+    try {
+      const html = buildInvoiceHtml(selectedOrder, APP_CONFIG.appName);
+      const file = await generatePDF({
+        html,
+        fileName: `invoice-${selectedOrder.orderNumber || selectedOrder.id}`.replace(/[^a-zA-Z0-9_-]/g, ''),
+        base64: false,
+        padding: 16,
+        bgColor: '#FFFFFF',
+      });
+      if (Platform.OS === 'android') {
+        await BlobUtil.android.actionViewIntent(
+          file.filePath,
+          'application/pdf',
+        );
+      } else {
+        await BlobUtil.ios.openDocument(file.filePath.replace(/^file:\/\//, ''));
+      }
+    } catch (err) {
+      Alert.alert(
+        'Invoice Failed',
+        err instanceof Error ? err.message : 'Unable to generate the invoice PDF. Please try again.',
+      );
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  }, [selectedOrder]);
 
   const handleOpenOrder = (order: OrderType, from: 'TRACK' | 'LIST') => {
     setSelectedOrderId(order.id);
@@ -1208,6 +1479,70 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
     }
   };
 
+  const openReviewForm = () => {
+    setReviewRating(0);
+    setReviewTitle('');
+    setReviewComment('');
+    setReviewError('');
+    setReviewModalVisible(true);
+  };
+
+  const closeReviewForm = () => {
+    setReviewModalVisible(false);
+  };
+
+  const submitProductReview = async () => {
+    if (submittingReview || !selectedOrder || !selectedProduct) {
+      return;
+    }
+    if (reviewRating < 1) {
+      setReviewError('Please select a star rating');
+      return;
+    }
+    if (!reviewTitle.trim()) {
+      setReviewError('Please add a title to your review');
+      return;
+    }
+    if (!reviewComment.trim()) {
+      setReviewError('Please write a few words about the product');
+      return;
+    }
+    setReviewError('');
+    setSubmittingReview(true);
+    try {
+      const response = await apiService.post<{ success: boolean; message?: string }>(
+        REVIEWS_ENDPOINT,
+        {
+          productId: selectedProduct.productId,
+          orderId: selectedOrder.id,
+          rating: reviewRating,
+          title: reviewTitle.trim(),
+          comment: reviewComment.trim(),
+          images: [],
+        },
+      );
+      if (response?.success) {
+        Alert.alert(
+          'Thank you!',
+          response.message || 'Your review has been submitted and will appear shortly.',
+        );
+        setReviewModalVisible(false);
+      } else {
+        Alert.alert(
+          'Could not submit',
+          response?.message || 'Something went wrong. Please try again.',
+        );
+      }
+    } catch (err) {
+      Alert.alert(
+        'Could not submit',
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
@@ -1242,10 +1577,16 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
                 placeholder="Search by order ID or product name"
                 placeholderTextColor={colors.textMuted}
                 style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
               />
               <TouchableOpacity
                 style={styles.insideFilterBtn}
-                onPress={() => setFilterVisible(true)}
+                onPress={() => {
+                  setSelectedStatus(activeTab === 'All' ? 'All statuses' : activeTab);
+                  setFilterVisible(true);
+                }}
                 activeOpacity={0.7}>
                 <SvgXml xml={filterIcon(colors.textMuted)} width={18} height={18} />
               </TouchableOpacity>
@@ -1265,24 +1606,26 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
             ))}
           </ScrollView>
 
-          <View style={styles.metricsRow}>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Total orders</Text>
-              <Text style={styles.metricValue}>{orders.length}</Text>
+          {activeTab === 'All' && !searchQuery.trim() && selectedTime === 'Anytime' ? (
+            <View style={styles.metricsRow}>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Total orders</Text>
+                <Text style={styles.metricValue}>{orders.length}</Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>On the way</Text>
+                <Text style={[styles.metricValue , {color:"#2563EB"}]}>
+                  {orders.filter(o => getOrderBucket(o) === 'On the way').length}
+                </Text>
+              </View>
+              <View style={styles.metricCard}>
+                <Text style={styles.metricLabel}>Delivered</Text>
+                <Text style={[styles.metricValue, { color: colors.success }]}>
+                  {orders.filter(o => getOrderBucket(o) === 'Delivered').length}
+                </Text>
+              </View>
             </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>In progress</Text>
-              <Text style={[styles.metricValue , {color:"#2563EB"}]}>
-                {orders.filter(o => getOrderBucket(o) === 'On the way').length}
-              </Text>
-            </View>
-            <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Delivered</Text>
-              <Text style={[styles.metricValue, { color: colors.success }]}>
-                {orders.filter(o => getOrderBucket(o) === 'Delivered').length}
-              </Text>
-            </View>
-          </View>
+          ) : null}
 
           {loading ? (
             <View style={{ paddingVertical: 64, alignItems: 'center' }}>
@@ -1367,7 +1710,13 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
                       <Text style={styles.orderIdLabel}>ORDER ID</Text>
                       <View style={styles.orderIdRow}>
                         <Text style={styles.orderIdText}>{order.orderId}</Text>
-                        <SvgXml xml={copyIcon(colors.textMuted)} style={{ marginLeft: 6 }} />
+                        <TouchableOpacity
+                          onPress={() => handleCopyOrderId(order.orderId)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          activeOpacity={0.7}
+                          style={{ marginLeft: 6 }}>
+                          <SvgXml xml={copyIcon(colors.textMuted)} />
+                        </TouchableOpacity>
                       </View>
                     </View>
                     <View style={styles.priceAlignEnd}>
@@ -1605,6 +1954,15 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
             </View>
           )}
 
+          {isDelivered && selectedProduct && (
+            <TouchableOpacity
+              style={styles.writeReviewBtn}
+              activeOpacity={0.8}
+              onPress={openReviewForm}>
+              <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.sectionHeading}>Other Items In This Order</Text>
           <Text style={styles.orderIdSub}>Order ID {selectedOrder?.orderId}</Text>
 
@@ -1648,8 +2006,16 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
               <Text style={styles.totalBoldValue}>Rs. {formatMoney(selectedOrder?.totalAmount ?? 0)}</Text>
             </View>
 
-            <TouchableOpacity style={styles.downloadInvoiceBtn} activeOpacity={0.8}>
-              <Text style={styles.downloadInvoiceText}>Download Invoice</Text>
+            <TouchableOpacity
+              style={[styles.downloadInvoiceBtn, downloadingInvoice && { opacity: 0.6 }]}
+              onPress={handleDownloadInvoice}
+              disabled={downloadingInvoice}
+              activeOpacity={0.8}>
+              {downloadingInvoice ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.downloadInvoiceText}>Download Invoice</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -1749,11 +2115,18 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
                 onPress={() => {
                   setSelectedStatus('All statuses');
                   setSelectedTime('Anytime');
+                  setActiveTab('All');
                 }}
                 activeOpacity={0.7}>
                 <Text style={styles.clearBtnText}>Clear</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.applyBtn} onPress={() => setFilterVisible(false)} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.applyBtn}
+                onPress={() => {
+                  setActiveTab(selectedStatus === 'All statuses' ? 'All' : selectedStatus);
+                  setFilterVisible(false);
+                }}
+                activeOpacity={0.8}>
                 <Text style={styles.applyBtnText}>Apply Filters</Text>
               </TouchableOpacity>
             </View>
@@ -1852,6 +2225,89 @@ const [cancelReasons, setCancelReasons] = useState<string[]>(CANCEL_REASONS);
     </View>
   </View>
 </Modal>
+
+      {/* WRITE A REVIEW BOTTOM SHEET MODAL */}
+      <Modal
+        visible={reviewModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeReviewForm}>
+        <View style={styles.modalOverlay1}>
+          <View
+            style={[
+              styles.reviewModalSheet,
+              { paddingBottom: 28 + Math.max(insets.bottom, 16) },
+            ]}>
+            <View style={styles.modalHandle1} />
+
+            <View style={styles.cancelModalHeader}>
+              <View>
+                <Text style={styles.cancelModalTitle}>Write a Review</Text>
+                <Text style={styles.cancelModalSubtitle} numberOfLines={1}>
+                  {selectedProduct?.name || 'Rate this product'}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.closeBtnCircle} onPress={closeReviewForm}>
+                <BrandIcon icon={BRAND.close} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.reviewFieldLabel}>Your Rating</Text>
+              <View style={styles.reviewStarPicker}>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <TouchableOpacity
+                    key={i}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                    onPress={() => {
+                      setReviewRating(i);
+                      setReviewError('');
+                    }}>
+                    <SvgXml xml={starIcon(i <= reviewRating, 30, '#FFB400')} width={30} height={30} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {!!reviewError && <Text style={styles.reviewErrorText}>{reviewError}</Text>}
+
+              <Text style={styles.reviewFieldLabel}>Title</Text>
+              <TextInput
+                style={styles.reviewInput}
+                placeholder="e.g. Super soft fabric!"
+                placeholderTextColor={colors.textMuted}
+                value={reviewTitle}
+                onChangeText={setReviewTitle}
+                maxLength={80}
+              />
+
+              <Text style={styles.reviewFieldLabel}>Your Review</Text>
+              <TextInput
+                style={[styles.reviewInput, styles.reviewTextArea]}
+                placeholder="Share your experience about this product…"
+                placeholderTextColor={colors.textMuted}
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                multiline
+                maxLength={600}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={[styles.reviewSubmitBtn, submittingReview && { opacity: 0.6 }]}
+                activeOpacity={0.8}
+                disabled={submittingReview}
+                onPress={submitProductReview}>
+                {submittingReview ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.reviewSubmitBtnText}>Submit Review</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

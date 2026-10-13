@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { LOCATION_PIN_SVG } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
@@ -32,6 +32,8 @@ import {
   decrement,
   removeItem as removeCartItem,
   clearCart,
+  updateBuyNowQty,
+  clearBuyNowItem,
 } from '../store/slices/cartSlice';
 import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
@@ -55,7 +57,7 @@ const PAYMENT_COD_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="n
 const HOME_WHITE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>`;
 
 const CREATE_ORDER_ENDPOINT = '/api/storefront/orders/create';
-const COUPON_APPLY_ENDPOINT = '/api/storefront/coupon/apply';
+const COUPON_APPLY_ENDPOINT = '/api/coupons/apply';
 
 interface CouponApplyResponse {
   success: boolean;
@@ -72,6 +74,12 @@ const CartScreen = () => {
   const addressMaxWidth = Math.min(width * 0.42, 200);
   const dispatch = useDispatch<AppDispatch>();
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const buyNowItem = useSelector((state: RootState) => state.cart.buyNowItem);
+  const route = useRoute<any>();
+  const isBuyNow = route.params?.mode === 'buyNow';
+
+  // Buy Now checkout renders only the reserved item; bag/Add To Cart shows the full saved cart.
+  const checkoutItems = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
 
   // Dynamic States
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
@@ -204,7 +212,7 @@ const CartScreen = () => {
     if (isProcessingPayment) {
       return;
     }
-    if (!cartItems.length) {
+    if (!checkoutItems.length) {
       return;
     }
     if (!selectedAddress) {
@@ -220,7 +228,7 @@ const CartScreen = () => {
         phone: profile?.phone || selectedAddress.phone || '',
       };
 
-      const items = cartItems.map(item => ({
+      const items = checkoutItems.map(item => ({
         productId: item.productId,
         productName: item.name,
         productCode: item.productCode || '',
@@ -268,7 +276,11 @@ const CartScreen = () => {
         const placedOrder = response.data ?? response;
         const placedOrderNumber = placedOrder?.orderNumber || placedOrder?._id || placedOrder?.id || '';
         setOrderId(placedOrderNumber ? `#${placedOrderNumber}` : `BTRS${Math.floor(100000 + Math.random() * 900000)}`);
-        dispatch(clearCart());
+        if (isBuyNow) {
+          dispatch(clearBuyNowItem());
+        } else {
+          dispatch(clearCart());
+        }
         setIsProcessingPayment(false);
         setIsPaymentSuccess(true);
       } else {
@@ -298,8 +310,8 @@ const CartScreen = () => {
   const isCOD = paymentMethod === 'COD';
 
   // --- Dynamic Calculations ---
-  const totalMRP = cartItems.reduce((acc, item) => acc + item.originalPrice * item.quantity, 0);
-  const subTotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const totalMRP = checkoutItems.reduce((acc, item) => acc + item.originalPrice * item.quantity, 0);
+  const subTotal = checkoutItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const discountRs = totalMRP - subTotal;
   const discountPercentage = totalMRP > 0 ? Math.round((discountRs / totalMRP) * 100) : 0;
   
@@ -309,6 +321,10 @@ const CartScreen = () => {
 
   // --- Handlers ---
   const updateQuantity = (cartId: string, delta: number) => {
+    if (isBuyNow && buyNowItem) {
+      dispatch(updateBuyNowQty({ delta }));
+      return;
+    }
     if (delta < 0) {
       dispatch(decrement(cartId));
     } else {
@@ -317,6 +333,10 @@ const CartScreen = () => {
   };
 
   const removeItem = (cartId: string) => {
+    if (isBuyNow && buyNowItem) {
+      dispatch(clearBuyNowItem());
+      return;
+    }
     dispatch(removeCartItem(cartId));
   };
 
@@ -347,20 +367,17 @@ const CartScreen = () => {
     if (!trimmed) {
       return { success: false, message: 'Please enter coupon code' };
     }
-    if (cartItems.length === 0) {
+    if (checkoutItems.length === 0) {
       return { success: false, message: 'Your cart is empty.' };
     }
     try {
       const response = await apiService.post<CouponApplyResponse>(COUPON_APPLY_ENDPOINT, {
         code: trimmed,
         subtotal: subTotal,
-        cartItems: cartItems.map(item => ({
+        cartItems: checkoutItems.map(item => ({
           productId: item.productId,
-          quantity: item.quantity,
-          size: item.size,
-          price: item.price,
           finalPrice: item.price * item.quantity,
-          category: item.name,
+          quantity: item.quantity,
         })),
       });
       if (response.success) {
@@ -418,7 +435,7 @@ const CartScreen = () => {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Dynamic Cart Items List */}
-          {cartItems.map(item => (
+          {checkoutItems.map(item => (
             <View key={item.cartId} style={styles.cartItemCard}>
               <Image source={{ uri: item.image }} style={styles.itemImage} />
 
@@ -456,7 +473,7 @@ const CartScreen = () => {
             </View>
           ))}
 
-          {cartItems.length === 0 && (
+          {checkoutItems.length === 0 && (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Your cart is empty!</Text>
             </View>
@@ -588,7 +605,7 @@ const CartScreen = () => {
         </ScrollView>
 
         {/* Dynamic Sticky Bottom Bar */}
-        {cartItems.length > 0 && (
+        {checkoutItems.length > 0 && (
           <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <View style={styles.bottomBarRow}>
               <Text style={styles.bottomTotalLabel}>Total</Text>
@@ -686,7 +703,7 @@ const CartScreen = () => {
                       <View style={styles.amountBox}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.amountBoxLabel}>Total Payable</Text>
-                          <Text style={styles.amountBoxSub}>{cartItems.length} item(s)</Text>
+                          <Text style={styles.amountBoxSub}>{checkoutItems.length} item(s)</Text>
                         </View>
                         <Text style={styles.amountBoxValue}>
                           Rs. {finalTotal.toLocaleString('en-IN')}

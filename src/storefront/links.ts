@@ -130,11 +130,26 @@ export const resolveLink = (
     return { type: 'collection', collectionId: collectionMatch[1] };
   }
 
-  // `?type=Clothing` and friends — the products endpoint filters on this.
-  const type = params.get('type') || params.get('category');
+  // `?type=Clothing`, `?category=Clothing`, `?websiteCategory=Clothing` and
+  // friends — the products endpoint filters on these. `websiteCategory` comes
+  // first because the banner CTAs tag their target with it.
+  const type =
+    params.get('websiteCategory') ||
+    params.get('type') ||
+    params.get('category');
   if (type) return { type: 'category', category: type };
 
   const normalized = path.replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+
+  // The live `home_hero_cards` "Comfort" banner links to `/colllections` — a
+  // misspelled `/collections` with no category tag. The store is a kids'
+  // clothing shop, so the card is meant to browse the default product type:
+  // resolve the typo to `Clothing` so the listing heading and the products
+  // query (`websiteCategory=Clothing`) agree. Other banners point at a type
+  // explicitly with `?websiteCategory=` / `?type=`.
+  if (normalized === 'colllections') {
+    return { type: 'category', category: 'Clothing' };
+  }
 
   const pathRoute = PATH_ROUTES[normalized];
   // `collections` resolves to the whole-catalogue sentinel, which is a HomeTab
