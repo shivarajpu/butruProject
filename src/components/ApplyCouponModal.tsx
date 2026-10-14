@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { fetchCoupons, type StoreCoupon } from '../storefront/coupons';
+import { STORE_ID } from '../config/storeIdentity';
 import { formatPrice } from '../storefront/catalog';
 import { selectCurrency } from '../storefront/selectors';
 
@@ -349,9 +350,9 @@ export default function ApplyCouponModal({
    */
   const loadCoupons = useCallback(async () => {
     setCoupons(null);
-    const list = await fetchCoupons(theme.api.storeSlug);
+    const list = await fetchCoupons(STORE_ID);
     setCoupons(list);
-  }, [theme.api.storeSlug]);
+  }, []);
 
   useEffect(() => {
     if (visible) {

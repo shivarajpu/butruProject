@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -32,7 +32,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'HelpSupport'>;
 // The store the app is bound to, resolved per client in `storeIdentity.ts` — the
 // same id sent as the `x-store-id` header, so the query param never disagrees.
 const HELP_SUPPORT_ENDPOINT = '/api/storefront/help-support';
-const STORE_ENDPOINT = '/api/storefront/store';
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 const backArrowIcon = (color: string) =>
@@ -307,35 +306,6 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '700',
       fontFamily: FONTS.poppinsBold,
     },
-    storeDataCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      padding: 16,
-      marginTop: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    storeDataTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.text,
-      fontFamily: FONTS.poppinsBold,
-      marginBottom: 12,
-    },
-    storeDataBox: {
-      backgroundColor: colors.surfaceVariant,
-      borderRadius: 14,
-      padding: 14,
-    },
-    storeDataText: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      fontFamily: FONTS.arimoRegular,
-      lineHeight: 18,
-    },
-    storeDataError: {
-      color: colors.error,
-    },
   });
 };
 
@@ -360,43 +330,6 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Raw GET /api/storefront/store response, pretty-printed for on-screen preview.
-  const [storeJson, setStoreJson] = useState<string | null>(null);
-  const [storeError, setStoreError] = useState('');
-  const [isLoadingStore, setIsLoadingStore] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadStore = async () => {
-      setIsLoadingStore(true);
-      setStoreError('');
-      try {
-        const response = await apiService.get(
-          `${STORE_ENDPOINT}?storeId=${encodeURIComponent(STORE_ID)}`,
-        );
-        if (!cancelled) {
-          setStoreJson(JSON.stringify(response, null, 2));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStoreError(
-            error instanceof Error ? error.message : 'Failed to load store details.',
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingStore(false);
-        }
-      }
-    };
-
-    loadStore();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleCall = async () => {
     const url = `tel:${config.phone}`;
@@ -664,21 +597,6 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
                 <Text style={styles.submitButtonText}>Send Message</Text>
               )}
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.storeDataCard}>
-            <Text style={styles.storeDataTitle}>Store API Response</Text>
-            <View style={styles.storeDataBox}>
-              {isLoadingStore ? (
-                <ActivityIndicator color={colors.primary} size="small" />
-              ) : storeError ? (
-                <Text style={[styles.storeDataText, styles.storeDataError]}>{storeError}</Text>
-              ) : (
-                <Text style={styles.storeDataText} selectable>
-                  {storeJson}
-                </Text>
-              )}
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

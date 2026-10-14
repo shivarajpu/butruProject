@@ -44,12 +44,12 @@ beforeEach(() => {
 });
 
 describe('fetchCoupons', () => {
-  it('asks for the tenant slug and unwraps the envelope', async () => {
+  it('asks for the store id and unwraps the envelope', async () => {
     mockGet.mockResolvedValue({ success: true, count: 1, data: [coupon()] });
 
-    const list = await fetchCoupons('butru-store');
+    const list = await fetchCoupons('store-123');
 
-    expect(mockGet).toHaveBeenCalledWith('/api/storefront/coupons?slug=butru-store');
+    expect(mockGet).toHaveBeenCalledWith('/api/storefront/coupons?storeId=store-123');
     expect(list).toHaveLength(1);
     expect(list[0].code).toBe('SAVE10');
   });

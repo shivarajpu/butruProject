@@ -1,5 +1,5 @@
 /**
- * Storefront API types — `GET /api/storefront/store?slug=<slug>`
+ * Storefront API types — `GET /api/storefront/store?storeId=<storeId>`
  *
  * SCOPE: this file intentionally models only the fields that the MOBILE APP
  * consumes. Web-only payloads (seo.*, googleAnalyticsId, webConfig.flags,

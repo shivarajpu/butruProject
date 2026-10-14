@@ -12,7 +12,7 @@
  */
 
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import APP_CONFIG from '../../config/clients';
+import { STORE_ID } from '../../config/storeIdentity';
 import {
   getStoreConfig,
   readCachedConfig,
@@ -46,7 +46,7 @@ const initialState: StorefrontState = {
 export const hydrateFromCache = createAsyncThunk<StoreConfig | null>(
   'storefront/hydrateFromCache',
   async () => {
-    const cached = await readCachedConfig(APP_CONFIG.api.storeSlug);
+    const cached = await readCachedConfig(STORE_ID);
     return cached?.config ?? null;
   },
 );
@@ -56,18 +56,16 @@ export const loadStorefront = createAsyncThunk<
   void,
   { rejectValue: string }
 >('storefront/load', async (_, { rejectWithValue }) => {
-  const slug = APP_CONFIG.api.storeSlug;
-
   // Deliberately revalidates on every launch instead of trusting a TTL: the
   // cache is an offline fallback and a fast first paint, never the source of
   // truth, otherwise theme/widget edits would take hours to reach devices.
   try {
-    const config = await getStoreConfig(slug);
-    await writeCachedConfig(slug, config);
+    const config = await getStoreConfig(STORE_ID);
+    await writeCachedConfig(STORE_ID, config);
     clearCatalogCache();
     return config;
   } catch (error) {
-    const cached = await readCachedConfig(slug);
+    const cached = await readCachedConfig(STORE_ID);
     if (cached?.config) return cached.config;
 
     return rejectWithValue(
@@ -81,8 +79,8 @@ export const refreshStorefront = createAsyncThunk<StoreConfig, void, { rejectVal
   'storefront/refresh',
   async (_, { rejectWithValue }) => {
     try {
-      const config = await getStoreConfig(APP_CONFIG.api.storeSlug);
-      await writeCachedConfig(APP_CONFIG.api.storeSlug, config);
+      const config = await getStoreConfig(STORE_ID);
+      await writeCachedConfig(STORE_ID, config);
       clearCatalogCache();
       return config;
     } catch (error) {

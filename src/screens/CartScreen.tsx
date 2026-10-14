@@ -59,10 +59,22 @@ const HOME_WHITE_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const CREATE_ORDER_ENDPOINT = '/api/storefront/orders/create';
 const COUPON_APPLY_ENDPOINT = '/api/coupons/apply';
 
+interface CouponApplyData {
+  code?: string;
+  discount: number;
+  type?: string;
+  value?: number;
+  minOrderAmount?: number;
+  maxDiscount?: number | null;
+  eligibilityType?: string;
+  appliesOn?: string;
+  eligibleSubtotal?: number;
+}
+
 interface CouponApplyResponse {
   success: boolean;
   message?: string;
-  discount?: number;
+  data?: CouponApplyData | null;
 }
 
 const CartScreen = () => {
@@ -83,6 +95,10 @@ const CartScreen = () => {
 
   // Dynamic States
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
+  // The coupon's headline rate, straight from the API (`type`/`value`), so a
+  // "10% off" ticket reads as 10% even when a cap made the rupee discount lower.
+  const [appliedCouponType, setAppliedCouponType] = useState<string>('');
+  const [appliedCouponValue, setAppliedCouponValue] = useState<number>(0);
   const [isCouponModalVisible, setIsCouponModalVisible] = useState(false);
 
   // GST number state
@@ -319,6 +335,17 @@ const CartScreen = () => {
   const totalSave = discountRs + appliedCoupon;
   const finalTotal = Math.max(0, subTotal - appliedCoupon);
 
+  // A percentage coupon reports its own rate; a flat/capped one reports the
+  // effective percentage the rupee discount represents against the subtotal.
+  const couponDiscountPercent =
+    appliedCoupon <= 0
+      ? 0
+      : appliedCouponType === 'percentage' && appliedCouponValue > 0
+        ? Math.round(appliedCouponValue)
+        : subTotal > 0
+          ? Math.round((appliedCoupon / subTotal) * 100)
+          : 0;
+
   // --- Handlers ---
   const updateQuantity = (cartId: string, delta: number) => {
     if (isBuyNow && buyNowItem) {
@@ -381,7 +408,14 @@ const CartScreen = () => {
         })),
       });
       if (response.success) {
-        setAppliedCoupon(response.discount ?? 0);
+        const data = response.data;
+        const discount = data?.discount ?? 0;
+        if (discount <= 0) {
+          return { success: false, message: response.message || 'Invalid coupon code.' };
+        }
+        setAppliedCoupon(discount);
+        setAppliedCouponType(data?.type ?? '');
+        setAppliedCouponValue(data?.value ?? 0);
         return { success: true, message: response.message || 'Coupon applied successfully!' };
       }
       return { success: false, message: response.message || 'Invalid coupon code.' };
@@ -589,7 +623,10 @@ const CartScreen = () => {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Coupon Discount :</Text>
               {appliedCoupon > 0 ? (
-                <Text style={styles.greenValueText}>- Rs. {appliedCoupon}</Text>
+                <Text style={styles.greenValueText}>
+                  - Rs. {appliedCoupon.toLocaleString('en-IN')}
+                  {couponDiscountPercent > 0 ? ` (${couponDiscountPercent}% off)` : ''}
+                </Text>
               ) : (
                 <TouchableOpacity onPress={() => setIsCouponModalVisible(true)}>
                   <Text style={styles.applyCouponLinkText}>Apply coupon</Text>
@@ -598,8 +635,10 @@ const CartScreen = () => {
             </View>
 
             <View style={[styles.summaryRow, { marginTop: 12 }]}>
-              <Text style={styles.totalLabel}>Total :</Text>
-              <Text style={styles.totalValue}>Rs. {finalTotal.toLocaleString('en-IN')}</Text>
+              <Text style={styles.totalLabel}>Total Payable :</Text>
+              <Text style={styles.totalValue}>
+                Rs. {finalTotal.toLocaleString('en-IN')}
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -607,6 +646,16 @@ const CartScreen = () => {
         {/* Dynamic Sticky Bottom Bar */}
         {checkoutItems.length > 0 && (
           <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            {appliedCoupon > 0 && (
+              <View style={styles.bottomBarRow}>
+                <Text style={styles.bottomDiscountLabel}>
+                  Coupon Discount{couponDiscountPercent > 0 ? ` (${couponDiscountPercent}% off)` : ''}
+                </Text>
+                <Text style={styles.bottomDiscountValue}>
+                  - Rs. {appliedCoupon.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            )}
             <View style={styles.bottomBarRow}>
               <Text style={styles.bottomTotalLabel}>Total</Text>
               <Text style={styles.bottomTotalValue}>
@@ -703,7 +752,12 @@ const CartScreen = () => {
                       <View style={styles.amountBox}>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.amountBoxLabel}>Total Payable</Text>
-                          <Text style={styles.amountBoxSub}>{checkoutItems.length} item(s)</Text>
+                          <Text style={styles.amountBoxSub}>
+                            {checkoutItems.length} item(s)
+                            {appliedCoupon > 0
+                              ? ` · ${couponDiscountPercent}% off (- Rs. ${appliedCoupon.toLocaleString('en-IN')})`
+                              : ''}
+                          </Text>
                         </View>
                         <Text style={styles.amountBoxValue}>
                           Rs. {finalTotal.toLocaleString('en-IN')}
@@ -1197,6 +1251,16 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 15,
     fontWeight: '800',
     color: colors.primary,
+  },
+  bottomDiscountLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.success,
+  },
+  bottomDiscountValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.success,
   },
   paymentBtn: {
     backgroundColor: colors.primary,

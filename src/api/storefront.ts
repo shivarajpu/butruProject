@@ -1,7 +1,7 @@
 /**
  * Storefront API — store configuration endpoint.
  *
- *   GET /api/storefront/store?slug=<storeSlug>
+ *   GET /api/storefront/store?storeId=<storeId>
  *
  * The response is cached in AsyncStorage so the app can paint the correct
  * brand/theme instantly on the next launch, then refresh in the background.
@@ -14,16 +14,16 @@ import type { StoreConfig, StoreConfigResponse } from '../storefront/types';
 
 const ENDPOINT = '/api/storefront/store';
 
-const storageKey = (slug: string) => `@storefront_config:${slug}`;
+const storageKey = (storeId: string) => `@storefront_config:${storeId}`;
 
 type CachedConfig = {
   fetchedAt: number;
   config: StoreConfig;
 };
 
-export const getStoreConfig = (slug: string): Promise<StoreConfig> =>
+export const getStoreConfig = (storeId: string): Promise<StoreConfig> =>
   apiService
-    .get<StoreConfigResponse>(`${ENDPOINT}?slug=${encodeURIComponent(slug)}`)
+    .get<StoreConfigResponse>(`${ENDPOINT}?storeId=${encodeURIComponent(storeId)}`)
     .then(response => {
       if (!response?.success || !response?.data) {
         throw new Error('Store configuration is unavailable.');
@@ -31,9 +31,9 @@ export const getStoreConfig = (slug: string): Promise<StoreConfig> =>
       return response.data;
     });
 
-export const readCachedConfig = async (slug: string): Promise<CachedConfig | null> => {
+export const readCachedConfig = async (storeId: string): Promise<CachedConfig | null> => {
   try {
-    const raw = await AsyncStorage.getItem(storageKey(slug));
+    const raw = await AsyncStorage.getItem(storageKey(storeId));
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as CachedConfig;
@@ -46,12 +46,12 @@ export const readCachedConfig = async (slug: string): Promise<CachedConfig | nul
 };
 
 export const writeCachedConfig = async (
-  slug: string,
+  storeId: string,
   config: StoreConfig,
 ): Promise<void> => {
   try {
     await AsyncStorage.setItem(
-      storageKey(slug),
+      storageKey(storeId),
       JSON.stringify({ fetchedAt: Date.now(), config } satisfies CachedConfig),
     );
   } catch {

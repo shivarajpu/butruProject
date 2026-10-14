@@ -1,7 +1,7 @@
 /**
  * Storefront coupons.
  *
- *   GET /api/storefront/coupons?slug=<storeSlug>
+ *   GET /api/storefront/coupons?storeId=<storeId>
  *
 *  Applying a code is a different endpoint and already lives with the cart
  *  (`CartScreen` → POST /api/coupons/apply). This one only backs the
@@ -61,10 +61,10 @@ export const isLiveCoupon = (coupon: StoreCoupon): boolean => {
  * Best-effort list: a failed request yields no coupons rather than an error
  * state, because the shopper can still type a code by hand in the same sheet.
  */
-export const fetchCoupons = async (slug: string): Promise<StoreCoupon[]> => {
+export const fetchCoupons = async (storeId: string): Promise<StoreCoupon[]> => {
   try {
     const response = await apiService.get<CouponsResponse>(
-      `${ENDPOINT}?slug=${encodeURIComponent(slug)}`,
+      `${ENDPOINT}?storeId=${encodeURIComponent(storeId)}`,
     );
     if (!response?.success) return [];
     return (response.data ?? []).filter(isLiveCoupon);
