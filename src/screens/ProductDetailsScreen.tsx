@@ -37,7 +37,7 @@ import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
 import { addItem as addCartItem, setBuyNowItem } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
-import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import APP_CONFIG from '../config/clients';
@@ -702,7 +702,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               <View style={styles.locationRow}>
                 <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: Math.min(width * 0.42, 200) }]} numberOfLines={1}>
-                   Delivering to {formatAddressLabel(selectedAddress)}
+                   {formatDeliveryLabel(selectedAddress)}
                  </Text>
               </View>
             </TouchableOpacity>

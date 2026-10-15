@@ -35,7 +35,7 @@ import {
   updateBuyNowQty,
   clearBuyNowItem,
 } from '../store/slices/cartSlice';
-import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
@@ -77,6 +77,22 @@ interface CouponApplyResponse {
   data?: CouponApplyData | null;
 }
 
+const addressToText = (address?: Address | null): string => {
+  if (!address) {
+    return '';
+  }
+  if (address.fullAddress) {
+    return address.fullAddress;
+  }
+  const line = [address.street, address.locality, address.city, address.state]
+    .filter(Boolean)
+    .join(', ');
+  if (address.pincode) {
+    return line ? `${line} - ${address.pincode}` : address.pincode;
+  }
+  return line;
+};
+
 const CartScreen = () => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
@@ -111,6 +127,7 @@ const CartScreen = () => {
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [justSavedAddress, setJustSavedAddress] = useState<Address | null>(null);
 
   const { profile, addresses, refresh } = useProfile();
 
@@ -121,8 +138,27 @@ const CartScreen = () => {
     }
   }, [addresses, selectedAddressId]);
 
+  // Drop the optimistic copy once the freshly-saved address shows up in the
+  // fetched list, so later edits/deletes behave normally again.
+  useEffect(() => {
+    if (
+      justSavedAddress &&
+      addresses.some(a => a._id === justSavedAddress._id)
+    ) {
+      setJustSavedAddress(null);
+    }
+  }, [addresses, justSavedAddress]);
+
   const selectedAddress =
     addresses.find(a => (a._id || '') === selectedAddressId) || null;
+
+  // The refetch triggered after saving may not include the new/updated address
+  // yet, so prefer the address returned by the save call for immediate display.
+  const effectiveAddress =
+    justSavedAddress &&
+    (!selectedAddressId || justSavedAddress._id === selectedAddressId)
+      ? justSavedAddress
+      : selectedAddress || justSavedAddress;
 
   const handleShare = async () => {
     const shareUrl = `https://${APP_CONFIG.api.storeDomain}`;
@@ -184,10 +220,22 @@ const CartScreen = () => {
     ]);
   };
 
-  const handleAddressSaved = () => {
+  const handleAddressSaved = (savedAddresses?: Address[]) => {
+    const editedId = editingAddress?._id;
     setIsAddAddressModalVisible(false);
     setEditingAddress(null);
     refresh();
+    if (savedAddresses && savedAddresses.length) {
+      const target =
+        savedAddresses.find(a => a._id && a._id === editedId) ||
+        savedAddresses.find(a => a.isDefault) ||
+        savedAddresses[savedAddresses.length - 1];
+      if (target) {
+        setJustSavedAddress(target);
+        setSelectedAddressId(target._id || '0');
+        setDeliveryAddressInput(addressToText(target));
+      }
+    }
   };
 
   // Payment modal state
@@ -199,22 +247,15 @@ const CartScreen = () => {
 
   useEffect(() => {
     if (selectedAddress) {
-      const addressText =
-        selectedAddress.fullAddress ||
-        [
-          selectedAddress.street,
-          selectedAddress.locality,
-          selectedAddress.city,
-          selectedAddress.state,
-        ]
-          .filter(Boolean)
-          .join(', ') +
-          (selectedAddress.pincode ? ` - ${selectedAddress.pincode}` : '');
-      setDeliveryAddressInput(addressText);
+      setDeliveryAddressInput(addressToText(selectedAddress));
     }
   }, [selectedAddress]);
 
   const [orderId, setOrderId] = useState('');
+  // Amount actually paid, snapshotted at order time. The cart is cleared right
+  // after a successful order, which would otherwise drive `finalTotal` to 0 and
+  // make the success sheet show "Rs. 0".
+  const [placedAmount, setPlacedAmount] = useState(0);
 
   const generateIdempotencyKey = (): string => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -231,7 +272,7 @@ const CartScreen = () => {
     if (!checkoutItems.length) {
       return;
     }
-    if (!selectedAddress) {
+    if (!effectiveAddress) {
       Alert.alert('Missing Address', 'Please select a delivery address.');
       return;
     }
@@ -239,9 +280,9 @@ const CartScreen = () => {
     setIsPaymentSuccess(false);
     try {
       const customer = {
-        name: profile?.name || selectedAddress.name || '',
+        name: profile?.name || effectiveAddress.name || '',
         email: profile?.email || '',
-        phone: profile?.phone || selectedAddress.phone || '',
+        phone: profile?.phone || effectiveAddress.phone || '',
       };
 
       const items = checkoutItems.map(item => ({
@@ -256,13 +297,13 @@ const CartScreen = () => {
       }));
 
       const shippingAddress = {
-        name: selectedAddress.name || customer.name,
-        phone: selectedAddress.phone || customer.phone,
-        street: selectedAddress.street || '',
-        city: selectedAddress.city || '',
-        state: selectedAddress.state || '',
-        pincode: selectedAddress.pincode || '',
-        country: selectedAddress.country || 'India',
+        name: effectiveAddress.name || customer.name,
+        phone: effectiveAddress.phone || customer.phone,
+        street: effectiveAddress.street || '',
+        city: effectiveAddress.city || '',
+        state: effectiveAddress.state || '',
+        pincode: effectiveAddress.pincode || '',
+        country: effectiveAddress.country || 'India',
       };
 
       const payload = {
@@ -292,6 +333,7 @@ const CartScreen = () => {
         const placedOrder = response.data ?? response;
         const placedOrderNumber = placedOrder?.orderNumber || placedOrder?._id || placedOrder?.id || '';
         setOrderId(placedOrderNumber ? `#${placedOrderNumber}` : `BTRS${Math.floor(100000 + Math.random() * 900000)}`);
+        setPlacedAmount(finalTotal);
         if (isBuyNow) {
           dispatch(clearBuyNowItem());
         } else {
@@ -451,7 +493,7 @@ const CartScreen = () => {
               <View style={styles.locationRow}>
                 <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
-                   Delivering to {formatAddressLabel(selectedAddress)}
+                   {formatDeliveryLabel(effectiveAddress)}
                  </Text>
               </View>
             </TouchableOpacity>
@@ -731,22 +773,27 @@ const CartScreen = () => {
                       </View>
 
                       <Text style={styles.fieldLabel}>Deliver To</Text>
-                      <View style={styles.inputContainer}>
+                      <TouchableOpacity
+                        style={styles.inputContainer}
+                        activeOpacity={0.7}
+                        onPress={() => setIsAddressModalVisible(true)}>
                         <SvgXml
                           xml={LOCATION_PIN_SVG(theme.colors.primary)}
                           width={12}
                           height={12}
                           style={styles.inputLeftIcon}
                         />
-                        <TextInput
-                          style={[styles.formInputWithIcon, styles.addressInput]}
-                          value={deliveryAddressInput}
-                          onChangeText={setDeliveryAddressInput}
-                          multiline
-                          placeholder="Enter delivery address"
-                          placeholderTextColor={theme.colors.textMuted}
-                        />
-                      </View>
+                        <Text
+                          style={[
+                            styles.formInputWithIcon,
+                            styles.addressDisplayText,
+                            !effectiveAddress && styles.addressPlaceholder,
+                          ]}>
+                          {effectiveAddress
+                            ? deliveryAddressInput || addressToText(effectiveAddress)
+                            : 'No address added yet'}
+                        </Text>
+                      </TouchableOpacity>
 
                       <Text style={styles.fieldLabel}>Summary</Text>
                       <View style={styles.amountBox}>
@@ -848,7 +895,7 @@ const CartScreen = () => {
                         <View style={styles.successCardRow}>
                           <Text style={styles.successCardLabel}>Amount</Text>
                           <Text style={styles.successCardValue}>
-                            Rs. {finalTotal.toLocaleString('en-IN')}
+                            Rs. {placedAmount.toLocaleString('en-IN')}
                           </Text>
                         </View>
                         <View style={styles.successCardRow}>
@@ -1521,10 +1568,13 @@ const createStyles = (theme: AppTheme) => {
     fontWeight: '700',
     color: colors.textOnPrimary,
   },
-  addressInput: {
-    minHeight: 50,
-    textAlignVertical: 'top',
-    paddingVertical: 10,
+  // Read-only delivery address display: no forced min-height / top alignment,
+  // so a single-line address sits vertically centered next to the pin icon.
+  addressDisplayText: {
+    flexShrink: 1,
+  },
+  addressPlaceholder: {
+    color: colors.textMuted,
   },
   amountBox: {
     flexDirection: 'row',

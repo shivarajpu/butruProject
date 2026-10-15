@@ -30,6 +30,22 @@
         "address": "J-811/9F, STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308",
         "mapQuery": "STELLAR ONE, Sector 1, Greater Noida, Uttar Pradesh 201308"
       },
+      "theme": {
+        "light": {
+          "primary": "#4F46E5",
+          "primaryLight": "#EEF2FF",
+          "secondary": "#1E293B"
+        },
+        "dark": {
+          "primary": "#4F46E5",
+          "primaryLight": "#1E1B4B",
+          "secondary": "#1E293B"
+        }
+      },
+      "splash": {
+        "background": "#4F46E5",
+        "accent": "#1E293B"
+      },
       "firebase": {
         "enabled": false,
         "androidFile": "clients/firebase/butru/android/google-services.json",

@@ -26,7 +26,7 @@ import AppIconButton from '../components/AppIconButton';
 import { useDispatch } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
 import { apiService } from '../api/apiService';
-import { useProfile, type Address, type ProfileData, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, type ProfileData, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import {
@@ -330,7 +330,7 @@ const AccountTab = () => {
                       onPress={() => setIsAddressModalVisible(true)}>
                      <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200) , marginLeft:4 }]} numberOfLines={1}>
-                        Delivering to {formatAddressLabel(selectedAddress)}
+                        {formatDeliveryLabel(selectedAddress)}
                       </Text>
                    </TouchableOpacity>
                  </View>

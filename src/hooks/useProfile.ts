@@ -42,7 +42,7 @@ const PROFILE_ENDPOINT = '/api/auth/me';
 /** Compact single-line address label shown next to the location pin in headers. */
 export const formatAddressLabel = (
   address?: Address | null,
-  fallback = 'Home',
+  fallback = 'No address added yet',
 ): string => {
   if (!address) {
     return fallback;
@@ -60,6 +60,10 @@ export const formatAddressLabel = (
   }
   return line || address.fullAddress || fallback;
 };
+
+/** Header delivery line: prefixes "Delivering to" only when an address exists. */
+export const formatDeliveryLabel = (address?: Address | null): string =>
+  address ? `Delivering to ${formatAddressLabel(address)}` : 'No address added yet';
 
 export const useProfile = () => {
   const [profile, setProfile] = useState<ProfileData | null>(null);

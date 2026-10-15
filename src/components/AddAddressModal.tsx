@@ -94,7 +94,7 @@ type Props = {
   visible: boolean;
   editingAddress?: Address | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (addresses?: Address[]) => void;
 };
 
 type RequiredField = 'fullName' | 'mobile' | 'pincode' | 'address' | 'city';
@@ -552,7 +552,7 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
               ? 'Address updated successfully'
               : 'Address added successfully'),
         );
-        onSaved();
+        onSaved(response.data);
       } else {
         Alert.alert('Failed', response?.message || 'Something went wrong. Please try again.');
       }
@@ -662,8 +662,9 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                     keyboardType="phone-pad"
                     placeholderTextColor={theme.colors.textMuted}
                     value={mobile}
+                    maxLength={10}
                     onChangeText={text => {
-                      setMobile(text);
+                      setMobile(text.replace(/\D/g, '').slice(0, 10));
                       clearError('mobile');
                     }}
                   />

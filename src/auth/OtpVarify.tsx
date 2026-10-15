@@ -39,6 +39,7 @@ const VERIFY_OTP_ENDPOINT = '/api/auth/otp/email/verify';
 interface OtpVerifyResponse {
   success: boolean;
   message?: string;
+  token?: string;
 }
 
 const OtpVarify = ({ navigation, route }: Props) => {
@@ -75,6 +76,11 @@ const OtpVarify = ({ navigation, route }: Props) => {
   // ─── State ───────────────────────────────────────────────────────────────────
   // Get email/phone passed from Login or SignUp screen
   const emailAddress = route?.params?.email || route?.params?.phoneNumber || 'john12334@example.com';
+
+  // Token issued at register/OTP-send time. Used as a fallback when the
+  // verify response does not return a fresh token, so the session is always
+  // established (otherwise protected APIs reject the user as unauthorized).
+  const registerToken = route?.params?.token;
   
   const [otp, setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [timer, setTimer]       = useState(RESEND_SECONDS);
@@ -137,7 +143,12 @@ const OtpVarify = ({ navigation, route }: Props) => {
         return;
       }
 
-      dispatch(login({ user: { email: emailAddress } }));
+      dispatch(
+        login({
+          user: { email: emailAddress },
+          token: response.token || registerToken,
+        }),
+      );
       navigation.replace('Home');
     } catch (error) {
       Alert.alert(

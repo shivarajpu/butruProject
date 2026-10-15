@@ -11,6 +11,6 @@
   window to the JS splash will visibly jump on a fresh install.
 -->
 <resources>
-    <color name="brand_launch_background">#B12B5B</color>
-    <color name="brand_accent">#FF6B35</color>
+    <color name="brand_launch_background">#4F46E5</color>
+    <color name="brand_accent">#1E293B</color>
 </resources>

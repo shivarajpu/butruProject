@@ -16,7 +16,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
-import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AppButton from '../components/AppButton';
 import AppCard from '../components/AppCard';
@@ -240,7 +240,7 @@ const WishlistScreen = () => {
                 onPress={() => setIsAddressModalVisible(true)}>
                 <BrandIcon icon={BRAND.locationPinSm} width={12} height={12} />
                 <Text style={[styles.deliveryText, { maxWidth: Math.min(width * 0.42, 200)  , marginLeft:4}]} numberOfLines={1}>
-                 Delivering to {formatAddressLabel(deliveryAddress)}
+                 {formatDeliveryLabel(deliveryAddress)}
                </Text>
               </TouchableOpacity>
             </View>

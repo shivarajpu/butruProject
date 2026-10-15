@@ -30,7 +30,7 @@ import type { AppDispatch, RootState } from '../store';
 import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
 import { fetchProductsByCategoryName, fetchProductsForSource } from '../storefront/catalog';
 import { useStorefront } from '../storefront/useStorefront';
-import { useProfile, type Address, formatAddressLabel } from '../hooks/useProfile';
+import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
@@ -692,6 +692,17 @@ const HomeTab = () => {
   const [activeCategory, setActiveCategory] = useState('Home');
   const { addresses, refresh } = useProfile();
 
+  // The hardware-back handler is registered once on focus, so it reads the
+  // live view state through refs rather than a stale closure.
+  const searchActiveRef = useRef(searchActive);
+  const activeCategoryRef = useRef(activeCategory);
+  useEffect(() => {
+    searchActiveRef.current = searchActive;
+  }, [searchActive]);
+  useEffect(() => {
+    activeCategoryRef.current = activeCategory;
+  }, [activeCategory]);
+
   useEffect(() => {
     if (!selectedAddressId && addresses.length) {
       const defaultAddress = addresses.find(address => address.isDefault) || addresses[0];
@@ -914,6 +925,12 @@ const HomeTab = () => {
       fetchWishlistItems();
 
       const onBackPress = () => {
+        // First back out of search or a category listing, returning to the
+        // home feed the tab opens on. Only prompt to exit from that base state.
+        if (searchActiveRef.current || activeCategoryRef.current !== 'Home') {
+          resetToHomeFeed();
+          return true;
+        }
         Alert.alert(
           'Exit App',
           'Are you sure you want to close the app?',
@@ -928,7 +945,7 @@ const HomeTab = () => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
 
       return () => subscription.remove();
-    }, []),
+    }, [resetToHomeFeed]),
   );
 
   // Leaving the tab drops any applied filter and search. Without this the
@@ -1041,7 +1058,7 @@ const HomeTab = () => {
                 <View style={styles.locationRow}>
                   <SvgXml xml={LOCATION_PIN_SVG(theme.colors.primary)} width={12} height={12} />
                   <Text style={[styles.locationText, { maxWidth: addressMaxWidth }]} numberOfLines={1}>
-                    Delivering to {formatAddressLabel(deliveryAddress)}
+                    {formatDeliveryLabel(deliveryAddress)}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -1166,16 +1183,19 @@ const HomeTab = () => {
                 <Text style={styles.retryBtnText}>Try Again</Text>
               </TouchableOpacity>
             </View>
-          ) : searchActive && !searchQuery.trim() ? null : searchActive ? (
+          ) : searchActive ? (
             filteredProducts.length === 0 ? (
               <View style={styles.centerBox}>
                 <View style={styles.emptyIcon}>
                   <BrandIcon icon={BRAND.search} width={28} height={28} />
                 </View>
-                <Text style={styles.emptyTitle}>No results found</Text>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery.trim() ? 'No results found' : 'No products found'}
+                </Text>
                 <Text style={styles.emptyMessage}>
-                  We couldn't find anything matching "{searchQuery.trim()}". Try a
-                  different keyword.
+                  {searchQuery.trim()
+                    ? `We couldn't find anything matching "${searchQuery.trim()}". Try a different keyword.`
+                    : 'No items available to search right now.'}
                 </Text>
               </View>
             ) : (
