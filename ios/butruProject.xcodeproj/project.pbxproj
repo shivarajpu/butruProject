@@ -9,6 +9,19 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-butruProject.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-butruProject.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		5826E4943080FF3A007ECFA1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
+		5826E4963080FF3A007ECFA1 /* libPods-butruProject.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-butruProject.a */; };
+		5826E4983080FF3A007ECFA1 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		5826E4993080FF3A007ECFA1 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		5826E49A3080FF3A007ECFA1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
+		5826E49B3080FF3A007ECFA1 /* Arimo-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000001 /* Arimo-Bold.ttf */; };
+		5826E49C3080FF3A007ECFA1 /* Arimo-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000002 /* Arimo-Regular.ttf */; };
+		5826E49D3080FF3A007ECFA1 /* Inter_18pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000003 /* Inter_18pt-Bold.ttf */; };
+		5826E49E3080FF3A007ECFA1 /* Inter_18pt-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000004 /* Inter_18pt-SemiBold.ttf */; };
+		5826E49F3080FF3A007ECFA1 /* Inter_24pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000005 /* Inter_24pt-Bold.ttf */; };
+		5826E4A03080FF3A007ECFA1 /* Inter_28pt-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000006 /* Inter_28pt-Bold.ttf */; };
+		5826E4A13080FF3A007ECFA1 /* Inter_28pt-LightItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000007 /* Inter_28pt-LightItalic.ttf */; };
+		5826E4A23080FF3A007ECFA1 /* MomoSignature.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F00000020000000000000008 /* MomoSignature.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		E72C6B7FCAB8C1D0DAD4709F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -29,6 +42,8 @@
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = butruProject/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-butruProject.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-butruProject.debug.xcconfig"; path = "Target Support Files/Pods-butruProject/Pods-butruProject.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-butruProject.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-butruProject.release.xcconfig"; path = "Target Support Files/Pods-butruProject/Pods-butruProject.release.xcconfig"; sourceTree = "<group>"; };
+		5826E4A93080FF3A007ECFA1 /* butruProject copy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "butruProject copy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5826E4AA3080FF3B007ECFA1 /* butruProject copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "butruProject copy-Info.plist"; path = "/Users/shiva/Desktop/butruProject/ios/butruProject copy-Info.plist"; sourceTree = "<absolute>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-butruProject.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-butruProject.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = butruProject/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = butruProject/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -51,6 +66,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-butruProject.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5826E4953080FF3A007ECFA1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5826E4963080FF3A007ECFA1 /* libPods-butruProject.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,6 +118,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				5826E4AA3080FF3B007ECFA1 /* butruProject copy-Info.plist */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -105,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* butruProject.app */,
+				5826E4A93080FF3A007ECFA1 /* butruProject copy.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -166,6 +191,27 @@
 			productReference = 13B07F961A680F5B00A75B9A /* butruProject.app */;
 			productType = "com.apple.product-type.application";
 		};
+		5826E4913080FF3A007ECFA1 /* butruProject copy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5826E4A63080FF3A007ECFA1 /* Build configuration list for PBXNativeTarget "butruProject copy" */;
+			buildPhases = (
+				5826E4923080FF3A007ECFA1 /* [CP] Check Pods Manifest.lock */,
+				5826E4933080FF3A007ECFA1 /* Sources */,
+				5826E4953080FF3A007ECFA1 /* Frameworks */,
+				5826E4973080FF3A007ECFA1 /* Resources */,
+				5826E4A33080FF3A007ECFA1 /* Bundle React Native code and images */,
+				5826E4A43080FF3A007ECFA1 /* [CP] Embed Pods Frameworks */,
+				5826E4A53080FF3A007ECFA1 /* [CP] Copy Pods Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "butruProject copy";
+			productName = butruProject;
+			productReference = 5826E4A93080FF3A007ECFA1 /* butruProject copy.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -193,6 +239,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* butruProject */,
+				5826E4913080FF3A007ECFA1 /* butruProject copy */,
 			);
 		};
 /* End PBXProject section */
@@ -213,6 +260,24 @@
 				F00000010000000000000006 /* Inter_28pt-Bold.ttf in Resources */,
 				F00000010000000000000007 /* Inter_28pt-LightItalic.ttf in Resources */,
 				F00000010000000000000008 /* MomoSignature.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5826E4973080FF3A007ECFA1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5826E4983080FF3A007ECFA1 /* LaunchScreen.storyboard in Resources */,
+				5826E4993080FF3A007ECFA1 /* Images.xcassets in Resources */,
+				5826E49A3080FF3A007ECFA1 /* PrivacyInfo.xcprivacy in Resources */,
+				5826E49B3080FF3A007ECFA1 /* Arimo-Bold.ttf in Resources */,
+				5826E49C3080FF3A007ECFA1 /* Arimo-Regular.ttf in Resources */,
+				5826E49D3080FF3A007ECFA1 /* Inter_18pt-Bold.ttf in Resources */,
+				5826E49E3080FF3A007ECFA1 /* Inter_18pt-SemiBold.ttf in Resources */,
+				5826E49F3080FF3A007ECFA1 /* Inter_24pt-Bold.ttf in Resources */,
+				5826E4A03080FF3A007ECFA1 /* Inter_28pt-Bold.ttf in Resources */,
+				5826E4A13080FF3A007ECFA1 /* Inter_28pt-LightItalic.ttf in Resources */,
+				5826E4A23080FF3A007ECFA1 /* MomoSignature.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,13 +308,97 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
+			outputPaths = (
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		5826E4923080FF3A007ECFA1 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-butruProject-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		5826E4A33080FF3A007ECFA1 /* Bundle React Native code and images */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/.xcode.env",
+			);
+			name = "Bundle React Native code and images";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"\\\"$WITH_ENVIRONMENT\\\" \\\"$REACT_NATIVE_XCODE\\\"\"\n";
+		};
+		5826E4A43080FF3A007ECFA1 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		5826E4A53080FF3A007ECFA1 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-resources-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			inputPaths = (
+			);
+			name = "[CP] Copy Pods Resources";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
@@ -282,9 +431,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-butruProject/Pods-butruProject-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -299,6 +452,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5826E4933080FF3A007ECFA1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5826E4943080FF3A007ECFA1 /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,6 +515,64 @@
 					"-lc++",
 				);
 				PRODUCT_NAME = butruProject;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		5826E4A73080FF3A007ECFA1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C11E17C0A0000000000000D3 /* Debug.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 55PCY8WR7N;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = "butruProject copy-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		5826E4A83080FF3A007ECFA1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C11E17C0A0000000000000E3 /* Release.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 55PCY8WR7N;
+				INFOPLIST_FILE = "butruProject copy-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.shopping";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -525,6 +744,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5826E4A63080FF3A007ECFA1 /* Build configuration list for PBXNativeTarget "butruProject copy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5826E4A73080FF3A007ECFA1 /* Debug */,
+				5826E4A83080FF3A007ECFA1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

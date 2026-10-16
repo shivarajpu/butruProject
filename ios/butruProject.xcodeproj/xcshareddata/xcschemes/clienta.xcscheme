@@ -5,6 +5,24 @@
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Select client: clienta"
+               scriptText = "export PATH=&quot;/opt/homebrew/bin:/usr/local/bin:$PATH&quot;; cd &quot;${SRCROOT:-$PROJECT_DIR}/..&quot; || exit 1; [ -f &quot;$SRCROOT/.xcode.env&quot; ] &amp;&amp; . &quot;$SRCROOT/.xcode.env&quot;; [ -f &quot;$SRCROOT/.xcode.env.local&quot; ] &amp;&amp; . &quot;$SRCROOT/.xcode.env.local&quot;; &quot;${NODE_BINARY:-node}&quot; scripts/sync-clients.js --client clienta">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
+                     BuildableName = "butruProject.app"
+                     BlueprintName = "butruProject"
+                     ReferencedContainer = "container:butruProject.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"

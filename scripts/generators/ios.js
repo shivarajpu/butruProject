@@ -1,20 +1,30 @@
 /**
- * ios — writes the xcconfig layer that makes an iOS build per-client.
+ * ios — writes the xcconfig layer that makes an iOS build per-client, and one
+ * Xcode scheme per client so the scheme dropdown itself is the flavour picker.
  *
- * ── Why xcconfig and not 50 schemes ─────────────────────────────────────────
- * One Xcode scheme per client means 50 scheme files and a pbxproj that Xcode
- * progressively refuses to open quickly. Instead there is exactly one scheme
- * (`butruProject`) and two build configurations (Debug / Release), and the
- * client-specific values arrive through an `.xcconfig` include chain:
+ * ── Where the client identity comes from ────────────────────────────────────
+ * The client-specific values arrive through an `.xcconfig` include chain:
  *
  *   Config/Shared.xcconfig          ← committed, hand-editable, RN defaults
  *     └─ Config/Client.xcconfig      ← generated, git-ignored  (one per client)
  *          └─ Config/Clients/<id>.xcconfig  ← committed, one per client
  *
  * `Client.xcconfig` is a one-line `#include` of the selected client's file, so
- * `npm run ios -- --client clienta` switches everything by rewriting two lines.
- * Nothing in the .pbxproj is touched after initial setup, and any number of
- * clients can be archived from CI in parallel.
+ * switching clients is a two-line rewrite. Nothing in the .pbxproj is touched
+ * after initial setup, and any number of clients can be archived from CI in
+ * parallel.
+ *
+ * ── Why there is a scheme per client after all ──────────────────────────────
+ * Selecting a client used to mean running `clients:sync --client <id>` first —
+ * fine from the terminal, invisible from Xcode, where the dropdown showed only
+ * `butruProject` and gave no hint which app you were about to archive.
+ *
+ * So we now emit one *shared* scheme per client (Schemes/<id>.xcscheme) whose
+ * Build pre-action runs `clients:sync --client <id>` before the build reads the
+ * xcconfig. Shared schemes live in `xcshareddata/xcschemes/`, NOT in the
+ * .pbxproj, so this adds zero pbxproj weight no matter how many clients exist —
+ * the same reason the xcconfig split exists. Picking the scheme is now the one
+ * action that sets bundle id, display name, Info.plist, icon and `.env`.
  *
  * ── What each client gets ───────────────────────────────────────────────────
  *   PRODUCT_BUNDLE_IDENTIFIER         com.company.clienta
@@ -32,6 +42,22 @@ const { generateIcons, hasMaster, iosAssetName } = require('./icons');
 
 const CONFIG_DIR = path.join(ROOT, 'ios', 'Config');
 const CLIENTS_DIR = path.join(CONFIG_DIR, 'Clients');
+
+// Shared schemes live here — one per client. Outside the .pbxproj on purpose.
+const SCHEMES_DIR = path.join(
+  ROOT,
+  'ios',
+  'butruProject.xcodeproj',
+  'xcshareddata',
+  'xcschemes',
+);
+// The one app target (app runs as butruProject.app for every client) and the
+// test target, referenced by the scheme's build/test actions.
+const APP_BLUEPRINT_ID = '13B07F861A680F5B00A75B9A';
+const TESTS_BLUEPRINT_ID = '00E356ED1AD99517003FC87E';
+// The old single scheme: superseded by the per-client ones. Removed on sync so
+// Xcode's dropdown shows only real flavours.
+const LEGACY_SCHEME = 'butruProject.xcscheme';
 
 // ── ios/Config/Clients/<id>.xcconfig  (committed, one per client) ────────────
 
@@ -161,6 +187,151 @@ CLIENT_ENV_FILE = .env.${resolved.id}
 `;
 }
 
+// ── ios/butruProject.xcodeproj/xcshareddata/xcschemes/<id>.xcscheme ──────────
+
+/**
+ * A shared scheme whose name IS the client id, so Xcode's scheme dropdown reads
+ * as the list of flavours. Its only job beyond the stock scheme is the Build
+ * pre-action: before Xcode compiles, it rewrites Config/Client.xcconfig to point
+ * at this client, so bundle id / display name / Info.plist / icon / env all come
+ * out right whether you hit Run, Test or Archive.
+ *
+ * `SRCROOT` is the ios/ directory (Xcode sets it for scheme pre-actions), so the
+ * repo root — where the sync script lives — is one level up. `PROJECT_DIR` is a
+ * fallback for the rare Xcode version that exports one but not the other.
+ *
+ * Node is resolved the same way the React Native bundle phase does it: source
+ * `.xcode.env` (which sets NODE_BINARY from `command -v node`) then
+ * `.xcode.env.local` (which pins an absolute path, written per machine and
+ * git-ignored). This matters because Xcode launched from Finder/Dock inherits a
+ * minimal PATH without Homebrew/nvm, so a bare `node` exits 127.
+ */
+function renderScheme(client) {
+  const id = client.id;
+  // Built as plain strings: `${SRCROOT:-$PROJECT_DIR}`, `${NODE_BINARY:-node}`
+  // and the `2>/dev/null` redirects must survive into the shell verbatim, so
+  // they must NOT be template-literal interpolations.
+  const syncScript = [
+    // Xcode.app from Finder has no Homebrew/nvm on PATH — add the usual homes.
+    'export PATH=&quot;/opt/homebrew/bin:/usr/local/bin:$PATH&quot;',
+    'cd &quot;${SRCROOT:-$PROJECT_DIR}/..&quot; || exit 1',
+    // Guard each source: POSIX `.` on a missing file aborts a non-interactive
+    // shell outright, so an absent .xcode.env.local (fresh clone) would kill the
+    // pre-action before node ever runs.
+    '[ -f &quot;$SRCROOT/.xcode.env&quot; ] &amp;&amp; . &quot;$SRCROOT/.xcode.env&quot;',
+    '[ -f &quot;$SRCROOT/.xcode.env.local&quot; ] &amp;&amp; . &quot;$SRCROOT/.xcode.env.local&quot;',
+    `&quot;\${NODE_BINARY:-node}&quot; scripts/sync-clients.js --client ${id}`,
+  ].join('; ');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1210"
+   version = "1.3">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+      <PreActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Select client: ${id}"
+               scriptText = "${syncScript}">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "${APP_BLUEPRINT_ID}"
+                     BuildableName = "butruProject.app"
+                     BlueprintName = "butruProject"
+                     ReferencedContainer = "container:butruProject.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PreActions>
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "${APP_BLUEPRINT_ID}"
+               BuildableName = "butruProject.app"
+               BlueprintName = "butruProject"
+               ReferencedContainer = "container:butruProject.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "${TESTS_BLUEPRINT_ID}"
+               BuildableName = "butruProjectTests.xctest"
+               BlueprintName = "butruProjectTests"
+               ReferencedContainer = "container:butruProject.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "${APP_BLUEPRINT_ID}"
+            BuildableName = "butruProject.app"
+            BlueprintName = "butruProject"
+            ReferencedContainer = "container:butruProject.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "${APP_BLUEPRINT_ID}"
+            BuildableName = "butruProject.app"
+            BlueprintName = "butruProject"
+            ReferencedContainer = "container:butruProject.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
+`;
+}
+
 // ── entry point ──────────────────────────────────────────────────────────────
 
 function generate({ resolved, check, log = () => {} }) {
@@ -182,16 +353,32 @@ function generate({ resolved, check, log = () => {} }) {
       assertValidXcconfig(rendered, `${id}.xcconfig`);
       fs.writeFileSync(file, rendered, 'utf8');
       written.push(file);
+
+      // One shared scheme per client — the flavour picker in Xcode's toolbar.
+      const scheme = path.join(SCHEMES_DIR, `${id}.xcscheme`);
+      fs.writeFileSync(scheme, renderScheme(client), 'utf8');
+      written.push(scheme);
     }
   });
 
   if (!check) {
+    // Retire the old single scheme so the dropdown lists flavours, not a name
+    // that silently builds whatever Client.xcconfig happens to say.
+    fs.mkdirSync(SCHEMES_DIR, { recursive: true });
+    const legacy = path.join(SCHEMES_DIR, LEGACY_SCHEME);
+    if (fs.existsSync(legacy)) fs.rmSync(legacy);
+
     const active = path.join(CONFIG_DIR, 'Client.xcconfig');
     const rendered = renderActiveXcconfig(resolved);
     assertValidXcconfig(rendered, 'Client.xcconfig');
     fs.writeFileSync(active, rendered, 'utf8');
     written.push(active);
     log(`  xcconfig → ${rel(active)} → ${resolved.id}.xcconfig`);
+    log(
+      `  schemes  → ios/butruProject.xcodeproj/xcshareddata/xcschemes/{${Object.keys(
+        registry.clients,
+      ).join(', ')}}.xcscheme`,
+    );
   }
 
   return written;

@@ -33,5 +33,15 @@ CLIENT_DISPLAY_NAME = Butru
 GCC_WARN_INHIBIT_ALL_WARNINGS = YES
 CLANG_WARN_DOCUMENTATION_COMMENTS = NO
 
+// ── Xcode 26 explicit modules ────────────────────────────────────────────────
+// Xcode 26 turns "Explicitly Built Modules" on by default, and CocoaPods does
+// not work with it: builds fail with errors like
+//   error: Unable to find module dependency: '_DarwinFoundation3'
+// Turning it off restores the classic build. The pods get the same setting from
+// the Podfile's post_install (this xcconfig only reaches the app target).
+// Remove this — and the Podfile block — once CocoaPods and Xcode's explicit
+// modules are known to coexist.
+SWIFT_ENABLE_EXPLICIT_MODULES = NO
+
 // Client-specific Info.plist path (overridden by client xcconfig)
 INFOPLIST_FILE = butruProject/Info.plist

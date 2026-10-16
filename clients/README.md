@@ -112,6 +112,21 @@ sirf wahi likho jo secret hai. Teen layers, priority high→low:
 `ios/Config/Client.xcconfig` sab git-ignored hain aur har build pe regenerate
 hote hain.
 
+### iOS: har client ka apna Xcode scheme
+
+`npm run clients:sync` har client ke liye ek **shared Xcode scheme** generate
+karta hai (`ios/butruProject.xcodeproj/xcshareddata/xcschemes/<id>.xcscheme`).
+Xcode kholo (`ios/butruProject.xcworkspace`) aur toolbar ke scheme dropdown se
+flavour chuno — `butru`, `clienta`. Scheme ka Build pre-action khud
+`clients:sync --client <id>` chala deta hai, isliye bundle id, display name,
+Info.plist, icon aur `.env` sab selected client ke hisaab se set ho jaate hain.
+
+TestFlight par bhejne ke liye: scheme chuno → destination **Any iOS Device
+(arm64)** → Product → Archive → Distribute App → App Store Connect → Upload.
+
+Schemes `.pbxproj` ke bahar rehte hain, isliye 50 clients bhi project ko bhaari
+nahi karte. `npm run ios -- --client <id>` bhi ab wahi scheme use karta hai.
+
 ---
 
 ## Naya client kaise add karein (Phase 13 mein poora detail)
