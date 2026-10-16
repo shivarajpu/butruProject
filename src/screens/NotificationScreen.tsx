@@ -165,12 +165,7 @@ export default function NotificationScreen({ navigation }: Props) {
           <Text style={styles.headerTitle}>Notifications</Text>
           <Text style={styles.headerSubtitle}>Offers, orders & styles.</Text>
         </View>
-        <TouchableOpacity
-          style={styles.bagBtn}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('CartScreen')}>
-          <SvgXml xml={bagIcon(colors.text)} width={19} height={21} />
-        </TouchableOpacity>
+        
       </View>
 
       {/* Filter Chips */}

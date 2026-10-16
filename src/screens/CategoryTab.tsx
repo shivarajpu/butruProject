@@ -28,6 +28,7 @@ import { useAppTheme } from '../theme/useAppTheme';
 import AppInput from '../components/AppInput';
 import type { AppTheme } from '../theme/types';
 import { apiService } from '../api/apiService';
+import { publishWishlistChange } from '../hooks/useWishlist';
 
 // Asset Imports
 import { heartFilledSvg, heartOutlineSvg } from '../assets/svg';
@@ -552,6 +553,7 @@ const CategoryTab = () => {
       else next.add(productId);
       return next;
     });
+    publishWishlistChange(productId, !isCurrentlyLiked);
 
     try {
       if (isCurrentlyLiked) {
@@ -567,6 +569,7 @@ const CategoryTab = () => {
         else next.delete(productId);
           return next;
         });
+      publishWishlistChange(productId, isCurrentlyLiked);
     } finally {
       setWishlistLoading(null);
     }

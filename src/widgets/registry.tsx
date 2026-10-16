@@ -24,7 +24,6 @@ import {
   PartyPosterWidget,
 } from './home/MarketingWidgets';
 import TestimonialWidget from './home/TestimonialWidget';
-import NewsletterWidget from './home/NewsletterWidget';
 import {
   ProductColourPickerWidget,
   ProductMediaWidget,
@@ -39,6 +38,9 @@ export type WidgetComponent = React.ComponentType<{
   product?: ProductWidgetProduct | undefined;
 }>;
 
+/** Renders nothing — used to keep a `WidgetType` key present while hiding it. */
+const HiddenWidget: WidgetComponent = () => null;
+
 const REGISTRY: Record<WidgetType, WidgetComponent> = {
   banner_cross_link: BannerWidget,
   hero_cards: HeroCardsWidget,
@@ -49,7 +51,7 @@ const REGISTRY: Record<WidgetType, WidgetComponent> = {
   party_poster: PartyPosterWidget,
   fashion_section: FashionSectionWidget,
   product_testimonial: TestimonialWidget,
-  newsletter: NewsletterWidget,
+  newsletter: HiddenWidget,
   product_media: ProductMediaWidget,
   product_title: ProductTitleWidget,
   product_size_picker: ProductSizePickerWidget,

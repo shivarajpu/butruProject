@@ -31,6 +31,7 @@ import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
 import { fetchProductsByCategoryName, fetchProductsForSource } from '../storefront/catalog';
 import { useStorefront } from '../storefront/useStorefront';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
+import { publishWishlistChange } from '../hooks/useWishlist';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
@@ -981,6 +982,7 @@ const HomeTab = () => {
       if (isCurrentlyLiked) next.delete(productId); else next.add(productId);
       return next;
     });
+    publishWishlistChange(productId, !isCurrentlyLiked);
 
     try {
       if (isCurrentlyLiked) {
@@ -995,6 +997,7 @@ const HomeTab = () => {
         if (isCurrentlyLiked) next.add(productId); else next.delete(productId);
         return next;
       });
+      publishWishlistChange(productId, isCurrentlyLiked);
     }
   };
 

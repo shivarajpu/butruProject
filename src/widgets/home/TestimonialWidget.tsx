@@ -13,27 +13,13 @@
 
 import React, { useMemo } from 'react';
 import { FONTS } from '../../constants/fonts';
-import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '../../theme/useAppTheme';
 import type { AppTheme } from '../../theme/types';
 import { useSelector } from 'react-redux';
-import { selectSocialLinks, selectTestimonials } from '../../storefront/selectors';
+import { selectTestimonials } from '../../storefront/selectors';
 import type { StoreTestimonial, StoreWidget } from '../../storefront/types';
-import { SvgXml } from 'react-native-svg';
-import { Stars, useWidgetActions, useWidgetLayout } from '../common';
-import {
-  FACEBOOK_SVG,
-  INSTAGRAM_SVG,
-  TELEGRAM_SVG,
-  YOUTUBE_SVG,
-} from '../../assets/svg/socialIcons';
+import { Stars, useWidgetLayout } from '../common';
 
 type Props = { widget: StoreWidget };
 
@@ -173,141 +159,15 @@ const ReviewsSection = ({
   );
 };
 
-// ─── Support strip ─────────────────────────────────────────────────────────────
-
-const hasSupportContent = (widget: StoreWidget): boolean => {
-  const { config } = widget;
-  return [
-    config.helpTitle,
-    config.supportTitle,
-    config.connectTitle,
-    config.downloadTitle,
-  ].some(value => typeof value === 'string' && value.trim().length > 0);
-};
-
-const SocialRow = ({ config }: { config: StoreWidget['config'] }) => {
-  const social = useSelector(selectSocialLinks);
-  const theme = useAppTheme();
-  const { onLink } = useWidgetActions();
-  const links = [
-    { label: 'Instagram', url: config.instagramUrl || social.instagram, icon: INSTAGRAM_SVG },
-    { label: 'Facebook', url: config.facebookUrl || social.facebook, icon: FACEBOOK_SVG },
-    { label: 'YouTube', url: config.youtubeUrl || social.youtube, icon: YOUTUBE_SVG },
-    { label: 'Telegram', url: config.telegramUrl || social.telegram, icon: TELEGRAM_SVG },
-  ].filter(link => !!link.url);
-
-  if (!links.length) return null;
-
-  return (
-    <View style={stylesLocal.socialRow}>
-      {links.map(link => (
-        <TouchableOpacity
-          key={link.label}
-          activeOpacity={0.7}
-          style={[stylesLocal.socialBtn, { borderColor: theme.colors.border }]}
-          onPress={() => onLink(link.url)}>
-          <SvgXml xml={link.icon} width={16} height={16} />
-          <Text style={stylesLocal.socialText}>{link.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-};
-
-const SupportStrip = ({
-  widget,
-  styles,
-  gutter,
-}: {
-  widget: StoreWidget;
-  styles: ReturnType<typeof createStyles>;
-  gutter: number;
-}) => {
-  const { config } = widget;
-  const rows = [
-    {
-      label: config.helpLabel || config.helpPrefix || '',
-      title: config.helpTitle || '',
-      value: config.phone || '',
-    },
-    {
-      label: config.supportLabel || config.supportPrefix || '',
-      title: config.supportTitle || '',
-      value: config.email || '',
-    },
-    {
-      label: config.downloadLabel || '',
-      title: config.downloadTitle || '',
-      value: config.appStoreUrl || config.playStoreUrl || '',
-    },
-    {
-      label: config.connectLabel || '',
-      title: config.connectTitle || '',
-      value: config.instagramUrl || config.facebookUrl || '',
-    },
-  ].filter(row => row.title);
-
-  if (!rows.length) return null;
-
-  return (
-    <View style={[styles.section, { paddingHorizontal: gutter }]}>
-      {config.showTitle !== false && !!config.heading && (
-        <Text style={styles.title}>{config.heading}</Text>
-      )}
-      <View style={styles.supportCard}>
-        {rows.map(row => (
-          <View key={row.title} style={styles.supportRow}>
-            <View style={styles.supportRowBody}>
-              {!!row.label && <Text style={styles.supportLabel}>{row.label}</Text>}
-              <Text style={styles.supportTitle}>{row.title}</Text>
-              {!!row.value && (
-                <Text style={styles.supportValue} numberOfLines={1}>
-                  {row.value}
-                </Text>
-              )}
-            </View>
-          </View>
-        ))}
-        <SocialRow config={config} />
-      </View>
-    </View>
-  );
-};
-
 // ─── Widget ────────────────────────────────────────────────────────────────────
 
-const TestimonialWidget = ({ widget }: Props) => {
+const TestimonialWidget = (_props: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
-  const { gutter } = useWidgetLayout();
   const testimonials = useSelector(selectTestimonials);
 
-  const showReviews = testimonials.length > 0;
-  const showSupport = hasSupportContent(widget);
-
-  if (!showReviews && !showSupport) return null;
-
-  return (
-    <View>
-      {showReviews && <ReviewsSection items={testimonials} styles={styles} />}
-      {showSupport && <SupportStrip widget={widget} styles={styles} gutter={gutter} />}
-    </View>
-  );
+  return <ReviewsSection items={testimonials} styles={styles} />;
 };
-
-const stylesLocal = StyleSheet.create({
-  socialRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
-  socialBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  socialText: { fontSize: 12, fontWeight: '600' },
-});
 
 const createStyles = (theme: AppTheme) => {
   const { colors, fontFamily } = theme;
@@ -322,21 +182,6 @@ const createStyles = (theme: AppTheme) => {
       fontFamily: FONTS.inter28Bold,
       marginBottom: 12,
     },
-    supportCard: {
-      backgroundColor: colors.surfaceVariant,
-      borderRadius: 16,
-      padding: 14,
-    },
-    supportRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 8,
-    },
-    supportRowBody: { flex: 1 },
-    supportLabel: { fontSize: 10, color: colors.textMuted, fontFamily: fontFamily.regular },
-    supportTitle: { fontSize: 13, color: colors.text, fontFamily: FONTS.poppinsBold },
-    supportValue: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-
     ratingBar: {
       flexDirection: 'row',
       alignItems: 'center',

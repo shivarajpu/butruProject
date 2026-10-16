@@ -365,6 +365,15 @@ const CartScreen = () => {
     setIsPaymentSuccess(false);
   };
 
+  // "Back to Home" clears the payment state and resets the stack to the Home
+  // screen (the tab navigator), landing the shopper on the HomeTab.
+  const handleBackToHome = () => {
+    setIsPaymentModalVisible(false);
+    setIsProcessingPayment(false);
+    setIsPaymentSuccess(false);
+    navigation.reset({ index: 0, routes: [{ name: 'Home' as never }] });
+  };
+
   const isCOD = paymentMethod === 'COD';
 
   // --- Dynamic Calculations ---
@@ -509,7 +518,12 @@ const CartScreen = () => {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.scrollContent,
+            checkoutItems.length === 0 && styles.scrollContentEmpty,
+          ]}>
           {/* Dynamic Cart Items List */}
           {checkoutItems.map(item => (
             <View key={item.cartId} style={styles.cartItemCard}>
@@ -555,6 +569,10 @@ const CartScreen = () => {
             </View>
           )}
 
+          {/* Coupons, GST and the price summary only make sense with items in
+              the cart — with nothing to total they just show empty figures. */}
+          {checkoutItems.length > 0 && (
+            <>
           {/* Dynamic Coupon Card */}
           <View style={styles.couponCard}>
             <View style={styles.couponHeader}>
@@ -683,6 +701,8 @@ const CartScreen = () => {
               </Text>
             </View>
           </View>
+            </>
+          )}
         </ScrollView>
 
         {/* Dynamic Sticky Bottom Bar */}
@@ -916,7 +936,7 @@ const CartScreen = () => {
                         </View>
                       </View>
 
-                      <TouchableOpacity style={styles.payBtn} activeOpacity={0.85} onPress={handleClosePaymentModal}>
+                      <TouchableOpacity style={styles.payBtn} activeOpacity={0.85} onPress={handleBackToHome}>
                         <SvgXml xml={HOME_WHITE_SVG} width={16} height={16} />
                         <Text style={styles.payBtnText}>Back to Home</Text>
                       </TouchableOpacity>
@@ -1006,6 +1026,9 @@ const createStyles = (theme: AppTheme) => {
     padding: 16,
     paddingBottom: 20,
   },
+  scrollContentEmpty: {
+    flexGrow: 1,
+  },
   cartItemCard: {
     flexDirection: 'row',
     marginBottom: 20,
@@ -1078,8 +1101,9 @@ const createStyles = (theme: AppTheme) => {
     color: colors.primary,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: 'center',
-    paddingVertical: 30,
+    justifyContent: 'center',
   },
   emptyText: {
     fontSize: 14,

@@ -158,8 +158,12 @@ export const {
   clearBuyNowItem,
 } = cartSlice.actions;
 
-/** Total units across all cart lines (used for the bag badge). */
+/**
+ * Number of items in the bag (one per distinct product line) — used for the
+ * bag badge. Adding another unit of a product that is already in the bag
+ * raises that line's `quantity`, not this count.
+ */
 export const selectCartCount = (state: { cart: CartState }): number =>
-  state.cart.items.reduce((sum, item) => sum + item.quantity, 0);
+  state.cart.items.length;
 
 export default cartSlice.reducer;

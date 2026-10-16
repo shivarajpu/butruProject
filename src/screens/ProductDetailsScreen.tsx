@@ -38,6 +38,7 @@ import { apiService } from '../api/apiService';
 import { addItem as addCartItem, setBuyNowItem } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
+import { publishWishlistChange } from '../hooks/useWishlist';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import APP_CONFIG from '../config/clients';
@@ -459,6 +460,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       else next.add(currentId);
       return next;
     });
+    publishWishlistChange(currentId, !isCurrentlyLiked);
 
     try {
       if (isCurrentlyLiked) {
@@ -474,6 +476,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         else next.delete(currentId);
         return next;
       });
+      publishWishlistChange(currentId, isCurrentlyLiked);
     } finally {
       setWishlistLoading(null);
     }

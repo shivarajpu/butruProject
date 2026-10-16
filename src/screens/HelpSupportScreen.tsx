@@ -333,50 +333,30 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
 
   const handleCall = async () => {
     const url = `tel:${config.phone}`;
-    let supported = false;
     try {
-      supported = await Linking.canOpenURL(url);
+      // Try to open directly — on Android, `canOpenURL` can report false even
+      // with a dialer present, so trusting it blocks real devices.
+      await Linking.openURL(url);
     } catch {
-      supported = false;
-    }
-
-    if (supported) {
-      try {
-        await Linking.openURL(url);
-      } catch {
-        Alert.alert('Error', 'Unable to open the phone dialer.');
-      }
-    } else {
       Alert.alert(
-        'Not available in Simulator',
+        Platform.OS === 'ios' ? 'Not available in Simulator' : 'Not available',
         Platform.OS === 'ios'
           ? 'Phone calls are not available in the iOS Simulator. Please test on your physical iPhone.'
-          : 'Your device does not support phone calls.',
+          : 'No phone/dialer app found on this device.',
       );
     }
   };
 
   const handleEmail = async () => {
     const url = `mailto:${config.email}`;
-    let supported = false;
     try {
-      supported = await Linking.canOpenURL(url);
+      await Linking.openURL(url);
     } catch {
-      supported = false;
-    }
-
-    if (supported) {
-      try {
-        await Linking.openURL(url);
-      } catch {
-        Alert.alert('Error', 'Unable to open the email app.');
-      }
-    } else {
       Alert.alert(
-        'Not available in Simulator',
+        Platform.OS === 'ios' ? 'Not available in Simulator' : 'Not available',
         Platform.OS === 'ios'
           ? 'The Mail app is not available in the iOS Simulator. Please test on your physical iPhone.'
-          : 'No email app found on your device.',
+          : 'No email app found on this device.',
       );
     }
   };
@@ -508,7 +488,7 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
                 onPress={handleEmail}
                 activeOpacity={0.8}
               >
-                <Text style={styles.secondaryButtonText}>Send Mail</Text>
+                <Text style={styles.secondaryButtonText}>Send Email</Text>
               </TouchableOpacity>
             </View>
           </View>

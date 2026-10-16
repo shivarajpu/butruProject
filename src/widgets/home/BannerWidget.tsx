@@ -5,15 +5,18 @@
  * so adding or removing slides never requires a release.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FONTS } from '../../constants/fonts';
 import {
   Image,
   ImageBackground,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { useAppTheme } from '../../theme/useAppTheme';
 import type { AppTheme } from '../../theme/types';
@@ -41,21 +44,51 @@ const BannerWidget = ({ widget }: Props) => {
   );
 
   const [index, setIndex] = useState(0);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const offsetRef = useRef(0);
+  const draggingRef = useRef(false);
+  const restartRef = useRef<() => void>(() => {});
+
+  const pageWidth = measuredWidth || width;
 
   useEffect(() => {
-    if (banners.length < 2) return undefined;
-    const timer = setInterval(() => {
-      setIndex(current => (current + 1) % banners.length);
-    }, AUTO_SCROLL_MS);
-    return () => clearInterval(timer);
-  }, [banners.length]);
+    if (banners.length < 2 || pageWidth <= 0) return undefined;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const advance = () => {
+      if (draggingRef.current) return;
+      let page = Math.round(offsetRef.current / pageWidth);
+      if (page >= banners.length) {
+        scrollRef.current?.scrollTo({ x: 0, animated: false });
+        offsetRef.current = 0;
+        page = 0;
+      }
+      scrollRef.current?.scrollTo({ x: (page + 1) * pageWidth, animated: true });
+    };
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        advance();
+        schedule();
+      }, AUTO_SCROLL_MS);
+    };
+
+    restartRef.current = schedule;
+    schedule();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [banners.length, pageWidth]);
 
   if (loading && banners.length === 0) {
     return <View style={[styles.loaderBox, { height }]} />;
   }
   if (!banners.length) return null;
 
-  const active = banners[Math.min(index, banners.length - 1)];
   const align =
     config.titleAlignment === 'left'
       ? 'flex-start'
@@ -63,54 +96,132 @@ const BannerWidget = ({ widget }: Props) => {
       ? 'flex-end'
       : 'center';
 
-  // Banners often carry only an image (the panel leaves the title as a file
-  // name), so the caption strip is skipped when there's nothing to say.
-  const hasCaption =
-    !!active.title ||
-    !!active.subtitle ||
-    active.offerPercent > 0 ||
-    !!(active.ctaText || config.ctaText);
+  // The last slide is followed by a clone of the first so the auto-scroll can
+  // keep moving forward forever; the clone snaps back to the real first page
+  // as soon as the scroll settles.
+  const slides = banners.length > 1 ? [...banners, banners[0]] : banners;
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    offsetRef.current = event.nativeEvent.contentOffset.x;
+    if (pageWidth <= 0 || banners.length === 0) return;
+    const current = Math.round(offsetRef.current / pageWidth) % banners.length;
+    setIndex(previous => (previous === current ? previous : current));
+  };
+
+  const handleScrollBeginDrag = () => {
+    draggingRef.current = true;
+  };
+
+  const handleScrollEndDrag = () => {
+    draggingRef.current = false;
+    restartRef.current();
+  };
+
+  const handleMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const page = pageWidth > 0 ? Math.round(offsetX / pageWidth) : 0;
+    if (page >= banners.length) {
+      offsetRef.current = 0;
+      scrollRef.current?.scrollTo({ x: 0, animated: false });
+      setIndex(0);
+    } else {
+      offsetRef.current = offsetX;
+      setIndex(page % banners.length);
+    }
+    draggingRef.current = false;
+    restartRef.current();
+  };
+
+  const goTo = (dotIndex: number) => {
+    offsetRef.current = dotIndex * pageWidth;
+    setIndex(dotIndex);
+    scrollRef.current?.scrollTo({ x: offsetRef.current, animated: true });
+    restartRef.current();
+  };
 
   return (
-    <View style={{ marginBottom: 20 }}>
-      <ImageBackground
-        source={{ uri: active.image }}
-        style={[
-          styles.slide,
-          {
-            height,
-            backgroundColor: config.backgroundColor || theme.colors.surfaceVariant,
-          },
-        ]}
-        imageStyle={{ borderRadius: 16 }}
-        resizeMode={config.fitImage ? 'contain' : 'cover'}>
-        {hasCaption ? (
-          <View style={[styles.overlay, { alignItems: align }]}>
-            {!!active.title && <Text style={styles.slideTitle}>{active.title}</Text>}
-            {!!active.subtitle && <Text style={styles.slideSubtitle}>{active.subtitle}</Text>}
-            {!!active.offerPercent && (
-              <View style={styles.offerPill}>
-                <Text style={styles.offerPillText}>{active.offerPercent}% OFF</Text>
-              </View>
-            )}
-            {(active.ctaText || config.ctaText) && (
-              <TouchableOpacity
-                style={styles.cta}
-                activeOpacity={0.8}
-                onPress={() => onLink(active.ctaUrl || config.ctaUrl)}>
-                <Text style={styles.ctaText}>{active.ctaText || config.ctaText}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : null}
-      </ImageBackground>
+    <View
+      style={{ marginBottom: 20 }}
+      onLayout={event => {
+        const layoutWidth = event.nativeEvent.layout.width;
+        if (layoutWidth > 0 && layoutWidth !== measuredWidth) {
+          setMeasuredWidth(layoutWidth);
+        }
+      }}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScrollEndDrag={handleScrollEndDrag}
+        onMomentumScrollEnd={handleMomentumEnd}>
+        {slides.map((banner, slideIndex) => {
+          // Banners often carry only an image (the panel leaves the title as a
+          // file name), so the caption strip is skipped when nothing to say.
+          const hasCaption =
+            !!banner.title ||
+            !!banner.subtitle ||
+            banner.offerPercent > 0 ||
+            !!(banner.ctaText || config.ctaText);
+
+          return (
+            <View
+              key={`${banner.id}-${slideIndex}`}
+              style={{ width: pageWidth, height }}>
+              <ImageBackground
+                source={{ uri: banner.image }}
+                style={[
+                  styles.slide,
+                  {
+                    height,
+                    backgroundColor:
+                      config.backgroundColor || theme.colors.surfaceVariant,
+                  },
+                ]}
+                imageStyle={{ borderRadius: 16 }}
+                resizeMode={config.fitImage ? 'contain' : 'cover'}>
+                {hasCaption ? (
+                  <View style={[styles.overlay, { alignItems: align }]}>
+                    {!!banner.title && (
+                      <Text style={styles.slideTitle}>{banner.title}</Text>
+                    )}
+                    {!!banner.subtitle && (
+                      <Text style={styles.slideSubtitle}>{banner.subtitle}</Text>
+                    )}
+                    {!!banner.offerPercent && (
+                      <View style={styles.offerPill}>
+                        <Text style={styles.offerPillText}>
+                          {banner.offerPercent}% OFF
+                        </Text>
+                      </View>
+                    )}
+                    {(banner.ctaText || config.ctaText) && (
+                      <TouchableOpacity
+                        style={styles.cta}
+                        activeOpacity={0.8}
+                        onPress={() => onLink(banner.ctaUrl || config.ctaUrl)}>
+                        <Text style={styles.ctaText}>
+                          {banner.ctaText || config.ctaText}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : null}
+              </ImageBackground>
+            </View>
+          );
+        })}
+      </ScrollView>
 
       {banners.length > 1 && (
         <View style={styles.dots}>
           {banners.map((banner, dotIndex) => (
             <TouchableOpacity
               key={banner.id}
-              onPress={() => setIndex(dotIndex)}
+              onPress={() => goTo(dotIndex)}
               hitSlop={8}>
               <View
                 style={[

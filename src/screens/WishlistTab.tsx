@@ -24,6 +24,7 @@ import AppIconButton from '../components/AppIconButton';
 import BagIconButton from '../components/BagIconButton';
 import AddAddressModal from '../components/AddAddressModal';
 import { apiService } from '../api/apiService';
+import { publishWishlistChange } from '../hooks/useWishlist';
 import { BRAND } from '../assets/svg/brand';
 import { SvgXml } from 'react-native-svg';
 import { heartFilledSvg } from '../assets/svg';
@@ -202,6 +203,7 @@ const WishlistScreen = () => {
   const removeItem = async (id: string) => {
     try {
       await apiService.delete(`/api/storefront/wishlist/items/${id}`);
+      publishWishlistChange(id, false);
       setItems(prev => prev.filter(item => item.id !== id));
     } catch {
       // Leave item in list if server removal fails
