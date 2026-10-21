@@ -292,15 +292,12 @@ const AccountTab = () => {
     setLogoutStatus('loading');
     try {
       await apiService.post<LogoutResponse>(LOGOUT_ENDPOINT, {});
-      setLogoutStatus('success');
-    } catch (error) {
-      setLogoutStatus('error');
-      setLogoutError(
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong. Please try again.',
-      );
+    } catch {
+      // Best-effort server invalidation. A failed call — most commonly a 401
+      // because the stored token already expired (seen on some devices) — must
+      // not block ending the local session, so we fall through to success.
     }
+    setLogoutStatus('success');
   };
 
   const closeLogoutModal = () => {

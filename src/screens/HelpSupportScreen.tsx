@@ -22,7 +22,6 @@ import { apiService } from '../api/apiService';
 import { STORE_ID } from '../config/storeIdentity';
 import type { AppTheme, SupportConfig } from '../theme/types';
 import type { RootStackParamList } from '../navigation/types';
-import { LOCATION_PIN_SVG } from '../assets/svg';
 import { FONTS } from '../constants/fonts';
 import { BRAND } from '../assets/svg/brand';
 import BrandIcon from '../components/BrandIcon';
@@ -190,59 +189,6 @@ const createStyles = (theme: AppTheme) => {
       fontWeight: '700',
       fontFamily: FONTS.poppinsBold,
     },
-    addressCard: {
-      backgroundColor: colors.primaryLight,
-      borderRadius: 20,
-      padding: 16,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: colors.divider,
-    },
-    addressHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 14,
-    },
-    addressHeaderTitleWrapper: {
-      marginLeft: 10,
-    },
-    addressCardTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: colors.text,
-      fontFamily: FONTS.poppinsBold,
-    },
-    addressBox: {
-      backgroundColor: colors.hisemibackound,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 14,
-    },
-    companyTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 6,
-    },
-    redDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-      backgroundColor: colors.primary,
-      marginRight: 6,
-    },
-    companyNameText: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.text,
-      letterSpacing: 0.5,
-      fontFamily: FONTS.poppinsBold,
-    },
-    addressFullText: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      lineHeight: 18,
-      fontWeight: '500',
-    },
     formCard: {
       backgroundColor: colors.surface,
       borderRadius: 20,
@@ -361,20 +307,6 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
     }
   };
 
-  const handleOpenMap = () => {
-    const url = Platform.select({
-      ios: `maps:0,0?q=${encodeURIComponent(config.mapQuery)}`,
-      android: `geo:0,0?q=${encodeURIComponent(config.mapQuery)}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        config.mapQuery
-      )}`,
-    });
-
-    if (url) {
-      Linking.openURL(url);
-    }
-  };
-
   const handleSendMessage = async () => {
     if (!name.trim() || !email.trim() || !message.trim()) {
       Alert.alert('Validation Error', 'Please fill in all fields before sending.');
@@ -488,37 +420,9 @@ export const HelpSupportScreen = ({ navigation, route }: Props) => {
                 onPress={handleEmail}
                 activeOpacity={0.8}
               >
-                <Text style={styles.secondaryButtonText}>Send Email</Text>
+                <Text style={styles.secondaryButtonText}>Send e-mail</Text>
               </TouchableOpacity>
             </View>
-          </View>
-
-          <View style={styles.addressCard}>
-            <View style={styles.addressHeader}>
-              <View style={styles.iconCircle}>
-                <SvgXml xml={LOCATION_PIN_SVG(colors.primary)} width={12} height={12} />
-              </View>
-              <View style={styles.addressHeaderTitleWrapper}>
-                <Text style={styles.cardSmallLabel}>ADDRESS</Text>
-                <Text style={styles.addressCardTitle}>Where are we?</Text>
-              </View>
-            </View>
-
-            <View style={styles.addressBox}>
-              <View style={styles.companyTitleRow}>
-                <View style={styles.redDot} />
-                <Text style={styles.companyNameText}>{config.companyName}</Text>
-              </View>
-              <Text style={styles.addressFullText}>{config.address}</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleOpenMap}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.secondaryButtonText}>Open in Google Maps</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.formCard}>
