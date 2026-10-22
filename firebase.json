@@ -1,0 +1,11 @@
+{
+  "react-native": {
+    "messaging_android_notification_channel_id": "butru-default",
+    "messaging_android_notification_color": "@color/brand_launch_background",
+    "messaging_ios_foreground_presentation_options": {
+      "alert": true,
+      "badge": true,
+      "sound": false
+    }
+  }
+}

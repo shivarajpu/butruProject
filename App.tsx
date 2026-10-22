@@ -16,9 +16,22 @@ import Geolocation from '@react-native-community/geolocation';
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
 import { loadCartState, hydrate as hydrateCart } from './src/store/slices/cartSlice';
+import {
+  loadNotificationState,
+  hydrate as hydrateNotifications,
+  loadUnreadCount,
+} from './src/store/slices/notificationSlice';
 import { useStorefront } from './src/storefront/useStorefront';
 import { useAppTheme } from './src/theme/useAppTheme';
 import { readableOn } from './src/storefront/bridge';
+import { navigationRef } from './src/navigation/rootNavigation';
+import {
+  flushPendingNavigation,
+  handleInitialNotification,
+  initPushNotifications,
+  registerDeviceToken,
+  unregisterDeviceToken,
+} from './src/services/push';
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/auth/LoginScreen';
 import OtpScreen from './src/auth/otpScreen';
@@ -41,6 +54,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function AppNavigator() {
   const mode = useSelector((state: RootState) => state.theme.mode);
   const isHydrated = useSelector((state: RootState) => state.auth.isHydrated);
+  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const { colors } = useAppTheme();
   const dispatch = useDispatch<AppDispatch>();
 
@@ -57,7 +71,41 @@ function AppNavigator() {
     loadCartState().then(saved => {
       dispatch(hydrateCart(saved));
     });
+    loadNotificationState().then(saved => {
+      dispatch(hydrateNotifications(saved));
+    });
   }, [dispatch]);
+
+  // Push notifications.
+  //
+  // `initPushNotifications` asks for the notification permission, creates the
+  // Android channels and registers the FCM token with the backend. It is a
+  // no-op when Firebase is not configured for this build, so it is safe to
+  // call unconditionally.
+  useEffect(() => {
+    initPushNotifications().catch(() => undefined);
+  }, []);
+
+  // The token belongs to whoever is signed in. Register it once the session is
+  // known, and drop it again on logout so the next user of this device does
+  // not inherit the previous account's pushes.
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (isLoggedIn) {
+      registerDeviceToken().catch(() => undefined);
+      dispatch(loadUnreadCount());
+    } else {
+      unregisterDeviceToken().catch(() => undefined);
+    }
+  }, [dispatch, isHydrated, isLoggedIn]);
+
+  // A notification tap can open the app from a cold start, before the
+  // navigator exists. The pending navigation is replayed once the container
+  // is ready (see `onReady` below).
+  useEffect(() => {
+    handleInitialNotification().catch(() => undefined);
+  }, []);
 
   // Android-only: point the geolocation module at the Play Services fused
   // provider. Its default raw-LocationManager path turns a high-accuracy
@@ -89,7 +137,13 @@ function AppNavigator() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={mode === 'dark' ? 'light-content' : 'dark-content'} />
-      <NavigationContainer>
+      {/* `ref` is what makes `navigationRef` usable. Without it the ref is
+          never attached to the container, `isReady()` stays false and every
+          imperative navigation (401 logout reset, notification taps) is a
+          silent no-op. */}
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={flushPendingNavigation}>
         <Stack.Navigator
           initialRouteName="Splash"
           screenOptions={{ headerShown: false }}>

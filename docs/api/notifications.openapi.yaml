@@ -1,0 +1,338 @@
+openapi: 3.1.0
+
+info:
+  title: BUTRU Notifications API
+  version: 1.0.0
+  summary: In-app notification feed and FCM device-token registry.
+  description: |
+    Contract for the in-app notification centre and the push-token registry that
+    the server uses to deliver Firebase Cloud Messaging (FCM) pushes.
+
+    ### Status
+
+    These endpoints are **proposed** — the deployed API at `https://api.butru.in`
+    does not serve them yet (every path below returns `404` as of the contract
+    being written). The app is written against this contract and degrades
+    gracefully: an unreachable/404 notifications API leaves the bell empty and
+    never blocks login, the storefront or checkout.
+
+    ### Authentication
+
+    All endpoints require the storefront bearer token
+    (`Authorization: Bearer <token>`) *except* `device-token/register` and
+    `device-token/unregister`, which are called with the same token but must
+    tolerate a logged-out device (the FCM token is registered on app start and
+    unregistered on logout).
+
+    ### Tenant headers
+
+    Every request carries the tenant headers already produced by
+    `src/api/apiService.ts`: `x-store-slug`, `x-store-domain`,
+    `x-forwarded-host` and `x-store-id`.
+
+    ### Push payload (server → FCM)
+
+    The server is expected to send **data-only** FCM messages so the app fully
+    controls channels, styling and images:
+
+    ```json
+    {
+      "data": {
+        "type": "order",
+        "title": "Order shipped",
+        "body": "Your order #BK12345 is on its way.",
+        "image": "https://cdn.example.com/og/order.png",
+        "link": "/orders",
+        "notificationId": "n_123"
+      },
+      "android": { "priority": "high" },
+      "apns": {
+        "payload": { "aps": { "content-available": 1 } },
+        "headers": { "apns-push-type": "background", "apns-priority": "5" }
+      }
+    }
+    ```
+
+    `content-available: 1` + `apns-priority: 5` (iOS) and `priority: high`
+    (Android) are required, otherwise a data-only message is treated as
+    low-priority and is dropped while the app is backgrounded or quit.
+
+servers:
+  - url: https://api.butru.in
+    description: Butru production API
+
+tags:
+  - name: Notifications
+    description: The in-app notification feed.
+  - name: Device Tokens
+    description: Registry of FCM tokens used to deliver pushes.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications, newest first.
+      operationId: listNotifications
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: type
+          in: query
+          description: Optional category filter.
+          schema:
+            type: string
+            enum: [all, orders, offers, updates]
+      responses:
+        '200':
+          description: A page of notifications.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationListResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Number of unread notifications (drives the bell badge).
+      operationId: getUnreadCount
+      responses:
+        '200':
+          description: Unread count.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UnreadCountResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark one notification as read.
+      operationId: markNotificationRead
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Marked as read.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark every notification as read.
+      operationId: markAllNotificationsRead
+      responses:
+        '200':
+          description: All notifications marked as read.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/notifications/device-token/register:
+    post:
+      tags: [Device Tokens]
+      summary: Register (or refresh) an FCM device token for the signed-in user.
+      description: |
+        Idempotent — re-registering the same token refreshes its `lastSeenAt`
+        and re-points it at the current user, so a device that changed owners
+        stops receiving the previous user's pushes.
+      operationId: registerDeviceToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceTokenRequest' }
+      responses:
+        '200':
+          description: Token registered.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceTokenResponse' }
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+
+  /api/notifications/device-token/unregister:
+    post:
+      tags: [Device Tokens]
+      summary: Remove an FCM device token.
+      description: |
+        POST rather than DELETE because the token has to travel in the request
+        body, and the shared `apiService.delete` helper does not send one.
+      operationId: unregisterDeviceToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200':
+          description: Token removed (or already absent).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SuccessResponse' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Missing or expired bearer token.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: Resource does not exist.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unprocessable:
+      description: Body failed validation.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    Notification:
+      type: object
+      required: [id, title, message, type, isRead, createdAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        message:
+          type: string
+          description: Body text shown under the title.
+        type:
+          type: string
+          enum: [order, offer, coupon, update, system]
+          description: Drives the icon and the list filter.
+        image:
+          type: string
+          nullable: true
+          description: Optional artwork URL shown instead of the type icon.
+        link:
+          type: string
+          nullable: true
+          description: |
+            In-app path the notification opens (e.g. `/orders`, `/collections`).
+            Resolved by `src/storefront/links.ts`; external URLs are opened by
+            the system browser.
+        isRead: { type: boolean }
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    NotificationListResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          type: object
+          required: [notifications, total, page, limit]
+          properties:
+            notifications:
+              type: array
+              items: { $ref: '#/components/schemas/Notification' }
+            total: { type: integer }
+            page: { type: integer }
+            limit: { type: integer }
+            unreadCount: { type: integer }
+
+    UnreadCountResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          type: object
+          required: [count]
+          properties:
+            count: { type: integer }
+
+    RegisterDeviceTokenRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          description: The FCM registration token for this device.
+        platform:
+          type: string
+          enum: [ios, android]
+        osVersion:
+          type: string
+          description: e.g. `17.4` (iOS) or `14` (Android).
+        appVersion:
+          type: string
+          description: Marketing version of the running app.
+
+    DeviceToken:
+      type: object
+      properties:
+        id: { type: string }
+        token: { type: string }
+        platform: { type: string, enum: [ios, android] }
+        lastSeenAt: { type: string, format: date-time }
+
+    DeviceTokenResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: { $ref: '#/components/schemas/DeviceToken' }
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data:
+          type: object
+          additionalProperties: true
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        success: { type: boolean, default: false }
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties: { type: string }

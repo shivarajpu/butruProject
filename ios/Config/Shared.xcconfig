@@ -45,3 +45,13 @@ SWIFT_ENABLE_EXPLICIT_MODULES = NO
 
 // Client-specific Info.plist path (overridden by client xcconfig)
 INFOPLIST_FILE = butruProject/Info.plist
+
+// ── Push notifications ───────────────────────────────────────────────────────
+// The entitlements file carries `aps-environment`, which the Push Notifications
+// capability requires. Without it, iOS refuses the aps-environment entitlement
+// during signing and the app can never receive a remote notification.
+//
+// APS_ENVIRONMENT itself lives in Debug.xcconfig / Release.xcconfig, because
+// the value has to match the provisioning profile: "development" for a debug
+// build, "production" for TestFlight / the App Store.
+CODE_SIGN_ENTITLEMENTS = butruProject/butruProject.entitlements

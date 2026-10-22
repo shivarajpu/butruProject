@@ -17,6 +17,8 @@
  *   4. android/app/src/<flavor>/…                  → strings/colors/icons   (Phase 3)
  *   5. ios/Config/Clients/<client>.xcconfig        → bundle id/name/icon    (Phase 4)
  *   6. ios/Config/Client.xcconfig                  → the active one        (Phase 4)
+ *   7. android/app/src/<flavor>/google-services.json → Firebase config      (push)
+ *      ios/butruProject/GoogleService-Info.plist      → Firebase config      (push)
  *
  * Everything it writes into `android/` and `ios/` sits either in a dedicated
  * source set or in a clearly marked block, so nothing hand-written is clobbered.
@@ -146,6 +148,15 @@ function writeActive(resolved, { check } = {}) {
  */
 function writeActiveJson(resolved, { check } = {}) {
   const file = path.join(ROOT, 'clients', 'active.json');
+
+  // The effective Firebase state, not the flag: a client whose config file is
+  // on disk has push switched on, whatever the registry says. Gradle reads
+  // this to decide whether to apply the Google Services plugin, so it has to
+  // be the state the generator will actually use.
+  const firebaseFiles = require('./generators/firebase').resolveFirebaseFiles(
+    resolved,
+  );
+
   const next = `${JSON.stringify(
     {
       id: resolved.id,
@@ -154,6 +165,9 @@ function writeActiveJson(resolved, { check } = {}) {
       displayName: resolved.displayName,
       android: resolved.android,
       ios: resolved.ios,
+      firebase: {
+        enabled: firebaseFiles.enabled === true,
+      },
     },
     null,
     2,
@@ -171,6 +185,19 @@ function writeAndroid(resolved, { check, args }) {
 
 function writeIos(resolved, { check, args }) {
   const gen = require('./generators/ios');
+  return gen.generate({ resolved, check, log: (m) => log(args, m) });
+}
+
+/**
+ * Copies the per-client Firebase config into the Android flavor source set and
+ * the iOS bundle, and wires the plist into the Xcode project.
+ *
+ * Runs on every sync because the config is per client: the Android file is
+ * flavor-specific, and the iOS bundle has exactly one slot that has to hold
+ * whichever client is being built.
+ */
+function writeFirebase(resolved, { check, args }) {
+  const gen = require('./generators/firebase');
   return gen.generate({ resolved, check, log: (m) => log(args, m) });
 }
 
@@ -229,6 +256,7 @@ function main() {
 
   written.push(...writeAndroid(resolved, { check: args.check, args }));
   written.push(...writeIos(resolved, { check: args.check, args }));
+  written.push(...writeFirebase(resolved, { check: args.check, args }));
 
   if (args.quiet) return;
 

@@ -26,6 +26,7 @@ import { useWidgetActions } from '../widgets/common';
 import { selectCollections } from '../storefront/selectors';
 import { useDispatch, useSelector } from 'react-redux';
 import { addItem as addCartItem } from '../store/slices/cartSlice';
+import { selectUnreadCount } from '../store/slices/notificationSlice';
 import type { AppDispatch, RootState } from '../store';
 import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
 import { fetchProductsByCategoryName, fetchProductsForSource } from '../storefront/catalog';
@@ -169,14 +170,26 @@ const createStyles = (theme: AppTheme) => {
       padding: 4,
       position: 'relative',
     },
-    notifDot: {
+    notifBadge: {
       position: 'absolute',
-      top: 6.5,
-      right: 6,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.notifDot,
+      top: -2,
+      right: -4,
+      minWidth: 16,
+      height: 16,
+      paddingHorizontal: 4,
+      borderRadius: 8,
+      backgroundColor: colors.error,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.background,
+    },
+    notifBadgeText: {
+      fontSize: 9,
+      lineHeight: 12,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      fontFamily: fontFamily.medium,
     },
     searchBar: {
       flexDirection: 'row',
@@ -774,6 +787,10 @@ const HomeTab = () => {
   const route = useRoute<RouteProp<TabParamList, 'HomeTab'>>();
   const widgetActions = useWidgetActions();
   const storeCollections = useSelector(selectCollections);
+  // Unread notifications drive the bell badge. It is read from the store
+  // rather than fetched here so a push that arrives while the app is open
+  // updates the badge immediately.
+  const unreadCount = useSelector(selectUnreadCount);
   // `useStorefront` is idempotent (module-level guard), so calling it here on
   // top of `App` just gives us `refresh` for pull-to-refresh.
   const { refresh: refreshStorefront } = useStorefront();
@@ -1071,9 +1088,20 @@ const HomeTab = () => {
               <TouchableOpacity
                 style={styles.iconBtn}
                 activeOpacity={0.7}
+                accessibilityLabel={
+                  unreadCount > 0
+                    ? `Notifications, ${unreadCount} unread`
+                    : 'Notifications'
+                }
                 onPress={() => navigation.navigate('Notification')}>
                 <BrandIcon icon={BRAND.bellOutline} width={25} height={25} />
-                <View style={styles.notifDot} />
+                {unreadCount > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <BagIconButton />
             </View>

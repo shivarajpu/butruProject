@@ -517,12 +517,13 @@ function launchClientApps(resolved) {
 /**
  * The app identifiers this client may legitimately report over Metro.
  *
- * A debug Android build carries an `applicationIdSuffix ".debug"`, so its
- * package id is `<applicationId>.debug` while the registry records the store
- * id. Comparing a connected app against the iOS bundle id alone therefore
- * mislabels every Android debug app as foreign — the exact false "different
- * client" alarm the ownership check exists to avoid. iOS debug builds keep the
- * plain bundle id.
+ * A client has ONE id: its debug build and its release build share it, and
+ * Android and iOS share it too. So this is normally a single string.
+ *
+ * The `.debug` variant is still accepted for one reason: a device may still
+ * have an older build installed from before the suffix was removed, and
+ * mistaking that app for a foreign client is exactly the false "different
+ * client" alarm the ownership check exists to avoid.
  */
 function clientAppIds(resolved) {
   const ids = [resolved.ios.bundleId, resolved.android.applicationId];
@@ -530,10 +531,10 @@ function clientAppIds(resolved) {
     if (!id) continue;
     ids.push(`${id}.debug`);
   }
-  return ids;
+  return [...new Set(ids)];
 }
 
-/** True when a connected app id belongs to this client (debug suffix included). */
+/** True when a connected app id belongs to this client. */
 function appBelongsToClient(resolved, appId) {
   return clientAppIds(resolved).includes(appId);
 }

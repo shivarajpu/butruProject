@@ -14,6 +14,16 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
+# react-native-firebase v27 resolves Firebase through Swift Package Manager,
+# and SPM products are automatic libraries — they are not `.dynamic`. With
+# static pod linkage every RNFB pod embeds its own copy of FirebaseCore and
+# the app fails to link with duplicate symbols.
+#
+# Dynamic linkage is the durable fix. Setting USE_FRAMEWORKS=dynamic only for
+# one `pod install` would work locally but revert to static on the next run,
+# so the line below is unconditional.
+use_frameworks! :linkage => :dynamic
+
 target 'butruProject' do
   config = use_native_modules!
 

@@ -11,7 +11,7 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.butruproject</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>1.0</string>
 	<key>CFBundleName</key>
@@ -61,6 +61,18 @@
 		<string>MomoSignature.ttf</string>
 		<string>Poppins-Medium.ttf</string>
 		<string>Poppins-Bold.ttf</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<!-- Needed so a data-only FCM message can wake a backgrounded or
+		     quit app. Without it iOS simply never calls the app for
+		     silent pushes and the notification is only delivered the next
+		     time the user opens the app. -->
+		<string>remote-notification</string>
+	</array>
+	<key>UIBackgroundModes~ipad</key>
+	<array>
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

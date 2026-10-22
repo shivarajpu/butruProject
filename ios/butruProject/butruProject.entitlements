@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Push Notifications entitlement.
+
+	  `aps-environment` must match the provisioning profile the build is signed
+	  with: "development" for a debug build on a device, "production" for an
+	  App Store / TestFlight build. Hard-coding one of the two breaks the other
+	  kind of build — the app installs and then never receives a single push,
+	  with no error anywhere.
+
+	  So the value is a build setting instead: APS_ENVIRONMENT is "development"
+	  in Debug.xcconfig and "production" in Release.xcconfig.
+
+	  Referenced from Config/Shared.xcconfig via CODE_SIGN_ENTITLEMENTS.
+	-->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
+</dict>
+</plist>

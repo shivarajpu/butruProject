@@ -12,6 +12,7 @@ import themeReducer from './slices/themeSlice';
 import authReducer from './slices/authSlice';
 import cartReducer from './slices/cartSlice';
 import storefrontReducer from './slices/storefrontSlice';
+import notificationReducer from './slices/notificationSlice';
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +20,7 @@ export const store = configureStore({
     auth: authReducer,
     cart: cartReducer,
     storefront: storefrontReducer,
+    notifications: notificationReducer,
     // Add more slices here as the app grows:
   },
 });

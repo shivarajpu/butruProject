@@ -16,3 +16,9 @@
 
 // The client currently being built. Git-ignored; regenerated on every build.
 #include "Client.xcconfig"
+
+// ── Push notifications ──────────────────────────────────────────────────────
+// A debug build is signed with a development provisioning profile, so the
+// aps-environment entitlement has to say "development". Release.xcconfig says
+// "production" for the same reason.
+APS_ENVIRONMENT = development
