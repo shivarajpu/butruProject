@@ -121,7 +121,14 @@ const AccountTab = () => {
   }, []);
 
   // Only render rows whose policy API returned content.
-  const POLICIES_CARD_ORDER: PolicyKey[] = ['terms', 'shipping', 'returns', 'privacy'];
+  const POLICIES_CARD_ORDER: PolicyKey[] = [
+    'terms',
+    'shipping',
+    // Disabled: the store does not offer returns/refunds/exchanges.
+    // Uncomment together with the JSX row below and the PolicyKey entry.
+    // 'returns',
+    'privacy',
+  ];
   const shownPolicyKeys = POLICIES_CARD_ORDER.filter(
     key => policyAvailability[key] === true,
   );
@@ -518,6 +525,8 @@ const AccountTab = () => {
               </TouchableOpacity>
             )}
 
+            {/* Disabled: no return policy from our end. Uncomment this row
+                (and 'returns' in POLICIES_CARD_ORDER / PolicyKey) to restore.
             {shownPolicyKeys.includes('returns') && (
               <TouchableOpacity
                 style={[
@@ -537,7 +546,7 @@ const AccountTab = () => {
                 <BrandIcon icon={BRAND.chevronRight} width={18} height={18} />
               </TouchableOpacity>
             )}
-
+            */}
             {shownPolicyKeys.includes('privacy') && (
               <TouchableOpacity
                 style={[

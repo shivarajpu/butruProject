@@ -57,14 +57,36 @@ const PATH_ROUTES: Record<string, PathRoute> = {
   'privacy-policy': policy('privacy'),
   shipping: policy('shipping'),
   'shipping-policy': policy('shipping'),
-  returns: policy('returns'),
-  'returns-refunds-exchange': policy('returns'),
-  'returns-refunds': policy('returns'),
+  // Disabled: no return/exchange policy. Uncomment these together with the
+  // other return-policy pieces (PolicyKey, Account row, customer links) to
+  // re-enable. REMOVED_PATHS below keeps the paths dead until then.
+  // returns: policy('returns'),
+  // 'returns-refunds-exchange': policy('returns'),
+  // 'returns-refunds': policy('returns'),
   about: policy('about'),
   'about-us': policy('about'),
 };
 
 const TAB_ROUTES = new Set(['CategoryTab', 'WishlistTab', 'AccountTab']);
+
+/**
+ * The store does not offer returns, refunds or exchanges, so these paths must
+ * stay dead even if an old banner/push still points at one. Without this they
+ * would fall through to the bare-slug branch and open a "Returns" category.
+ */
+const REMOVED_PATHS = new Set([
+  'returns',
+  'return',
+  'returns-refunds',
+  'returns-refunds-exchange',
+  'return-refund',
+  'refund',
+  'refunds',
+  'exchange',
+  'exchanges',
+  'return-policy',
+  'refund-policy',
+]);
 
 /** `new-arrivals` → `New Arrivals` — the casing the API's type filter expects. */
 const titleCaseSlug = (slug: string): string =>
@@ -140,6 +162,10 @@ export const resolveLink = (
   if (type) return { type: 'category', category: type };
 
   const normalized = path.replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+
+  if (REMOVED_PATHS.has(normalized)) {
+    return { type: 'none' };
+  }
 
   // The live `home_hero_cards` "Comfort" banner links to `/colllections` — a
   // misspelled `/collections` with no category tag. The store is a kids'

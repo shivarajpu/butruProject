@@ -430,8 +430,10 @@ const CartScreen = () => {
   const handleGstSubmit = () => {
     const code = gstInput.trim().toUpperCase();
     Keyboard.dismiss();
+    // GST number is optional; an empty field should never block checkout or
+    // show a validation error.
     if (!code) {
-      setGstError('Please enter a GST number');
+      setGstError('');
       return;
     }
     if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(code)) {
@@ -606,7 +608,7 @@ const CartScreen = () => {
             <View style={styles.gstHeader}>
               <View style={styles.gstTitleRow}>
                 <SvgXml xml={INFO_ICON_SVG} width={16} height={16} />
-                <Text style={styles.gstTitle}>GST Number</Text>
+                <Text style={styles.gstTitle}>GST Number (Optional)</Text>
               </View>
               {savedGst.length > 0 && (
                 <TouchableOpacity activeOpacity={0.7} onPress={handleGstRemove}>
@@ -615,7 +617,7 @@ const CartScreen = () => {
               )}
             </View>
             <Text style={styles.gstSub}>
-              Add your GST number to get GST invoice on this order.
+              Add your GST number to get a GST invoice. You can skip this step.
             </Text>
 
             {savedGst.length > 0 ? (

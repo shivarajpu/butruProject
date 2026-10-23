@@ -57,7 +57,9 @@ import {
   PAYMENT_CARD_SVG,
   PRIVACY_SHIELD_SVG,
   PROFILE_USER_SVG,
-  RETURN_REFUND_SVG,
+  // Disabled: return policy module. Uncomment the import, the `returnRefund`
+  // def below and `RETURN_REFUND_SVG` in svg/index.ts to restore the icon.
+  // RETURN_REFUND_SVG,
   SEARCH_SVG,
   SHOES_SVG,
   TOYS_SVG,
@@ -117,7 +119,8 @@ export const BRAND = {
   bell: def(BELL_ICON_SVG, 'primary', '#E8006F'),
   document: def(DOCUMENT_SVG, 'primary', '#E8006F'),
   truck: def(TRUCK_SVG, 'primary', '#E8006F'),
-  returnRefund: def(RETURN_REFUND_SVG, 'primary', '#E8006F'),
+  // Disabled with the return policy module.
+  // returnRefund: def(RETURN_REFUND_SVG, 'primary', '#E8006F'),
   privacyShield: def(PRIVACY_SHIELD_SVG, 'primary', '#E8006F'),
   helpQuestion: def(HELP_QUESTION_SVG, 'primary', '#E8006F'),
   aboutInfo: def(ABOUT_INFO_SVG, 'primary', '#E8006F'),

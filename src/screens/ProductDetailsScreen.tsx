@@ -92,7 +92,9 @@ interface ApiProductDetail {
   sku: string;
   skus: ProductSku[];
   attributes: ProductAttribute[];
-  returnExchangeCondition: string;
+  // Disabled: no return policy from our end. Uncomment to show the
+  // product-level return/exchange condition again.
+  // returnExchangeCondition: string;
   categoryPath: string[];
   totalInventory: number;
   isOutOfStock: boolean;
@@ -223,7 +225,8 @@ const mapApiProductToUI = (item: ApiProductDetail) => {
     description: item.description ?? '',
     color: item.color ?? '',
     attributes: item.attributes ?? [],
-    returnExchangeCondition: item.returnExchangeCondition ?? '',
+    // Disabled with the return policy module.
+    // returnExchangeCondition: item.returnExchangeCondition ?? '',
     categoryPath: item.categoryPath ?? [],
     totalInventory: item.totalInventory ?? 0,
     isOutOfStock: item.isOutOfStock ?? false,
@@ -911,13 +914,15 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               </View>
             ) : null}
 
+            {/* Disabled: no return policy from our end. Uncomment to show the
+                product-level return/exchange condition again.
             {product.returnExchangeCondition ? (
               <View style={styles.deliveryFeatureRow}>
                 <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
                 <Text style={styles.deliveryFeatureText}>{product.returnExchangeCondition}</Text>
               </View>
             ) : null}
-
+            */}
             {features.codEnabled ? (
               <View style={styles.deliveryFeatureRow}>
                 <SvgXml xml={CHECK_GREEN_SVG} width={14} height={14} />
@@ -1000,9 +1005,16 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
             <Text style={styles.loveBrandText}>ButruLove</Text>
 
             <View style={styles.loveFeaturesRow}>
+              {/* Disabled: "No Questions Asked / Easy Returns" made a return
+                  promise the store cannot keep. Uncomment to restore it.
               <View style={styles.loveFeatureItem}>
                 <Text style={styles.loveFeatureTitle}>No Questions{'\n'}Asked</Text>
                 <Text style={styles.loveFeatureSub}>Easy Returns</Text>
+              </View>
+              */}
+              <View style={styles.loveFeatureItem}>
+                <Text style={styles.loveFeatureTitle}>Fast{'\n'}Delivery</Text>
+                <Text style={styles.loveFeatureSub}>Ships In 24H</Text>
               </View>
               <View style={styles.loveFeatureItem}>
                 <Text style={styles.loveFeatureTitle}>COD{'\n'}Available</Text>

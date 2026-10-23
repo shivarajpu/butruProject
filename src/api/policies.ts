@@ -1,6 +1,13 @@
 import { apiService } from './apiService';
 
-export type PolicyKey = 'returns' | 'shipping' | 'terms' | 'privacy' | 'about';
+export type PolicyKey =
+  // Disabled: the store does not offer a return/refund/exchange policy.
+  // Uncomment `'returns'` to bring the policy screen entry back.
+  // | 'returns'
+  | 'shipping'
+  | 'terms'
+  | 'privacy'
+  | 'about';
 
 export type Policy = {
   key: string;
@@ -25,7 +32,9 @@ export type PolicyResponse = {
 };
 
 const POLICY_LABELS: Record<PolicyKey, string> = {
-  returns: 'Returns, Refunds & Exchange',
+  // Disabled with the return policy module; uncomment together with the
+  // `'returns'` PolicyKey member to restore it.
+  // returns: 'Returns, Refunds & Exchange',
   shipping: 'Shipping Policy',
   terms: 'Terms and Conditions',
   privacy: 'Privacy Policy',
@@ -36,7 +45,8 @@ export const POLICY_KEYS: PolicyKey[] = [
   'about',
   'terms',
   'shipping',
-  'returns',
+  // Disabled: no return policy from our end.
+  // 'returns',
   'privacy',
 ];
 
