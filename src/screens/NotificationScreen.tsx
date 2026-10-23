@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FONTS } from '../constants/fonts';
 import {
   StyleSheet,
@@ -91,6 +91,21 @@ export default function NotificationScreen({ navigation }: Props) {
     dispatch(setFilter(filter));
   };
 
+  // Per-row "Read more" state. `truncated` is measured from a hidden copy of
+  // the message (without `numberOfLines`) so the toggle only appears when the
+  // text actually overflows two lines.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [truncated, setTruncated] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const measureTruncation = useCallback((id: string, lines: number) => {
+    const isTruncated = lines > 2;
+    setTruncated(prev => (prev[id] === isTruncated ? prev : { ...prev, [id]: isTruncated }));
+  }, []);
+
   /**
    * Opens a notification.
    *
@@ -102,9 +117,14 @@ export default function NotificationScreen({ navigation }: Props) {
     if (!item.isRead) {
       dispatch(readNotification(item.id));
     }
-    if (item.link) {
-      navigateFromNotification({ link: item.link });
-    }
+
+    // `metadata.screen` decides where the notification goes; the link is the
+    // fallback for older payloads.
+    navigateFromNotification({
+      ...(item.metadata ?? {}),
+      screen: item.screen ?? item.metadata?.screen,
+      link: item.link ?? item.metadata?.link,
+    });
   };
 
   const isInitialLoad = status === 'loading' && notifications.length === 0;
@@ -122,8 +142,8 @@ export default function NotificationScreen({ navigation }: Props) {
           <Text style={styles.headerTitle}>Notifications</Text>
           <Text style={styles.headerSubtitle}>
             {unreadCount > 0
-              ? `${unreadCount} unread · offers, orders & styles`
-              : 'Offers, orders & styles.'}
+              ? `${unreadCount} unread · offers, orders`
+              : 'Offers, orders .'}
           </Text>
         </View>
         {unreadCount > 0 && (
@@ -221,9 +241,40 @@ export default function NotificationScreen({ navigation }: Props) {
                   <Text style={styles.cardTime}>{item.time}</Text>
                 </View>
                 {!!item.description && (
-                  <Text style={styles.cardDescription} numberOfLines={2}>
-                    {item.description}
-                  </Text>
+                  <View>
+                    <Text
+                      style={styles.cardDescription}
+                      numberOfLines={expanded[item.id] ? undefined : 2}>
+                      {item.description}
+                    </Text>
+
+                    {!!truncated[item.id] && (
+                      <Text
+                        style={styles.readMoreText}
+                        onPress={event => {
+                          // The whole card is a TouchableOpacity; stop the tap
+                          // here so expanding the message does not also
+                          // navigate to the notification's destination.
+                          event.stopPropagation();
+                          toggleExpanded(item.id);
+                        }}>
+                        {expanded[item.id] ? 'Read less' : 'Read more'}
+                      </Text>
+                    )}
+
+                    {/* Invisible, full-width copy used only to count the
+                        unwrapped lines. `numberOfLines` would report just the
+                        visible lines, so it cannot answer this question. */}
+                    <View pointerEvents="none" style={styles.measureTextWrap}>
+                      <Text
+                        style={styles.cardDescription}
+                        onTextLayout={event =>
+                          measureTruncation(item.id, event.nativeEvent.lines.length)
+                        }>
+                        {item.description}
+                      </Text>
+                    </View>
+                  </View>
                 )}
               </View>
 
@@ -408,6 +459,20 @@ const createStyles = (theme: AppTheme) => {
       color: colors.textSecondary,
       fontFamily: fontFamily.regular,
       lineHeight: 17,
+    },
+    readMoreText: {
+      marginTop: 2,
+      fontSize: 12,
+      color: colors.primary,
+      fontFamily: fontFamily.medium,
+      fontWeight: '600',
+    },
+    measureTextWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      opacity: 0,
     },
     unreadDot: {
       width: 7,

@@ -1,3 +1,4 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SupportConfig } from '../theme/types';
 import type { PolicyKey } from '../api/policies';
 
@@ -8,10 +9,30 @@ export type RootStackParamList = {
   OtpVarify: { phoneNumber?: string; email?: string; token?: string } | undefined;
   SignUp: undefined;
   ForgotPassword: undefined;
-  Home: undefined;
-  ProductDetails: { product: any };
-  CartScreen: { mode?: 'buyNow' } | undefined;
-  MyOrders: undefined;
+  Home: NavigatorScreenParams<TabParamList> | undefined;
+  ProductDetails: {
+    product: any;
+    /**
+     * Prices carried by a `product_details` notification. When present the
+     * screen shows these instead of the catalogue price.
+     */
+    priceOverride?: { newPrice?: number; oldPrice?: number };
+    /** Set when the notification only carries an id. */
+    productId?: string;
+  };
+  CartScreen: { mode?: 'buyNow'; filterProductId?: string } | undefined;
+  MyOrders:
+    | {
+        /** Which internal view to open once the orders are loaded. */
+        view?: 'list' | 'track' | 'details';
+        orderId?: string;
+        orderNumber?: string;
+        productId?: string;
+        trackingNumber?: string;
+        /** `add_review` notifications open the review form straight away. */
+        openReview?: boolean;
+      }
+    | undefined;
   Notification: undefined;
   HelpSupport:
     | {
@@ -31,6 +52,6 @@ export type TabParamList = {
    */
   HomeTab: { category?: string; navNonce?: number } | undefined;
   CategoryTab: undefined;
-  WishlistTab: undefined;
+  WishlistTab: { filterProductId?: string; navNonce?: number } | undefined;
   AccountTab: undefined;
 };

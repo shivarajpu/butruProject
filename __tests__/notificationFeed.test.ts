@@ -39,6 +39,8 @@ import {
 } from '../src/api/notifications';
 import reducer, {
   hydrate,
+  readAllNotifications,
+  readNotification,
   receivePushNotification,
   setFilter,
   clearNotifications,
@@ -107,6 +109,42 @@ describe('normalizeNotification', () => {
     expect(item?.createdAt).toBe(1_700_000_000_000);
   });
 
+  it('reads the live metadata block used for routing', () => {
+    const item = normalizeNotification({
+      _id: 'n3',
+      type: 'order.placed',
+      title: 'Order confirmed',
+      message: 'Thanks for shopping',
+      ctaUrl: '/Orders/Track/6adaf66f178102698701001d',
+      metadata: {
+        screen: 'order_details',
+        orderId: '6adaf66f178102698701001d',
+        orderNumber: 'ORD-831317-755776',
+        productId: 'product-1',
+        newPrice: 499,
+        oldPrice: 799,
+        imageUrl: 'https://cdn.example.com/order.png',
+      },
+      isRead: false,
+      createdAt: '2026-10-23T05:53:56.899Z',
+    });
+
+    expect(item?.category).toBe('Orders');
+    expect(item?.screen).toBe('order_details');
+    expect(item?.link).toBe('/Orders/Track/6adaf66f178102698701001d');
+    expect(item?.imageUri).toBe('https://cdn.example.com/order.png');
+    expect(item?.metadata).toEqual(
+      expect.objectContaining({
+        screen: 'order_details',
+        orderId: '6adaf66f178102698701001d',
+        orderNumber: 'ORD-831317-755776',
+        productId: 'product-1',
+        newPrice: 499,
+        oldPrice: 799,
+      }),
+    );
+  });
+
   it('drops a record with no id, because it cannot be keyed or marked read', () => {
     expect(normalizeNotification({ title: 'No id here' })).toBeNull();
     expect(normalizeNotification(null)).toBeNull();
@@ -144,10 +182,40 @@ describe('fetchNotifications', () => {
 
     const page = await fetchNotifications({ page: 1, limit: 20 });
 
-    expect(mockGet).toHaveBeenCalledWith('/api/notifications?page=1&limit=20');
+    expect(mockGet).toHaveBeenCalledWith('/api/notifications/customer?page=1&limit=20');
     expect(page.notifications).toHaveLength(1);
     expect(page.notifications[0].title).toBe('Hi');
     expect(page.unreadCount).toBe(1);
+  });
+
+  it('reads the live root-array response with its pagination fields', async () => {
+    mockGet.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          _id: 'n1',
+          type: 'welcome',
+          title: 'Welcome Aboard!',
+          message: 'Start shopping',
+          metadata: { screen: 'home', notificationType: 'welcome' },
+          isRead: false,
+          createdAt: '2026-10-23T05:51:46.322Z',
+        },
+      ],
+      page: 1,
+      total: 2,
+      unreadCount: 2,
+      pages: 1,
+    });
+
+    const page = await fetchNotifications({ page: 1, limit: 20 });
+
+    expect(page.notifications).toHaveLength(1);
+    expect(page.notifications[0].screen).toBe('home');
+    expect(page.total).toBe(2);
+    expect(page.unreadCount).toBe(2);
+    expect(page.pages).toBe(1);
+    expect(page.hasMore).toBe(false);
   });
 
   it('gives an empty page when the endpoint does not exist yet', async () => {
@@ -200,6 +268,48 @@ describe('notification slice', () => {
 
     expect(state.items).toHaveLength(1);
     expect(state.unreadCount).toBe(1);
+  });
+
+  it('marks a notification read as soon as it is opened', () => {
+    let state = reducer(
+      empty(),
+      receivePushNotification({
+        id: 'push_1',
+        title: 'Order shipped',
+        description: 'On its way',
+        category: 'Orders',
+        iconType: 'order',
+        isRead: false,
+        createdAt: 1,
+        time: '',
+      }),
+    );
+
+    state = reducer(state, readNotification.pending('request-1', 'push_1'));
+
+    expect(state.items[0].isRead).toBe(true);
+    expect(state.unreadCount).toBe(0);
+  });
+
+  it('marks everything read as soon as the button is pressed', () => {
+    let state = reducer(
+      empty(),
+      receivePushNotification({
+        id: 'push_1',
+        title: 'A',
+        description: '',
+        category: 'Updates',
+        iconType: 'megaphone',
+        isRead: false,
+        createdAt: 1,
+        time: '',
+      }),
+    );
+
+    state = reducer(state, readAllNotifications.pending('request-2'));
+
+    expect(state.items.every(item => item.isRead)).toBe(true);
+    expect(state.unreadCount).toBe(0);
   });
 
   it('does not count the same push twice', () => {

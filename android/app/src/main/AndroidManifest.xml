@@ -51,6 +51,36 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+
+        <!-- Custom scheme: butru://orders/track/<id> -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="butru" />
+        </intent-filter>
+
+        <!-- App Link: https://butru.in/Orders/Track/<id>.
+             Requires https://butru.in/.well-known/assetlinks.json to verify. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data
+                android:scheme="https"
+                android:host="butru.in"
+                android:pathPrefix="/" />
+        </intent-filter>
+
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data
+                android:scheme="https"
+                android:host="www.butru.in"
+                android:pathPrefix="/" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

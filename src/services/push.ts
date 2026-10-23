@@ -6,10 +6,12 @@
  *   Notifee               → draws the notification and reports taps
  *
  * The server sends **data-only** messages so the app controls channels,
- * styling and artwork. That is also why the tap handling lives in Notifee and
- * not in RNFirebase: once Notifee is in the picture, RNFirebase's
- * `onNotificationOpenedApp` / `getInitialNotification` never fire — Notifee
- * consumes the press event.
+ * styling and artwork, and Notifee owns taps on those notifications.
+ *
+ * iOS also displays an APNs alert (`notification` payload) itself when the app
+ * is backgrounded or quit. Taps on those system notifications never reach
+ * Notifee, so they are handled through RNFirebase's
+ * `onNotificationOpenedApp` / `getInitialNotification` as well.
  *
  * ── Why permission is requested through Notifee ─────────────────────────────
  * RNFirebase's `requestPermission` is deprecated (and a no-op on Android ≤ 32).
@@ -23,6 +25,7 @@
  */
 
 import { Linking, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, {
   AndroidImportance,
   AndroidStyle,
@@ -38,6 +41,7 @@ import {
   getMessaging,
   getToken,
   onMessage,
+  onNotificationOpenedApp,
   onTokenRefresh,
   registerDeviceForRemoteMessages,
   setBackgroundMessageHandler,
@@ -45,6 +49,7 @@ import {
   type RemoteMessage,
 } from '@react-native-firebase/messaging';
 import { navigationRef } from '../navigation/rootNavigation';
+import { parseDeepLink } from '../navigation/deepLink';
 import { isExternalLink, resolveLink, type WidgetAction } from '../storefront/links';
 import { store } from '../store';
 import { receivePushNotification } from '../store/slices/notificationSlice';
@@ -114,6 +119,7 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       badge: true,
       sound: true,
     });
+    console.log('[push] permission status', settings.authorizationStatus);
     return (
       settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
       settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
@@ -128,11 +134,16 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 export const hasNotificationPermission = async (): Promise<boolean> => {
   try {
     const settings = await notifee.getNotificationSettings();
+    console.log('[push] hasNotificationPermission', settings.authorizationStatus);
     return (
       settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
       settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
     );
-  } catch {
+  } catch (e) {
+    console.log(
+      '[push] hasNotificationPermission err',
+      e instanceof Error ? e.message : String(e),
+    );
     return false;
   }
 };
@@ -302,7 +313,10 @@ const readData = (message: RemoteMessage | undefined): Record<string, string> =>
     if (typeof value === 'string') {
       flat[key] = value;
     } else if (value !== undefined && value !== null) {
-      flat[key] = String(value);
+      // FCM data is string-only, but a nested object is JSON-encoded so
+      // `readNotificationMetadata` can still parse the routing block.
+      flat[key] =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
     }
   });
 
@@ -417,12 +431,16 @@ const toAppNotification = (message: RemoteMessage | undefined): AppNotification 
   const payload = message?.notification;
 
   return normalizeNotification({
+    // FCM data-only payloads carry the routing block (`metadata`) and the
+    // ctaUrl as flat strings; spread them so a tapped foreground push lands on
+    // the same screen as the feed item served by the API.
+    ...data,
     id: data.notificationId ?? message?.messageId ?? `push_${Date.now()}`,
     title: data.title ?? payload?.title ?? '',
     message: data.body ?? payload?.body ?? '',
     type: data.type ?? 'update',
-    image: data.image ?? payload?.image,
-    link: data.link,
+    image: data.image ?? data.imageUrl ?? payload?.image,
+    link: data.link ?? data.ctaUrl,
     isRead: false,
     createdAt: message?.sentTime ?? Date.now(),
   });
@@ -432,8 +450,12 @@ const toAppNotification = (message: RemoteMessage | undefined): AppNotification 
 export const handleForegroundMessage = async (
   message: RemoteMessage | undefined,
 ): Promise<void> => {
+  console.log('[push] foreground message received', JSON.stringify(message?.data ?? {}));
   const notification = buildNotification(message);
-  if (!notification) return;
+  if (!notification) {
+    console.warn('[push] foreground message produced no notification');
+    return;
+  }
 
   await displayNotification(notification);
 
@@ -451,6 +473,7 @@ export const handleForegroundMessage = async (
 export const handleBackgroundMessage = async (
   message: RemoteMessage | undefined,
 ): Promise<void> => {
+  console.log('[push] background message received', JSON.stringify(message?.data ?? {}));
   // On Android, a message that carries an FCM `notification` block is
   // displayed by the Firebase SDK itself while the app is in the background —
   // displaying it again here would put two copies in the tray. iOS never
@@ -476,15 +499,252 @@ let pendingNavigation: {
   params?: Record<string, unknown>;
 } | null = null;
 
+const pickText = (source: Record<string, unknown>, keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+};
+
+const pickNumber = (source: Record<string, unknown>, keys: string[]): number | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Reads `metadata` from notification data. FCM data-only messages can only
+ * carry strings, so a nested object may arrive JSON-encoded.
+ */
+const readNotificationMetadata = (
+  data: Record<string, unknown>,
+): Record<string, unknown> => {
+  const raw = data.metadata;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Not JSON — fall through to the flat data map.
+    }
+  }
+  return data;
+};
+
+const PENDING_NOTIFICATION_KEY = '@butru/pending-notification-target';
+
+/**
+ * Keeps the tapped payload around until the app is actually in the foreground.
+ *
+ * A background/headless JS runtime can receive the press event without a
+ * mounted navigator, and it is not the same runtime the user then sees. Writing
+ * the target to storage lets the foreground app pick it up on mount or on the
+ * next `active` app-state change instead of dropping the tap.
+ */
+const savePendingNotification = async (
+  data?: Record<string, unknown>,
+): Promise<void> => {
+  if (!data || Object.keys(data).length === 0) return;
+  try {
+    await AsyncStorage.setItem(PENDING_NOTIFICATION_KEY, JSON.stringify(data));
+    console.log('[push] saved pending notification', JSON.stringify(data));
+  } catch (error) {
+    console.warn('[push] could not persist the notification tap', error);
+  }
+};
+
+const openWhenReady = (params: {
+  screen: keyof RootStackParamList;
+  params?: Record<string, unknown>;
+}): void => {
+  console.log('[push] openWhenReady', params.screen, JSON.stringify(params.params));
+  pendingNavigation = params;
+  flushPendingNavigation();
+};
+
+/**
+ * Routes a notification by its `metadata.screen` hint.
+ *
+ * Returns `true` when the hint was understood. The destination filters are
+ * passed as route params so the target screen can narrow its own list:
+ *
+ *   home            → Home
+ *   cart            → CartScreen filtered by productId
+ *   wishlist        → Wishlist tab filtered by productId
+ *   order_details   → MyOrders (details) filtered by orderId/orderNumber
+ *   track_shipment  → MyOrders (track) filtered by orderId/orderNumber/trackingNumber
+ *   add_review      → MyOrders (details + review form) filtered by productId/orderNumber
+ *   product_details → ProductDetails with optional newPrice/oldPrice
+ */
+const openNotificationScreen = (
+  screen: string,
+  meta: Record<string, unknown>,
+): boolean => {
+  // Normalize: handle camelCase (productDetails), spaces, hyphens
+  let normalized = screen.trim().toLowerCase();
+  normalized = normalized.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  normalized = normalized.replace(/[\s-]+/g, '_');
+  // Map common variants
+  const aliases: Record<string, string> = {
+    productdetails: 'product_details',
+    productdetail: 'product_details',
+    product_details_screen: 'product_details',
+    product: 'product_details',
+    orderdetails: 'order_details',
+    orderdetail: 'order_details',
+    orders: 'order_details',
+    myorders: 'order_details',
+    trackshipment: 'track_shipment',
+    trackorder: 'track_shipment',
+    tracking: 'track_shipment',
+    track_shipment_screen: 'track_shipment',
+    addreview: 'add_review',
+    add_review_screen: 'add_review',
+    wishlisttab: 'wishlist',
+    cartscreen: 'cart',
+  };
+  if (aliases[normalized]) normalized = aliases[normalized];
+  const productId =
+    pickText(meta, ['productId', 'product_id', 'productID', 'product']) ||
+    pickText(meta as any, ['id']);
+  const orderId = pickText(meta, ['orderId', 'order_id', 'orderID']);
+  const orderNumber = pickText(meta, ['orderNumber', 'order_number', 'orderNo']);
+  const trackingNumber = pickText(meta, [
+    'trackingNumber',
+    'tracking_number',
+    'awb',
+    'trackingId',
+    'tracking_no',
+  ]);
+
+  switch (normalized) {
+    case 'home':
+      openWhenReady({ screen: 'Home' });
+      return true;
+
+    case 'cart':
+      openWhenReady({
+        screen: 'CartScreen',
+        params: productId ? { filterProductId: productId } : undefined,
+      });
+      return true;
+
+    case 'wishlist':
+      openWhenReady({
+        screen: 'Home',
+        params: {
+          screen: 'WishlistTab',
+          params: {
+            filterProductId: productId,
+            navNonce: Date.now(),
+          },
+        },
+      });
+      return true;
+
+    case 'order_details':
+    case 'order_detail':
+    case 'orders':
+    case 'order_detail_screen':
+      openWhenReady({
+        screen: 'MyOrders',
+        params: {
+          view: 'details',
+          orderId,
+          orderNumber,
+          productId,
+        },
+      });
+      return true;
+
+    case 'track_shipment':
+    case 'track_order':
+    case 'tracking':
+    case 'track_shipment_details':
+      openWhenReady({
+        screen: 'MyOrders',
+        params: {
+          view: 'track',
+          orderId,
+          orderNumber,
+          trackingNumber,
+          productId,
+        },
+      });
+      return true;
+
+    case 'add_review':
+      openWhenReady({
+        screen: 'MyOrders',
+        params: {
+          view: 'details',
+          openReview: true,
+          orderId,
+          orderNumber,
+          productId,
+        },
+      });
+      return true;
+
+    case 'product_details':
+    case 'product_detail':
+    case 'product': {
+      if (!productId) return false;
+
+      const newPrice = pickNumber(meta, ['newPrice', 'new_price']);
+      const oldPrice = pickNumber(meta, ['oldPrice', 'old_price', 'mrp']);
+
+      openWhenReady({
+        screen: 'ProductDetails',
+        params: {
+          product: { id: productId, _id: productId },
+          productId,
+          priceOverride: { newPrice, oldPrice },
+        },
+      });
+      return true;
+    }
+
+    default:
+      return false;
+  }
+};
+
 /**
  * Opens whatever a notification points at.
  *
- * Uses the same link resolver as the storefront widgets, so a notification
- * linking to `/orders` lands on the orders screen and one linking to
- * `/collections` lands on the catalogue — no screen-specific string matching.
+ * The backend puts a `metadata.screen` hint on every event, so that is checked
+ * first and routed with its filter keys. Notifications without a hint (or with
+ * a screen the app does not know) fall back to the same link resolver as the
+ * storefront widgets.
  */
 export const navigateFromNotification = (data?: Record<string, unknown>): void => {
-  const rawLink = data?.link;
+  console.log('[push] navigateFromNotification data:', JSON.stringify(data));
+  const flat = data ?? {};
+  const meta = readNotificationMetadata(flat);
+  console.log('[push] navigateFromNotification meta:', JSON.stringify(meta));
+
+  const screen =
+    pickText(meta, ['screen']) ??
+    pickText(flat, ['screen', 'notificationType']);
+
+  if (screen && openNotificationScreen(screen, meta)) {
+    return;
+  }
+
+  const rawLink = meta.link ?? flat.link ?? meta.ctaUrl ?? flat.ctaUrl ?? meta.deepLink ?? meta.url;
   const link = typeof rawLink === 'string' ? rawLink.trim() : '';
 
   if (!link) {
@@ -493,7 +753,21 @@ export const navigateFromNotification = (data?: Record<string, unknown>): void =
     return;
   }
 
+  // A notification `ctaUrl` such as `/Orders/Track/<id>` (or the same URL on
+  // the storefront) carries a destination the generic link resolver does not
+  // know. Parse it into metadata first, then reuse the metadata router.
+  const deep = parseDeepLink(link);
+  if (deep?.screen) {
+    navigateFromNotification(deep);
+    return;
+  }
+
   if (isExternalLink(link)) {
+    const internal = parseDeepLink(link);
+    if (internal?.screen) {
+      navigateFromNotification(internal);
+      return;
+    }
     Linking.openURL(link).catch(error => {
       console.warn('[push] could not open the external link', error);
     });
@@ -504,12 +778,36 @@ export const navigateFromNotification = (data?: Record<string, unknown>): void =
   openActionWhenReady(action);
 };
 
-const openWhenReady = (params: {
-  screen: keyof RootStackParamList;
-  params?: Record<string, unknown>;
-}): void => {
-  pendingNavigation = params;
-  flushPendingNavigation();
+/**
+ * Opens the destination encoded in an app URL.
+ *
+ * Called for `butru://…` links and storefront links, whether they arrive on a
+ * cold start (`Linking.getInitialURL`) or while the app is already running
+ * (`Linking` `url` event). Navigation is queued until the navigator is ready,
+ * so a link that launches the app is not lost to the startup sequence.
+ */
+export const navigateFromDeepLink = (url?: string | null): void => {
+  const deep = parseDeepLink(url);
+  if (!deep) return;
+
+  navigateFromNotification(deep);
+};
+
+/** Wires URL-based deep linking for the lifetime of the app. */
+export const initDeepLinking = (): (() => void) => {
+  const subscription = Linking.addEventListener('url', ({ url }) => {
+    navigateFromDeepLink(url);
+  });
+
+  Linking.getInitialURL()
+    .then(url => {
+      if (url) navigateFromDeepLink(url);
+    })
+    .catch(error => {
+      console.warn('[deeplink] could not read the initial URL', error);
+    });
+
+  return () => subscription.remove();
 };
 
 /**
@@ -579,11 +877,13 @@ const openActionWhenReady = (action: WidgetAction): void => {
  * has mounted.
  */
 export const flushPendingNavigation = (): void => {
+  console.log('[push] flushPendingNavigation', !!pendingNavigation, navigationRef.isReady());
   if (!pendingNavigation) return;
   if (!navigationRef.isReady()) return;
 
   const target = pendingNavigation;
   pendingNavigation = null;
+  console.log('[push] flushing nav to', target.screen, JSON.stringify(target.params));
 
   try {
     navigationRef.navigate(
@@ -602,12 +902,36 @@ export const handleNotificationPress = (event: Event): void => {
   navigateFromNotification(data);
 };
 
+/**
+ * Replays a tap that a background/headless runtime could not navigate to.
+ *
+ * Called on app mount and whenever the app becomes active again, so both a
+ * cold start and a background tap end up on the notification's screen.
+ */
+export const restorePendingNotification = async (
+  silent = false,
+): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_NOTIFICATION_KEY);
+    if (!raw) return;
+    await AsyncStorage.removeItem(PENDING_NOTIFICATION_KEY);
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    console.log('[push] restoring pending notification', JSON.stringify(data));
+    navigateFromNotification(data);
+  } catch (error) {
+    if (!silent) console.warn('[push] could not restore the notification tap', error);
+  }
+};
+
 /** Handles the notification that opened the app (cold start / from the tray). */
 export const handleInitialNotification = async (): Promise<void> => {
   try {
+    console.log('[push] handleInitialNotification');
     const initial = await notifee.getInitialNotification();
+    console.log('[push] getInitialNotification result', !!initial);
     if (!initial) return;
     const data = initial.notification?.data as Record<string, unknown> | undefined;
+    console.log('[push] initial notification data', JSON.stringify(data));
     navigateFromNotification(data);
   } catch (error) {
     console.warn('[push] could not read the initial notification', error);
@@ -619,6 +943,7 @@ export const handleInitialNotification = async (): Promise<void> => {
 let foregroundUnsubscribe: (() => void) | null = null;
 let tokenRefreshUnsubscribe: (() => void) | null = null;
 let foregroundEventUnsubscribe: (() => void) | null = null;
+let notificationOpenedUnsubscribe: (() => void) | null = null;
 let initialised = false;
 
 /**
@@ -644,9 +969,18 @@ export const initPushNotifications = async (): Promise<void> => {
     const messaging = getMessagingInstance();
 
     foregroundUnsubscribe = onMessage(messaging, message => {
+      console.log('[push] onMessage fired', message?.messageId);
       handleForegroundMessage(message).catch(error => {
         console.warn('[push] foreground message handling failed', error);
       });
+    });
+
+    // iOS: an APNs alert shown by the system while the app is backgrounded is
+    // not a Notifee notification, so a tap on it never reaches
+    // `notifee.onForegroundEvent`. Firebase reports that tap here.
+    notificationOpenedUnsubscribe = onNotificationOpenedApp(messaging, message => {
+      console.log('[push] onNotificationOpenedApp', message?.messageId, JSON.stringify(message?.data ?? {}));
+      if (message?.data) navigateFromNotification(message.data as Record<string, unknown>);
     });
 
     tokenRefreshUnsubscribe = onTokenRefresh(messaging, token => {
@@ -672,6 +1006,8 @@ export const stopPushNotifications = (): void => {
   tokenRefreshUnsubscribe = null;
   foregroundEventUnsubscribe?.();
   foregroundEventUnsubscribe = null;
+  notificationOpenedUnsubscribe?.();
+  notificationOpenedUnsubscribe = null;
   initialised = false;
 };
 
@@ -701,15 +1037,17 @@ export const registerBackgroundMessageHandler = (): void => {
     const messaging = getMessagingInstance();
 
     setBackgroundMessageHandler(messaging, async message => {
+      console.log('[push] setBackgroundMessageHandler fired', message?.messageId);
       await handleBackgroundMessage(message);
     });
 
     // Android action presses (a button on the notification itself) arrive
     // while the app is backgrounded, so they need their own background hook.
     notifee.onBackgroundEvent(async event => {
+      console.log('[push] notifee background event', event.type);
       if (event.type !== EventType.PRESS && event.type !== EventType.ACTION_PRESS) return;
       const data = event.detail.notification?.data as Record<string, unknown> | undefined;
-      navigateFromNotification(data);
+      await savePendingNotification(data);
     });
   } catch (error) {
     console.warn('[push] background message handling is unavailable for this build', error);

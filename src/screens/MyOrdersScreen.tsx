@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -104,6 +104,7 @@ type OrderType = {
   shippingCharges: number;
   status: string;
   trackingStatus: string;
+  trackingNumber?: string;
   items: ProductItem[];
   shippingAddress?: {
     name?: string;
@@ -173,6 +174,9 @@ type ApiOrder = {
   };
   tracking?: {
     currentStatus?: string;
+    trackingNumber?: string;
+    tracking_number?: string;
+    awb?: string;
     statusHistory?: { status: string; timestamp: string }[];
   };
 };
@@ -276,6 +280,10 @@ const mapApiOrder = (order: ApiOrder): OrderType => {
     shippingCharges: order.pricing?.shippingCharges ?? 0,
     status: order.status || 'Pending',
     trackingStatus: currentStatus,
+    trackingNumber:
+      order.tracking?.trackingNumber ||
+      order.tracking?.tracking_number ||
+      order.tracking?.awb,
     items,
     shippingAddress: order.shippingAddress,
     paymentMethod: order.payment?.mode || 'COD',
@@ -1235,7 +1243,7 @@ const CANCEL_REASONS = [
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyOrders'>;
 
-const MyOrdersScreen = ({ navigation }: Props) => {
+const MyOrdersScreen = ({ navigation, route }: Props) => {
   const theme = useAppTheme();
   const { colors, fontFamily } = theme;
   const styles = createStyles(theme);
@@ -1274,6 +1282,21 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
   const selectedOrder =
     orders.find(o => o.id === selectedOrderId) || orders[0] || null;
+
+  /**
+   * Notification taps pass the order they refer to. The list is filtered down
+   * to that order as soon as it has loaded, and the matching view is opened.
+   * `appliedTargetRef` keeps a re-render from re-running the same navigation
+   * after the user has moved around inside the screen.
+   */
+  const appliedTargetRef = useRef<string | null>(null);
+  const notificationProductId = route.params?.productId;
+  const trackItems = useMemo(() => {
+    const items = selectedOrder?.items ?? [];
+    if (!notificationProductId) return items;
+    const matched = items.filter(item => item.productId === notificationProductId);
+    return matched.length ? matched : items;
+  }, [notificationProductId, selectedOrder]);
 
   const isCancelled = selectedOrder
     ? `${selectedOrder.status} ${selectedOrder.trackingStatus}`
@@ -1351,6 +1374,63 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
       setSelectedOrderId(orders[0].id);
     }
   }, [orders, selectedOrderId]);
+
+  useEffect(() => {
+    const target = route.params;
+    if (!target || loading || orders.length === 0) return;
+
+    const targetKey = JSON.stringify(target);
+    if (appliedTargetRef.current === targetKey) return;
+
+    const normalize = (value?: string) =>
+      (value ?? '').trim().toLowerCase().replace(/^#/, '');
+
+    const wantedOrderId = normalize(target.orderId);
+    const wantedOrderNumber = normalize(target.orderNumber);
+    const wantedTracking = normalize(target.trackingNumber);
+
+    const matchedOrder = orders.find(order => {
+      const id = normalize(order.id);
+      const number = normalize(order.orderNumber);
+      const displayId = normalize(order.orderId);
+      const tracking = normalize(order.trackingNumber);
+
+      if (wantedOrderId && (id === wantedOrderId || displayId === wantedOrderId)) {
+        return true;
+      }
+      if (wantedOrderNumber && (number === wantedOrderNumber || displayId === wantedOrderNumber)) {
+        return true;
+      }
+      if (wantedTracking && tracking === wantedTracking) {
+        return true;
+      }
+      return false;
+    });
+
+    if (!matchedOrder) return;
+
+    appliedTargetRef.current = targetKey;
+    setSelectedOrderId(matchedOrder.id);
+
+    const matchedProduct = target.productId
+      ? matchedOrder.items.find(item => item.productId === target.productId)
+      : undefined;
+    const productToShow = matchedProduct ?? matchedOrder.items[0];
+    if (productToShow) {
+      setSelectedProduct(productToShow);
+    }
+
+    if (target.view === 'track') {
+      setCurrentScreen('TRACK');
+    } else if (target.view === 'details') {
+      setDetailsFrom('LIST');
+      setCurrentScreen('DETAILS');
+    }
+
+    if (target.openReview && productToShow) {
+      setReviewModalVisible(true);
+    }
+  }, [loading, orders, route.params]);
 
   const handleProductSelect = (product: ProductItem, from: 'TRACK' | 'LIST') => {
     setSelectedProduct(product);
@@ -1792,6 +1872,11 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
                     ? `Cancelled on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`
                     : `Placed on ${selectedOrder?.date} • ${selectedOrder?.items.length ?? 0} Items`}
                 </Text>
+                {!!selectedOrder?.trackingNumber && (
+                  <Text style={styles.orderDate}>
+                    Tracking No: {selectedOrder.trackingNumber}
+                  </Text>
+                )}
               </View>
             </View>
             <View style={{borderWidth:0.5,borderColor:'#F8D2DD' , marginTop:12}}/>
@@ -1870,9 +1955,9 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
             </Text>
           </View>
 
-          <Text style={styles.sectionHeading}>Order Item ({selectedOrder?.items.length ?? 0})</Text>
+          <Text style={styles.sectionHeading}>Order Item ({trackItems.length})</Text>
           <View style={styles.productListBox}>
-            {(selectedOrder?.items ?? []).map(item => (
+            {trackItems.map(item => (
               <TouchableOpacity
                 key={item.id}
                 style={styles.innerProductCard}

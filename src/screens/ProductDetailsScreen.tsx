@@ -263,6 +263,9 @@ interface ProductDetailsProps {
   route?: {
     params?: {
       product?: any;
+      productId?: string;
+      /** Prices carried by a `product_details` notification. */
+      priceOverride?: { newPrice?: number; oldPrice?: number };
     };
   };
   navigation?: any;
@@ -274,7 +277,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
 
-  const productId = route?.params?.product?.id || route?.params?.product?._id || '';
+  const productId =
+    route?.params?.productId ||
+    route?.params?.product?.id ||
+    route?.params?.product?._id ||
+    '';
 
   const [productData, setProductData] = useState<UIProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -383,6 +390,19 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const product = productData;
   const thumbnails = product?.images?.length ? product.images : [];
   const sizes = product?.sizes?.length ? product.sizes : [];
+
+  // A product_details notification can pin the price shown for this product.
+  const priceOverride = route?.params?.priceOverride;
+  const cataloguePrice = selectedVariant ? selectedVariant.price : product?.price ?? 0;
+  const catalogueOriginal = selectedVariant
+    ? product?.originalPrice ?? cataloguePrice
+    : product?.originalPrice ?? cataloguePrice;
+  const displayPrice = priceOverride?.newPrice ?? cataloguePrice;
+  const displayOriginal = priceOverride?.oldPrice ?? catalogueOriginal;
+  const displayDiscount =
+    displayOriginal > displayPrice
+      ? Math.round(((displayOriginal - displayPrice) / displayOriginal) * 100)
+      : 0;
 
   const [selectedImg, setSelectedImg] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
@@ -846,13 +866,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
             <View style={styles.priceContainer}>
               <Text style={styles.currencySymbol}>Rs. </Text>
-              <Text style={styles.mainPrice}>
-                {selectedVariant ? selectedVariant.price : product.price}
-              </Text>
-              {product.originalPrice > (selectedVariant ? selectedVariant.price : product.price) && (
+              <Text style={styles.mainPrice}>{displayPrice}</Text>
+              {displayOriginal > displayPrice && (
                 <>
-                  <Text style={styles.mrpText}>MRP Rs. {product.originalPrice}</Text>
-                  <Text style={styles.discountBadge}>{product.discount}% OFF</Text>
+                  <Text style={styles.mrpText}>MRP Rs. {displayOriginal}</Text>
+                  <Text style={styles.discountBadge}>{displayDiscount}% OFF</Text>
                 </>
               )}
             </View>

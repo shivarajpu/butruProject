@@ -7,6 +7,7 @@ import App from './App';
 import { name as appName } from './app.json';
 import { registerBackgroundMessageHandler } from './src/services/push';
 
+console.log('[index] registering app');
 AppRegistry.registerComponent(appName, () => App);
 
 /**
@@ -20,4 +21,5 @@ AppRegistry.registerComponent(appName, () => App);
  * Android runs this in a headless JS task; iOS starts the app in a background
  * state. Either way the handler must resolve quickly and must not touch the UI.
  */
+console.log('[index] registering background message handler');
 registerBackgroundMessageHandler();

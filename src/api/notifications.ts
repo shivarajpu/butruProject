@@ -28,6 +28,45 @@ export type NotificationCategory = 'Orders' | 'Offers' | 'Updates';
 /** Which artwork the row shows. */
 export type NotificationIconType = 'offer' | 'order' | 'coupon' | 'image' | 'megaphone';
 
+/**
+ * The destination encoded in `metadata.screen` by the backend.
+ *
+ * Each value is paired with the filter keys the destination screen understands:
+ *
+ *   home           → no filter
+ *   cart           → productId
+ *   wishlist       → productId
+ *   order_details  → orderId, orderNumber
+ *   track_shipment → orderId, orderNumber, trackingNumber
+ *   add_review     → productId, orderNumber
+ *   product_details→ productId, newPrice, oldPrice
+ */
+export type NotificationScreenName =
+  | 'home'
+  | 'cart'
+  | 'wishlist'
+  | 'order_details'
+  | 'track_shipment'
+  | 'add_review'
+  | 'product_details';
+
+export interface NotificationMetadata {
+  screen?: NotificationScreenName | string;
+  notificationType?: string;
+  productId?: string;
+  orderId?: string;
+  orderNumber?: string;
+  trackingNumber?: string;
+  newPrice?: number;
+  oldPrice?: number;
+  imageUrl?: string;
+  link?: string;
+  cta?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+  [key: string]: unknown;
+}
+
 /** A notification, normalised for the UI. */
 export interface AppNotification {
   id: string;
@@ -38,6 +77,10 @@ export interface AppNotification {
   imageUri?: string;
   /** In-app path the row opens, e.g. `/orders`. */
   link?: string;
+  /** Backend routing hint, e.g. `order_details`. */
+  screen?: string;
+  /** The raw metadata block, kept so a tap can apply its filters. */
+  metadata?: NotificationMetadata;
   isRead: boolean;
   /** Epoch milliseconds. */
   createdAt: number;
@@ -51,24 +94,34 @@ export interface NotificationPage {
   page: number;
   limit: number;
   unreadCount: number;
+  pages?: number;
+  hasMore?: boolean;
 }
 
 export type NotificationListResponse = {
   success?: boolean;
   message?: string;
-  data?: {
+  /** The live API returns the array directly, with pagination at the root. */
+  data?: unknown[] | {
     notifications?: unknown[];
     total?: number;
     page?: number;
     limit?: number;
     unreadCount?: number;
+    pages?: number;
   } | null;
+  page?: number;
+  total?: number;
+  unreadCount?: number;
+  pages?: number;
 };
 
 export type UnreadCountResponse = {
   success?: boolean;
   message?: string;
-  data?: { count?: number } | null;
+  data?: { count?: number; unreadCount?: number } | null;
+  count?: number;
+  unreadCount?: number;
 };
 
 export type SuccessResponse = {
@@ -113,6 +166,25 @@ const pickBoolean = (source: Record<string, unknown>, keys: string[]): boolean |
     if (typeof value === 'boolean') return value;
     if (value === 'true') return true;
     if (value === 'false') return false;
+  }
+  return undefined;
+};
+
+/**
+ * Reads the `metadata` block. Push data can only carry strings, so a metadata
+ * object may arrive JSON-encoded — parse it instead of dropping the routing
+ * information.
+ */
+const readMetadata = (source: Record<string, unknown>): NotificationMetadata | undefined => {
+  const raw = source.metadata;
+  if (isRecord(raw)) return raw as NotificationMetadata;
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (isRecord(parsed)) return parsed as NotificationMetadata;
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 };
@@ -174,7 +246,35 @@ export const normalizeCategory = (raw: unknown): NotificationCategory => {
   if (typeof raw !== 'string') return 'Updates';
   const key = raw.trim().toLowerCase().replace(/[\s_-]+/g, '');
   if (!key) return 'Updates';
-  return CATEGORY_ALIASES[key] ?? 'Updates';
+
+  const alias = CATEGORY_ALIASES[key];
+  if (alias) return alias;
+
+  // The live backend sends dotted types such as `order.placed`, `order.shipped`
+  // and `welcome`. Match their prefixes so an order event never falls into the
+  // catch-all Updates tab.
+  if (
+    key.startsWith('order') ||
+    key.startsWith('ship') ||
+    key.startsWith('deliver') ||
+    key.startsWith('track') ||
+    key.startsWith('return') ||
+    key.startsWith('refund')
+  ) {
+    return 'Orders';
+  }
+  if (
+    key.startsWith('offer') ||
+    key.startsWith('coupon') ||
+    key.startsWith('promo') ||
+    key.startsWith('discount') ||
+    key.startsWith('sale') ||
+    key.startsWith('voucher')
+  ) {
+    return 'Offers';
+  }
+
+  return 'Updates';
 };
 
 /** Picks the artwork for a row from its type and optional image. */
@@ -185,9 +285,22 @@ export const notificationIconType = (
   const key =
     typeof rawType === 'string' ? rawType.trim().toLowerCase().replace(/[\s_-]+/g, '') : '';
 
-  if (OFFER_ICON_TYPES.has(key)) return 'offer';
-  if (key === 'coupon' || key === 'voucher') return 'coupon';
-  if (key === 'order' || key === 'orders' || key === 'shipping' || key === 'delivered') {
+  // Server artwork wins over the generic type icon: order notifications carry
+  // a product/shipment image in `metadata.imageUrl`.
+  if (imageUri) return 'image';
+
+  if (OFFER_ICON_TYPES.has(key) || key.startsWith('offer') || key.startsWith('promo')) {
+    return 'offer';
+  }
+  if (key === 'coupon' || key === 'voucher' || key.startsWith('coupon')) return 'coupon';
+  if (
+    key.startsWith('order') ||
+    key.startsWith('ship') ||
+    key.startsWith('deliver') ||
+    key.startsWith('track') ||
+    key.startsWith('return') ||
+    key.startsWith('refund')
+  ) {
     return 'order';
   }
   // A row with artwork shows the artwork; the 'image' type always did.
@@ -256,8 +369,16 @@ export const normalizeNotification = (raw: unknown, now: number = Date.now()): A
   const id = pickString(raw, ['id', '_id', 'notificationId', 'uuid']);
   if (!id) return null;
 
-  const rawType = pickString(raw, ['type', 'category', 'notificationType', 'kind']);
-  const imageUri = pickString(raw, ['image', 'imageUrl', 'image_url', 'media', 'mediaUrl', 'thumbnail']);
+  const metadata = readMetadata(raw);
+  const meta = (metadata ?? {}) as Record<string, unknown>;
+
+  const rawType =
+    pickString(raw, ['type', 'category', 'notificationType', 'kind']) ??
+    pickString(meta, ['notificationType', 'type']);
+
+  const imageUri = pickString(raw, ['image', 'imageUrl', 'image_url', 'media', 'mediaUrl', 'thumbnail']) ??
+    pickString(meta, ['imageUrl', 'image', 'image_url']);
+
   const createdAt =
     toEpochMillis(raw.createdAt ?? raw.created_at ?? raw.sentAt ?? raw.sent_at ?? raw.date ?? raw.timestamp) ??
     now;
@@ -270,6 +391,17 @@ export const normalizeNotification = (raw: unknown, now: number = Date.now()): A
   const description =
     pickString(raw, ['message', 'body', 'description', 'text', 'content']) ?? '';
 
+  // `metadata.screen` is the routing hint the backend attaches to every event.
+  // The top-level `ctaUrl` / `metadata.link` are the fallback for notifications
+  // that predate it.
+  const screen =
+    pickString(meta, ['screen', 'type']) ??
+    pickString(raw, ['screen', 'notificationType', 'type']);
+
+  const link =
+    pickString(raw, ['link', 'url', 'ctaUrl', 'cta_url', 'actionUrl', 'action_url']) ??
+    pickString(meta, ['link', 'ctaUrl', 'cta_url', 'url', 'actionUrl', 'action_url']);
+
   return {
     id,
     title,
@@ -277,7 +409,9 @@ export const normalizeNotification = (raw: unknown, now: number = Date.now()): A
     category: normalizeCategory(rawType),
     iconType: notificationIconType(rawType, imageUri),
     imageUri,
-    link: pickString(raw, ['link', 'url', 'ctaUrl', 'cta_url', 'actionUrl', 'action_url']),
+    link,
+    screen,
+    metadata,
     isRead,
     createdAt,
     time: formatNotificationTime(createdAt, now),
@@ -287,6 +421,9 @@ export const normalizeNotification = (raw: unknown, now: number = Date.now()): A
 // ── endpoints ──────────────────────────────────────────────────────────────
 
 export const NOTIFICATIONS_ENDPOINT = '/api/notifications';
+
+/** Customer feed endpoint (auth required). */
+export const CUSTOMER_NOTIFICATIONS_ENDPOINT = '/api/notifications/customer';
 
 export type NotificationQuery = {
   page?: number;
@@ -314,7 +451,7 @@ export const fetchNotifications = async (
   let response: NotificationListResponse;
   try {
     response = await apiService.get<NotificationListResponse>(
-      `${NOTIFICATIONS_ENDPOINT}?${params.toString()}`,
+      `${CUSTOMER_NOTIFICATIONS_ENDPOINT}?${params.toString()}`,
     );
   } catch (error) {
     if (isMissingEndpoint(error)) {
@@ -323,16 +460,40 @@ export const fetchNotifications = async (
     throw error;
   }
 
-  const raw = Array.isArray(response?.data?.notifications) ? response.data.notifications : [];
+  // The live backend returns `data: [...]` with pagination at the root; older
+  // mocks/tests use `data: { notifications: [...] }`. Support both.
+  const payload = response?.data;
+  const envelope = Array.isArray(payload) ? undefined : payload;
+  const raw = Array.isArray(payload)
+    ? payload
+    : Array.isArray(envelope?.notifications)
+      ? envelope.notifications
+      : [];
+
+  const resolvedTotal = Array.isArray(payload)
+    ? response?.total ?? raw.length
+    : envelope?.total ?? raw.length;
+  const resolvedPage = Array.isArray(payload)
+    ? response?.page ?? page
+    : envelope?.page ?? page;
+  const resolvedLimit = Array.isArray(payload)
+    ? limit
+    : envelope?.limit ?? limit;
+  const resolvedUnread = Array.isArray(payload)
+    ? response?.unreadCount ?? 0
+    : envelope?.unreadCount ?? 0;
+  const resolvedPages = Array.isArray(payload) ? response?.pages : envelope?.pages;
 
   return {
     notifications: raw
       .map(item => normalizeNotification(item))
       .filter((item): item is AppNotification => item !== null),
-    total: response?.data?.total ?? raw.length,
-    page: response?.data?.page ?? page,
-    limit: response?.data?.limit ?? limit,
-    unreadCount: response?.data?.unreadCount ?? 0,
+    total: resolvedTotal,
+    page: resolvedPage,
+    limit: resolvedLimit,
+    unreadCount: resolvedUnread,
+    pages: resolvedPages,
+    hasMore: resolvedPages != null ? resolvedPage < resolvedPages : raw.length >= resolvedLimit,
   };
 };
 
@@ -342,7 +503,13 @@ export const fetchUnreadCount = async (): Promise<number> => {
     const response = await apiService.get<UnreadCountResponse>(
       `${NOTIFICATIONS_ENDPOINT}/unread-count`,
     );
-    return response?.data?.count ?? 0;
+    return (
+      response?.data?.count ??
+      response?.data?.unreadCount ??
+      response?.count ??
+      response?.unreadCount ??
+      0
+    );
   } catch (error) {
     if (isMissingEndpoint(error)) return 0;
     throw error;

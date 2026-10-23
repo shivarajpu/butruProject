@@ -12,10 +12,16 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import type { TabParamList } from '../navigation/types';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AppButton from '../components/AppButton';
@@ -93,6 +99,7 @@ const WishlistScreen = () => {
   const styles = createStyles(theme);
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<TabParamList, 'WishlistTab'>>();
   const { addresses, refresh } = useProfile();
 
   const [items, setItems] = useState<WishlistCardItem[]>([]);
@@ -167,6 +174,16 @@ const WishlistScreen = () => {
     setEditingAddress(null);
     refresh();
   };
+
+  // A `wishlist` notification narrows the grid to the product it names. If that
+  // product is no longer saved, fall back to the full wishlist instead of
+  // showing a misleading empty state.
+  const notificationProductId = route.params?.filterProductId;
+  const matchedNotificationItems = notificationProductId
+    ? items.filter(item => item.id === notificationProductId)
+    : [];
+  const displayItems =
+    matchedNotificationItems.length > 0 ? matchedNotificationItems : items;
 
   const isTablet = width >= 768;
   const hPad = 16;
@@ -274,7 +291,7 @@ const WishlistScreen = () => {
                 onPress={fetchWishlist}
               />
             </View>
-          ) : items.length === 0 ? (
+          ) : displayItems.length === 0 ? (
             <View style={styles.centerBox}>
               <Text style={styles.emptyTitle}>No items in your wishlist</Text>
               <Text style={styles.emptyMessage}>
@@ -283,7 +300,7 @@ const WishlistScreen = () => {
             </View>
           ) : (
           <View style={styles.grid}>
-            {items.map(item => {
+            {displayItems.map(item => {
               const imgH = cardW * 1.05;
               const hasOriginalPrice =
                 item.originalPrice != null && item.originalPrice > item.price;

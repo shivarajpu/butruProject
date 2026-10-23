@@ -174,6 +174,70 @@ describe('navigateFromNotification', () => {
     expect(mockNavigate).toHaveBeenCalledWith('MyOrders', undefined);
   });
 
+  it('routes metadata.screen to the cart with its product filter', () => {
+    const { push } = loadPush();
+
+    push.navigateFromNotification({
+      metadata: { screen: 'cart', productId: 'product-1' },
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('CartScreen', {
+      filterProductId: 'product-1',
+    });
+  });
+
+  it('routes order_details to MyOrders with the order filters', () => {
+    const { push } = loadPush();
+
+    push.navigateFromNotification({
+      metadata: {
+        screen: 'order_details',
+        orderId: 'order-1',
+        orderNumber: 'ORD-1',
+      },
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('MyOrders', {
+      view: 'details',
+      orderId: 'order-1',
+      orderNumber: 'ORD-1',
+      productId: undefined,
+    });
+  });
+
+  it('routes product_details with the notified prices', () => {
+    const { push } = loadPush();
+
+    push.navigateFromNotification({
+      metadata: {
+        screen: 'product_details',
+        productId: 'product-1',
+        newPrice: 499,
+        oldPrice: 799,
+      },
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('ProductDetails', {
+      product: { id: 'product-1', _id: 'product-1' },
+      productId: 'product-1',
+      priceOverride: { newPrice: 499, oldPrice: 799 },
+    });
+  });
+
+  it('follows an order-tracking CTA when there is no metadata screen', () => {
+    const { push } = loadPush();
+
+    push.navigateFromNotification({ link: '/Orders/Track/order-1' });
+
+    expect(mockNavigate).toHaveBeenCalledWith('MyOrders', {
+      view: 'track',
+      orderId: 'order-1',
+      orderNumber: undefined,
+      trackingNumber: 'order-1',
+      productId: undefined,
+    });
+  });
+
   it('opens an external link outside the app instead of pushing a screen', () => {
     const { push } = loadPush();
     const openURL = jest.spyOn(require('react-native').Linking, 'openURL').mockResolvedValue(true);

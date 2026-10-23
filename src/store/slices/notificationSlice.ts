@@ -17,7 +17,6 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   fetchNotifications,
-  fetchUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
   normalizeNotification,
@@ -42,6 +41,8 @@ export interface NotificationState {
   hasMore: boolean;
   activeFilter: NotificationFilter;
   lastFetchedAt: number | null;
+  /** Last time a notification was marked read locally (race guard). */
+  lastLocalReadAt: number | null;
 }
 
 const initialState: NotificationState = {
@@ -56,9 +57,10 @@ const initialState: NotificationState = {
   hasMore: true,
   activeFilter: 'All',
   lastFetchedAt: null,
+  lastLocalReadAt: null,
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 1000;
 
 // ── persistence ────────────────────────────────────────────────────────────
 
@@ -128,8 +130,16 @@ export const loadMoreNotifications = createAsyncThunk(
 export const loadUnreadCount = createAsyncThunk(
   'notifications/unreadCount',
   async (_, { rejectWithValue }) => {
+    const startedAt = Date.now();
     try {
-      return await fetchUnreadCount();
+      // Use the full feed (the same page the notification screen loads) rather
+      // than `/unread-count`. The badge has to agree with the list the user
+      // sees; a smaller page can miss unread items beyond the first page.
+      const page = await fetchNotifications({ page: 1, limit: PAGE_SIZE });
+      return {
+        count: page.unreadCount || page.notifications.filter(item => !item.isRead).length,
+        startedAt,
+      };
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : 'Could not load the unread count.');
     }
@@ -164,15 +174,55 @@ export const readAllNotifications = createAsyncThunk(
 
 const countUnread = (items: AppNotification[]): number => items.filter(item => !item.isRead).length;
 
+/**
+ * Applies "read" locally, before (or without) the server round trip.
+ *
+ * The badge and the per-row dot must react on tap even when the read endpoints
+ * are slow or missing, so the pending thunks call these directly.
+ */
+const markOneRead = (state: NotificationState, id: string): void => {
+  const target = state.items.find(item => item.id === id);
+  if (!target || target.isRead) return;
+
+  target.isRead = true;
+  state.unreadCount = Math.max(0, state.unreadCount - 1);
+  state.lastLocalReadAt = Date.now();
+  persistNotificationState(state);
+};
+
+const markEveryRead = (state: NotificationState): void => {
+  state.items.forEach(item => {
+    item.isRead = true;
+  });
+  state.unreadCount = 0;
+  state.lastLocalReadAt = Date.now();
+  persistNotificationState(state);
+};
+
 const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
     hydrate(state, action: PayloadAction<Partial<NotificationState>>) {
+      // Hydration is async and can land after a fresh server read (the app
+      // restores storage while the token/unread-count requests are in flight).
+      // Never let older persisted data overwrite a newer server/badge value.
+      const incomingAt = action.payload.lastFetchedAt ?? 0;
+      const currentAt = state.lastFetchedAt ?? 0;
+
+      if (incomingAt < currentAt) {
+        // A fresh read already ran. Keep its badge/feed, but still restore the
+        // offline feed if the only thing fetched so far was the badge count.
+        if (state.status === 'idle' && state.items.length === 0) {
+          state.items = action.payload.items ?? state.items;
+        }
+        return;
+      }
+
       state.items = action.payload.items ?? state.items;
       state.unreadCount = action.payload.unreadCount ?? state.unreadCount;
       state.total = action.payload.total ?? state.total;
-      state.lastFetchedAt = action.payload.lastFetchedAt ?? state.lastFetchedAt;
+      state.lastFetchedAt = incomingAt || state.lastFetchedAt;
     },
     setFilter(state, action: PayloadAction<NotificationFilter>) {
       state.activeFilter = action.payload;
@@ -220,7 +270,9 @@ const notificationSlice = createSlice({
         state.items = result.notifications;
         state.total = result.total;
         state.page = result.page;
-        state.hasMore = result.notifications.length >= result.limit && result.notifications.length > 0;
+        state.hasMore =
+          result.hasMore ??
+          (result.notifications.length >= result.limit && result.notifications.length > 0);
         state.unreadCount = result.unreadCount || countUnread(result.notifications);
         state.status = 'ready';
         state.refreshing = false;
@@ -244,30 +296,35 @@ const notificationSlice = createSlice({
         state.total = result.total;
         state.page = result.page;
         state.loadingMore = false;
-        state.hasMore = result.notifications.length >= result.limit && result.notifications.length > 0;
+        state.hasMore =
+          result.hasMore ??
+          (result.notifications.length >= result.limit && result.notifications.length > 0);
         persistNotificationState(state);
       })
       .addCase(loadMoreNotifications.rejected, state => {
         state.loadingMore = false;
       })
       .addCase(loadUnreadCount.fulfilled, (state, action) => {
-        state.unreadCount = action.payload;
+        // A read made after this request started is newer than its payload;
+        // applying the stale count would put the badge back up (the read
+        // endpoint can commit after the feed was read).
+        if (state.lastLocalReadAt != null && state.lastLocalReadAt > action.payload.startedAt) {
+          return;
+        }
+        state.unreadCount = action.payload.count;
+        state.lastFetchedAt = Date.now();
+      })
+      // Optimistic: the tap marks the row read before the request resolves, so
+      // navigation never waits on the API and a failing endpoint cannot leave
+      // an already-opened notification looking unread.
+      .addCase(readNotification.pending, (state, action) => {
+        markOneRead(state, action.meta.arg);
       })
       .addCase(readNotification.fulfilled, (state, action) => {
-        const target = state.items.find(item => item.id === action.payload);
-        if (target && !target.isRead) {
-          target.isRead = true;
-          state.unreadCount = Math.max(0, state.unreadCount - 1);
-          persistNotificationState(state);
-        }
+        markOneRead(state, action.payload);
       })
-      .addCase(readAllNotifications.fulfilled, state => {
-        state.items.forEach(item => {
-          item.isRead = true;
-        });
-        state.unreadCount = 0;
-        persistNotificationState(state);
-      });
+      .addCase(readAllNotifications.pending, markEveryRead)
+      .addCase(readAllNotifications.fulfilled, markEveryRead);
   },
 });
 

@@ -109,6 +109,15 @@ const CartScreen = () => {
   // Buy Now checkout renders only the reserved item; bag/Add To Cart shows the full saved cart.
   const checkoutItems = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
 
+  // A `cart` notification opens the bag filtered to the product it mentions.
+  // The full cart stays intact for checkout; only the visible rows are narrowed.
+  const filterProductId = route?.params?.filterProductId;
+  const matchedNotificationItems = filterProductId
+    ? checkoutItems.filter(item => item.productId === filterProductId)
+    : [];
+  const visibleItems =
+    matchedNotificationItems.length > 0 ? matchedNotificationItems : checkoutItems;
+
   // Dynamic States
   const [appliedCoupon, setAppliedCoupon] = useState<number>(0);
   // The coupon's headline rate, straight from the API (`type`/`value`), so a
@@ -522,10 +531,10 @@ const CartScreen = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.scrollContent,
-            checkoutItems.length === 0 && styles.scrollContentEmpty,
+            visibleItems.length === 0 && styles.scrollContentEmpty,
           ]}>
           {/* Dynamic Cart Items List */}
-          {checkoutItems.map(item => (
+          {visibleItems.map(item => (
             <View key={item.cartId} style={styles.cartItemCard}>
               <Image source={{ uri: item.image }} style={styles.itemImage} />
 
@@ -563,7 +572,7 @@ const CartScreen = () => {
             </View>
           ))}
 
-          {checkoutItems.length === 0 && (
+          {visibleItems.length === 0 && (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>Your cart is empty!</Text>
             </View>

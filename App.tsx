@@ -6,12 +6,13 @@
  */
 
 import React, { useEffect } from 'react';
-import { StatusBar, View, StyleSheet, Platform } from 'react-native';
+import { AppState, StatusBar, View, StyleSheet, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import Geolocation from '@react-native-community/geolocation';
+import { getMessaging, getInitialNotification } from '@react-native-firebase/messaging';
 
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
@@ -28,8 +29,11 @@ import { navigationRef } from './src/navigation/rootNavigation';
 import {
   flushPendingNavigation,
   handleInitialNotification,
+  initDeepLinking,
   initPushNotifications,
+  navigateFromNotification,
   registerDeviceToken,
+  restorePendingNotification,
   unregisterDeviceToken,
 } from './src/services/push';
 import SplashScreen from './src/screens/SplashScreen';
@@ -83,7 +87,10 @@ function AppNavigator() {
   // no-op when Firebase is not configured for this build, so it is safe to
   // call unconditionally.
   useEffect(() => {
-    initPushNotifications().catch(() => undefined);
+    console.log('[push] app initPushNotifications');
+    initPushNotifications()
+      .then(() => console.log('[push] initPushNotifications done'))
+      .catch((e) => console.log('[push] initPushNotifications err', e?.message));
   }, []);
 
   // The token belongs to whoever is signed in. Register it once the session is
@@ -100,12 +107,65 @@ function AppNavigator() {
     }
   }, [dispatch, isHydrated, isLoggedIn]);
 
+  // Pushes delivered while the app is backgrounded/quit never reach the Redux
+  // store (the JS runtime is suspended or headless). Refresh the badge as soon
+  // as the app is visible again so the bell reflects the new unread item
+  // without waiting for the notification screen to load.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') dispatch(loadUnreadCount());
+    });
+
+    return () => appStateSubscription.remove();
+  }, [dispatch, isLoggedIn]);
+
   // A notification tap can open the app from a cold start, before the
   // navigator exists. The pending navigation is replayed once the container
   // is ready (see `onReady` below).
   useEffect(() => {
-    handleInitialNotification().catch(() => undefined);
+    console.log('[App] handleInitialNotification');
+    handleInitialNotification().catch(e =>
+      console.log('[App] handleInitialNotification err', e?.message),
+    );
+
+    // A tap handled in a background/headless JS runtime is persisted instead of
+    // navigated (there is no visible navigator there). Replay it once the real
+    // app is running, and again whenever it returns to the foreground.
+    restorePendingNotification(true).catch(() => undefined);
+    const appStateSubscription = AppState.addEventListener('change', state => {
+      if (state === 'active') restorePendingNotification(true).catch(() => undefined);
+    });
+
+    // RNFirebase fallback: if Notifee did not hand us the notification that
+    // launched the app, ask Firebase directly. On iOS a quit-state tap on a
+    // system (APNs) notification is reported here with the original `data`.
+    try {
+      getInitialNotification(getMessaging())
+        .then(message => {
+          console.log('[App] firebase getInitialNotification', !!message);
+          if (message?.data) {
+            navigateFromNotification(message.data as Record<string, unknown>);
+          }
+        })
+        .catch(e =>
+          console.log('[App] firebase getInitialNotification err', e?.message),
+        );
+    } catch (e) {
+      console.log(
+        '[App] firebase getInitialNotification threw',
+        e instanceof Error ? e.message : String(e),
+      );
+    }
+
+    return () => appStateSubscription.remove();
   }, []);
+
+  // URL deep links (`butru://orders/track/<id>` and storefront links) work in
+  // every app state: `getInitialURL` covers a cold start, the event listener
+  // covers the app already running in the foreground or background.
+  useEffect(() => initDeepLinking(), []);
 
   // Android-only: point the geolocation module at the Play Services fused
   // provider. Its default raw-LocationManager path turns a high-accuracy

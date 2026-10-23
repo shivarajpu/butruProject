@@ -70,6 +70,17 @@
 		     time the user opens the app. -->
 		<string>remote-notification</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>butru</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIBackgroundModes~ipad</key>
 	<array>
 		<string>remote-notification</string>

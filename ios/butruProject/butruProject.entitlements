@@ -18,5 +18,14 @@
 	-->
 	<key>aps-environment</key>
 	<string>$(APS_ENVIRONMENT)</string>
+
+	<!-- Universal links: https://butru.in/... opens the app when the App ID has
+	     the Associated Domains capability and the site serves
+	     https://butru.in/.well-known/apple-app-site-association. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:butru.in</string>
+		<string>applinks:www.butru.in</string>
+	</array>
 </dict>
 </plist>

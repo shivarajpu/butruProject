@@ -97,9 +97,16 @@ const SplashScreen = () => {
   const configSettled = ready || Boolean(error) || graceElapsed;
 
   useEffect(() => {
-    if (minTimeElapsed && hydrated && configSettled) {
-      navigation.replace(isLoggedIn ? 'Home' : 'Login');
-    }
+    if (!minTimeElapsed || !hydrated || !configSettled) return;
+
+    // A notification tap or URL deep link may already have pushed its target
+    // while the splash animation was running. Replacing the splash with Home
+    // at that point would leave the destination on top of a duplicated tree,
+    // so only take over when the splash is still the active route.
+    const state = navigation.getState();
+    if (state.routes.length > 1 || state.index > 0) return;
+
+    navigation.replace(isLoggedIn ? 'Home' : 'Login');
   }, [minTimeElapsed, hydrated, configSettled, isLoggedIn, navigation]);
 
   return (
