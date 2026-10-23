@@ -36,6 +36,7 @@ import { BRAND } from '../assets/svg/brand';
 import BrandIcon from '../components/BrandIcon';
 import StoreLogo from '../components/StoreLogo';
 import { STORE_ID, STORE_SLUG } from '../config/storeIdentity';
+import { getAuthFcmToken } from '../services/push';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -169,11 +170,17 @@ const LoginScreen = ({ navigation }: Props) => {
 
     setIsSubmitting(true);
 
+    // The FCM token of this device, read fresh on every submit so the backend
+    // can bind the account to it. It is optional — when push is unavailable the
+    // key is simply left out of the payload.
+    const fcmToken = await getAuthFcmToken();
+
     const payload = {
       email: email.trim().toLowerCase(),
       password: password,
       storeId: STORE_ID,
       storeSlug: STORE_SLUG,
+      fcmToken,
     };
 
     if (__DEV__) {

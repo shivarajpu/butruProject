@@ -29,6 +29,7 @@ import { STORE_ID, STORE_SLUG } from '../config/storeIdentity';
 import { Callicon, userProfileIcon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
+import { getAuthFcmToken } from '../services/push';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
@@ -144,6 +145,11 @@ const SignUpScreen = ({ navigation }: Props) => {
 
     setIsSubmitting(true);
 
+    // The FCM token of this device, read fresh on every submit so the backend
+    // can bind the new account to it. It is optional — when push is unavailable
+    // the key is simply left out of the payload.
+    const fcmToken = await getAuthFcmToken();
+
     // API Payload
     const payload = {
       name: name.trim(),
@@ -152,6 +158,7 @@ const SignUpScreen = ({ navigation }: Props) => {
       password: password,
       storeId: STORE_ID,
       storeSlug: STORE_SLUG,
+      fcmToken,
     };
 
     if (__DEV__) {

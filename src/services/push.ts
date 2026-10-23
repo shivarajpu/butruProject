@@ -219,6 +219,25 @@ export const getDeviceToken = async (): Promise<string | null> => {
 
 export const getCachedToken = (): string | null => currentToken;
 
+/**
+ * The FCM token for an auth request body.
+ *
+ * Login and register send the device token along with the credentials, so the
+ * backend can bind this device to the account the moment the session starts
+ * instead of waiting for the separate device-token registration call.
+ *
+ * The token is read fresh on every call — FCM rotates it, and the cached copy
+ * may belong to a previous user of this device.
+ *
+ * Returns `undefined` when push is unavailable for this build (no Firebase
+ * config, no permission), so the key is left out of the JSON body instead of
+ * being sent as an empty value. Auth must never depend on push.
+ */
+export const getAuthFcmToken = async (): Promise<string | undefined> => {
+  const token = await getDeviceToken();
+  return token || undefined;
+};
+
 const getAppVersion = (): string => {
   try {
     return getUtils().appVersion ?? '';

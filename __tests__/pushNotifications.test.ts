@@ -244,6 +244,32 @@ describe('initPushNotifications', () => {
   });
 });
 
+describe('getAuthFcmToken', () => {
+  it('returns the FCM token of this device for the auth payload', async () => {
+    const { push, messaging } = loadPush();
+
+    await expect(push.getAuthFcmToken()).resolves.toBe('test-fcm-token');
+    expect(messaging.getToken).toHaveBeenCalled();
+  });
+
+  it('reads the token again on every call, because FCM rotates it', async () => {
+    const { push, messaging } = loadPush();
+
+    await push.getAuthFcmToken();
+    messaging.getToken.mockResolvedValueOnce('rotated-fcm-token');
+    await expect(push.getAuthFcmToken()).resolves.toBe('rotated-fcm-token');
+  });
+
+  it('returns undefined when Firebase is not configured, so the key is left out', async () => {
+    const { push, firebaseApp } = loadPush();
+    firebaseApp.getApp.mockImplementation(() => {
+      throw new Error("No Firebase App '[DEFAULT]' has been created");
+    });
+
+    await expect(push.getAuthFcmToken()).resolves.toBeUndefined();
+  });
+});
+
 describe('registerBackgroundMessageHandler', () => {
   it('registers the handler so a backgrounded app is woken up', () => {
     const { push, messaging } = loadPush();
