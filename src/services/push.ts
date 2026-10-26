@@ -947,6 +947,13 @@ let notificationOpenedUnsubscribe: (() => void) | null = null;
 let initialised = false;
 
 /**
+ * Incremented whenever push is stopped (logout). An in-flight
+ * `initPushNotifications` compares its captured generation after every await
+ * and aborts instead of re-registering a token for a session that has ended.
+ */
+let pushGeneration = 0;
+
+/**
  * Starts the push stack: channels, permission, token registration and the
  * foreground listeners.
  *
@@ -955,18 +962,33 @@ let initialised = false;
 export const initPushNotifications = async (): Promise<void> => {
   if (initialised) return;
   initialised = true;
+  const generation = pushGeneration;
+  const isStale = () => generation !== pushGeneration;
 
   try {
     await ensureNotificationChannels();
     await requestNotificationPermission();
+    if (isStale()) return;
 
     // Read the token even when the permission was refused: the token is what
     // identifies this device in the Firebase console, and it is the only way to
     // send a notification to a single device before the backend is live.
     await getDeviceToken();
+    if (isStale()) {
+      if (!initialised) await deleteDeviceToken();
+      return;
+    }
+
     await registerDeviceToken();
+    if (isStale()) {
+      // Logout finished while the register call was in flight. Invalidate the
+      // token again so the server cannot keep targeting this device.
+      if (!initialised) await deleteDeviceToken();
+      return;
+    }
 
     const messaging = getMessagingInstance();
+    if (isStale()) return;
 
     foregroundUnsubscribe = onMessage(messaging, message => {
       console.log('[push] onMessage fired', message?.messageId);
@@ -1000,6 +1022,7 @@ export const initPushNotifications = async (): Promise<void> => {
 
 /** Tears the listeners down (used by tests and on logout). */
 export const stopPushNotifications = (): void => {
+  pushGeneration += 1;
   foregroundUnsubscribe?.();
   foregroundUnsubscribe = null;
   tokenRefreshUnsubscribe?.();
@@ -1019,6 +1042,46 @@ export const deleteDeviceToken = async (): Promise<void> => {
     currentToken = null;
   } catch (error) {
     console.warn('[push] could not delete the FCM token', error);
+  }
+};
+
+/**
+ * Turns push off for the ended session.
+ *
+ * Logging out must stop the next notification, not just clear the auth token:
+ * the server keeps pushing to the device token it was given at login, so the
+ * token has to be removed from the backend AND invalidated on the device.
+ * Order matters — unregister while the token is still available, then delete
+ * it so an in-flight push cannot be delivered to this device anymore.
+ *
+ * Also drops listeners, the pending tap target and any notifications already
+ * sitting in the tray, so the signed-out user is left with a clean device.
+ */
+export const disablePushNotifications = async (): Promise<void> => {
+  const token = currentToken;
+
+  stopPushNotifications();
+
+  if (token) {
+    try {
+      await postDeviceTokenRemoval(token);
+    } catch (error) {
+      console.warn('[push] could not unregister the device token', error);
+    }
+  }
+
+  await deleteDeviceToken();
+
+  try {
+    await AsyncStorage.removeItem(PENDING_NOTIFICATION_KEY);
+  } catch {
+    // Storage cleanup is best-effort.
+  }
+
+  try {
+    await notifee.cancelAllNotifications();
+  } catch (error) {
+    console.warn('[push] could not clear displayed notifications', error);
   }
 };
 

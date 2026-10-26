@@ -308,6 +308,36 @@ describe('initPushNotifications', () => {
   });
 });
 
+describe('disablePushNotifications', () => {
+  it('unregisters and deletes the FCM token on logout', async () => {
+    const { push, messaging, notifee } = loadPush();
+    mockPost.mockResolvedValue({ success: true });
+
+    await push.getDeviceToken();
+    await push.disablePushNotifications();
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/notifications/device-token/unregister',
+      { token: 'test-fcm-token' },
+    );
+    expect(messaging.deleteToken).toHaveBeenCalled();
+    expect(notifee.default.cancelAllNotifications).toHaveBeenCalled();
+  });
+
+  it('stops the listeners so a later message is not handled', async () => {
+    const { push, messaging } = loadPush();
+    mockPost.mockResolvedValue({ success: true });
+
+    const onMessageUnsubscribe = jest.fn();
+    messaging.onMessage.mockReturnValueOnce(onMessageUnsubscribe);
+
+    await push.initPushNotifications();
+    await push.disablePushNotifications();
+
+    expect(onMessageUnsubscribe).toHaveBeenCalled();
+  });
+});
+
 describe('getAuthFcmToken', () => {
   it('returns the FCM token of this device for the auth payload', async () => {
     const { push, messaging } = loadPush();

@@ -65,6 +65,7 @@ jest.mock('@notifee/react-native', () => {
     onForegroundEvent: jest.fn(() => jest.fn()),
     onBackgroundEvent: jest.fn(() => jest.fn()),
     cancelNotification: jest.fn(async () => undefined),
+    cancelAllNotifications: jest.fn(async () => undefined),
   };
 
   return {

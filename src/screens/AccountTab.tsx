@@ -26,6 +26,7 @@ import AppIconButton from '../components/AppIconButton';
 import { useDispatch } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
 import { apiService } from '../api/apiService';
+import { disablePushNotifications } from '../services/push';
 import { useProfile, type Address, type ProfileData, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
@@ -297,6 +298,12 @@ const AccountTab = () => {
 
   const handleLogout = async () => {
     setLogoutStatus('loading');
+
+    // Remove the device token while the auth token is still valid, so the
+    // backend stops targeting this device. This runs before the session ends
+    // so a slow/failed logout request cannot leave push enabled.
+    await disablePushNotifications();
+
     try {
       await apiService.post<LogoutResponse>(LOGOUT_ENDPOINT, {});
     } catch {

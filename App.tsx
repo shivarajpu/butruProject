@@ -18,6 +18,7 @@ import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
 import { loadCartState, hydrate as hydrateCart } from './src/store/slices/cartSlice';
 import {
+  clearNotifications,
   loadNotificationState,
   hydrate as hydrateNotifications,
   loadUnreadCount,
@@ -27,14 +28,13 @@ import { useAppTheme } from './src/theme/useAppTheme';
 import { readableOn } from './src/storefront/bridge';
 import { navigationRef } from './src/navigation/rootNavigation';
 import {
+  disablePushNotifications,
   flushPendingNavigation,
   handleInitialNotification,
   initDeepLinking,
   initPushNotifications,
   navigateFromNotification,
-  registerDeviceToken,
   restorePendingNotification,
-  unregisterDeviceToken,
 } from './src/services/push';
 import SplashScreen from './src/screens/SplashScreen';
 import LoginScreen from './src/auth/LoginScreen';
@@ -80,30 +80,23 @@ function AppNavigator() {
     });
   }, [dispatch]);
 
-  // Push notifications.
+  // Push notifications belong to a session.
   //
-  // `initPushNotifications` asks for the notification permission, creates the
-  // Android channels and registers the FCM token with the backend. It is a
-  // no-op when Firebase is not configured for this build, so it is safe to
-  // call unconditionally.
-  useEffect(() => {
-    console.log('[push] app initPushNotifications');
-    initPushNotifications()
-      .then(() => console.log('[push] initPushNotifications done'))
-      .catch((e) => console.log('[push] initPushNotifications err', e?.message));
-  }, []);
-
-  // The token belongs to whoever is signed in. Register it once the session is
-  // known, and drop it again on logout so the next user of this device does
-  // not inherit the previous account's pushes.
+  // Start the stack only after login. On logout, unregister + DELETE the FCM
+  // token before the session is torn down; keeping the token alive would let
+  // the server keep delivering the previous account's pushes to this device.
   useEffect(() => {
     if (!isHydrated) return;
 
     if (isLoggedIn) {
-      registerDeviceToken().catch(() => undefined);
+      console.log('[push] app initPushNotifications');
+      initPushNotifications()
+        .then(() => console.log('[push] initPushNotifications done'))
+        .catch(e => console.log('[push] initPushNotifications err', e?.message));
       dispatch(loadUnreadCount());
     } else {
-      unregisterDeviceToken().catch(() => undefined);
+      disablePushNotifications().catch(() => undefined);
+      dispatch(clearNotifications());
     }
   }, [dispatch, isHydrated, isLoggedIn]);
 
