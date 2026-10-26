@@ -71,7 +71,7 @@ security:
   - bearerAuth: []
 
 paths:
-  /api/notifications:
+  /api/notifications/customer:
     get:
       tags: [Notifications]
       summary: List notifications, newest first.
@@ -112,8 +112,8 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /api/notifications/{id}/read:
-    post:
+  /api/notifications/customer/{id}/read:
+    patch:
       tags: [Notifications]
       summary: Mark one notification as read.
       operationId: markNotificationRead
@@ -133,8 +133,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  /api/notifications/read-all:
-    post:
+  /api/notifications/customer/read-all:
+    patch:
       tags: [Notifications]
       summary: Mark every notification as read.
       operationId: markAllNotificationsRead

@@ -2,11 +2,11 @@
  * Notifications API — the in-app notification feed and the FCM device-token
  * registry.
  *
- *   GET  /api/notifications?page&limit&type
- *   GET  /api/notifications/unread-count
- *   POST /api/notifications/{id}/read
- *   POST /api/notifications/read-all
- *   POST /api/notifications/device-token/register
+ *   GET   /api/notifications/customer?page&limit&type
+ *   GET   /api/notifications/unread-count
+ *   PATCH /api/notifications/customer/{id}/read
+ *   PATCH /api/notifications/customer/read-all
+ *   POST  /api/notifications/device-token/register
  *   POST /api/notifications/device-token/unregister
  *
  * The contract lives in `docs/api/notifications.openapi.yaml`.
@@ -518,11 +518,16 @@ export const fetchUnreadCount = async (): Promise<number> => {
 
 /** Marks one notification as read. */
 export const markNotificationRead = (id: string) =>
-  apiService.post<SuccessResponse>(`${NOTIFICATIONS_ENDPOINT}/${encodeURIComponent(id)}/read`, {});
+  apiService.update<SuccessResponse>(
+    `${CUSTOMER_NOTIFICATIONS_ENDPOINT}/${encodeURIComponent(id)}/read`,
+    {},
+    undefined,
+    'PATCH',
+  );
 
 /** Marks every notification as read. */
 export const markAllNotificationsRead = () =>
-  apiService.post<SuccessResponse>(`${NOTIFICATIONS_ENDPOINT}/read-all`, {});
+  apiService.update<SuccessResponse>(`${CUSTOMER_NOTIFICATIONS_ENDPOINT}/read-all`, {}, undefined, 'PATCH');
 
 /**
  * Registers an FCM token for the signed-in user.
