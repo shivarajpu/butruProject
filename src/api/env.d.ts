@@ -4,4 +4,5 @@ declare module '@env' {
   export const EXPO_PUBLIC_STORE_ID: string;
   export const EXPO_PUBLIC_STORE_SLUG: string;
   export const EXPO_PUBLIC_STORE_DOMAIN: string;
+  export const RAZORPAY_KEY_ID: string;
 }

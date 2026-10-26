@@ -22,6 +22,9 @@
         "storeId": "6a20248bf77d663ca797ce90",
         "baseUrl": "https://api.butru.in"
       },
+      "payments": {
+        "razorpayKeyId": "rzp_test_TqxMYmlk1zxzU4"
+      },
       "support": {
         "phone": "8128013130",
         "email": "hellobutru@gmail.com",

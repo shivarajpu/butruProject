@@ -22,4 +22,7 @@ declare module '@env' {
   export const EXPO_PUBLIC_STORE_ID: string;
   export const EXPO_PUBLIC_STORE_SLUG: string;
   export const EXPO_PUBLIC_STORE_DOMAIN: string;
+
+  /** Public Razorpay key id used by the checkout SDK. Never the key secret. */
+  export const RAZORPAY_KEY_ID: string;
 }

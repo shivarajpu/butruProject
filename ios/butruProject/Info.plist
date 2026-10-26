@@ -29,6 +29,12 @@
 		<string>tel</string>
 		<string>telprompt</string>
 		<string>mailto</string>
+		<!-- UPI apps Razorpay Checkout can hand off to on iOS. -->
+		<string>upi</string>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>bhim</string>
 	</array>
 	<key>MetroPort</key>
 	<string>$(RCT_METRO_PORT)</string>

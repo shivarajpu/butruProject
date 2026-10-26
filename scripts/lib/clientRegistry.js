@@ -152,6 +152,9 @@ function resolveClient(clientId, registry = loadRegistry()) {
       storeDomain: (client.api && client.api.storeDomain) || '',
       storeId: (client.api && client.api.storeId) || '',
     },
+    payments: {
+      razorpayKeyId: (client.payments && client.payments.razorpayKeyId) || '',
+    },
     support: {
       phone: (client.support && client.support.phone) || '',
       email: (client.support && client.support.email) || '',

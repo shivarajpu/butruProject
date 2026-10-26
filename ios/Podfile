@@ -51,6 +51,22 @@ target 'butruProject' do
       target.build_configurations.each do |config|
         config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
       end
+
+      # react-native-razorpay 3.0.0 imports both <RazorpayCore/…> and
+      # <Razorpay/…>, but CocoaPods only propagates the vendored framework of
+      # its direct `razorpay-pod` dependency (RazorpayStandard). Without these
+      # flags the pod links with "Undefined symbols: Razorpay.RazorpayCheckout".
+      next unless target.name == 'react-native-razorpay'
+
+      target.build_configurations.each do |config|
+        other_ldflags = config.build_settings['OTHER_LDFLAGS'] || ['$(inherited)']
+        other_ldflags = [other_ldflags] if other_ldflags.is_a?(String)
+        %w[Razorpay RazorpayCore].each do |framework|
+          flag = %(-framework "#{framework}")
+          other_ldflags << flag unless other_ldflags.include?(flag)
+        end
+        config.build_settings['OTHER_LDFLAGS'] = other_ldflags
+      end
     end
     installer.pods_project.save
   end

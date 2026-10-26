@@ -39,6 +39,7 @@ function injectedMeta(resolved) {
     EXPO_PUBLIC_STORE_ID: resolved.api.storeId,
     EXPO_PUBLIC_STORE_SLUG: resolved.api.storeSlug,
     EXPO_PUBLIC_STORE_DOMAIN: resolved.api.storeDomain,
+    RAZORPAY_KEY_ID: resolved.payments.razorpayKeyId,
   };
 }
 

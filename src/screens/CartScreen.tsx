@@ -42,6 +42,12 @@ import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCou
 import { apiService } from '../api/apiService';
 import { tintSvg } from '../assets/svg/tint';
 import APP_CONFIG from '../config/clients';
+import {
+  isRazorpayConfigured,
+  openRazorpayCheckout,
+  RazorpayPaymentError,
+  type RazorpayPaymentResult,
+} from '../services/razorpay';
 
 // Custom SVGs
 const TAG_ICON_SVG = tintSvg(`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`);
@@ -285,37 +291,39 @@ const CartScreen = () => {
       Alert.alert('Missing Address', 'Please select a delivery address.');
       return;
     }
+
     setIsProcessingPayment(true);
     setIsPaymentSuccess(false);
-    try {
-      const customer = {
-        name: profile?.name || effectiveAddress.name || '',
-        email: profile?.email || '',
-        phone: profile?.phone || effectiveAddress.phone || '',
-      };
 
-      const items = checkoutItems.map(item => ({
-        productId: item.productId,
-        productName: item.name,
-        productCode: item.productCode || '',
-        quantity: item.quantity,
-        size: item.size,
-        sku: item.size,
-        variant: item.size,
-        color: item.color,
-      }));
+    const customer = {
+      name: profile?.name || effectiveAddress.name || '',
+      email: profile?.email || '',
+      phone: profile?.phone || effectiveAddress.phone || '',
+    };
 
-      const shippingAddress = {
-        name: effectiveAddress.name || customer.name,
-        phone: effectiveAddress.phone || customer.phone,
-        street: effectiveAddress.street || '',
-        city: effectiveAddress.city || '',
-        state: effectiveAddress.state || '',
-        pincode: effectiveAddress.pincode || '',
-        country: effectiveAddress.country || 'India',
-      };
+    const items = checkoutItems.map(item => ({
+      productId: item.productId,
+      productName: item.name,
+      productCode: item.productCode || '',
+      quantity: item.quantity,
+      size: item.size,
+      sku: item.size,
+      variant: item.size,
+      color: item.color,
+    }));
 
-      const payload = {
+    const shippingAddress = {
+      name: effectiveAddress.name || customer.name,
+      phone: effectiveAddress.phone || customer.phone,
+      street: effectiveAddress.street || '',
+      city: effectiveAddress.city || '',
+      state: effectiveAddress.state || '',
+      pincode: effectiveAddress.pincode || '',
+      country: effectiveAddress.country || 'India',
+    };
+
+    const submitOrder = (payment: Record<string, unknown>) =>
+      apiService.post<any>(CREATE_ORDER_ENDPOINT, {
         idempotencyKey: generateIdempotencyKey(),
         customer,
         items,
@@ -329,41 +337,141 @@ const CartScreen = () => {
           discount: appliedCoupon,
           total: finalTotal,
         },
-        payment: {
-          mode: paymentMethod,
-          paymentStatus: 'Pending',
-          amount: finalTotal,
-        },
-      };
+        payment,
+      });
 
-      const response = await apiService.post<any>(CREATE_ORDER_ENDPOINT, payload);
-
-      if (response?.success) {
-        const placedOrder = response.data ?? response;
-        const placedOrderNumber = placedOrder?.orderNumber || placedOrder?._id || placedOrder?.id || '';
-        setOrderId(placedOrderNumber ? `#${placedOrderNumber}` : `BTRS${Math.floor(100000 + Math.random() * 900000)}`);
-        setPlacedAmount(finalTotal);
-        if (isBuyNow) {
-          dispatch(clearBuyNowItem());
-        } else {
-          dispatch(clearCart());
-        }
-        setIsProcessingPayment(false);
-        setIsPaymentSuccess(true);
+    const showOrderSuccess = (response: any) => {
+      const placedOrder = response.data ?? response;
+      const placedOrderNumber =
+        placedOrder?.orderNumber || placedOrder?._id || placedOrder?.id || '';
+      setOrderId(
+        placedOrderNumber
+          ? `#${placedOrderNumber}`
+          : `BTRS${Math.floor(100000 + Math.random() * 900000)}`,
+      );
+      setPlacedAmount(finalTotal);
+      if (isBuyNow) {
+        dispatch(clearBuyNowItem());
       } else {
-        setOrderId('');
-        setIsProcessingPayment(false);
-        Alert.alert(
-          'Order Failed',
-          response?.message || 'Something went wrong. Please try again.',
-        );
+        dispatch(clearCart());
       }
-    } catch (error) {
+      setIsProcessingPayment(false);
+      setIsPaymentSuccess(true);
+    };
+
+    const showOrderFailure = (message?: string) => {
       setOrderId('');
       setIsProcessingPayment(false);
       Alert.alert(
         'Order Failed',
-        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+        message || 'Something went wrong. Please try again.',
+      );
+    };
+
+    // Cash on delivery is created exactly as before: no gateway involved.
+    if (isCOD) {
+      try {
+        const response = await submitOrder({
+          mode: paymentMethod,
+          paymentStatus: 'Pending',
+          amount: finalTotal,
+        });
+        if (response?.success) {
+          showOrderSuccess(response);
+        } else {
+          showOrderFailure(response?.message);
+        }
+      } catch (error) {
+        showOrderFailure(
+          error instanceof Error
+            ? error.message
+            : 'Something went wrong. Please try again.',
+        );
+      }
+      return;
+    }
+
+    if (!isRazorpayConfigured()) {
+      setIsProcessingPayment(false);
+      Alert.alert(
+        'Online Payment Unavailable',
+        'Online payments are not configured for this app yet. Please choose Cash on Delivery.',
+      );
+      return;
+    }
+
+    // Online: charge first, then persist the order with the gateway reference.
+    // This never leaves an unpaid order behind if the shopper closes checkout.
+    let paymentResult: RazorpayPaymentResult;
+    try {
+      paymentResult = await openRazorpayCheckout({
+        amount: finalTotal,
+        customer,
+        description: `Order from ${APP_CONFIG.appName}`,
+        themeColor: theme.colors.primary,
+        method: paymentMethod === 'CARD' ? 'card' : 'upi',
+        notes: {
+          itemCount: String(checkoutItems.length),
+          orderType: 'Regular',
+        },
+      });
+    } catch (error) {
+      setIsProcessingPayment(false);
+      if (error instanceof RazorpayPaymentError && error.cancelled) {
+        return;
+      }
+      Alert.alert(
+        'Payment Failed',
+        error instanceof Error
+          ? error.message
+          : 'Your payment could not be completed. Please try again.',
+      );
+      return;
+    }
+
+    // The money is already captured, so retry a transient order-write failure
+    // once instead of making the shopper pay twice.
+    try {
+      let response: any;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await submitOrder({
+            mode: paymentMethod,
+            paymentStatus: 'Paid',
+            amount: finalTotal,
+            transactionId: paymentResult.paymentId,
+            razorpayPaymentId: paymentResult.paymentId,
+            razorpayOrderId: paymentResult.orderId,
+            razorpaySignature: paymentResult.signature,
+          });
+          if (response?.success) {
+            break;
+          }
+        } catch (error) {
+          if (attempt === 1) {
+            throw error;
+          }
+        }
+        if (attempt === 0) {
+          await new Promise<void>(resolve => setTimeout(() => resolve(), 1500));
+        }
+      }
+
+      if (response?.success) {
+        showOrderSuccess(response);
+        return;
+      }
+
+      setIsProcessingPayment(false);
+      Alert.alert(
+        'Order Not Placed',
+        `Payment successful (ID: ${paymentResult.paymentId}), but we could not save your order. Please contact support with this payment ID.`,
+      );
+    } catch {
+      setIsProcessingPayment(false);
+      Alert.alert(
+        'Order Not Placed',
+        `Payment successful (ID: ${paymentResult.paymentId}), but we could not save your order. Please contact support with this payment ID.`,
       );
     }
   };
