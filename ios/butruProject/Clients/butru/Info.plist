@@ -48,7 +48,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Please allow location access to fetch your current address.</string>
 	<key>RCTNewArchEnabled</key>
-	<true/>
+<true/>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>We need access to your photo library so you can select and upload photos in the app.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Arimo-Bold.ttf</string>

@@ -50,7 +50,7 @@
         "accent": "#1E293B"
       },
       "firebase": {
-        "enabled": false,
+        "enabled": true,
         "androidFile": "clients/firebase/butru/android/google-services.json",
         "iosFile": "clients/firebase/butru/ios/GoogleService-Info.plist"
       }
