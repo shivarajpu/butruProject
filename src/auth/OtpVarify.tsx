@@ -136,6 +136,9 @@ const OtpVarify = ({ navigation, route }: Props) => {
           email: emailAddress,
           otp: code,
         },
+        // Signup no longer marks the session as logged in before verification,
+        // so carry the register token explicitly on the verify request.
+        registerToken,
       );
 
       if (!response.success) {

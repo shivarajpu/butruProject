@@ -40,6 +40,11 @@ import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
 import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
 import { apiService } from '../api/apiService';
+import {
+  verifyGst,
+  toOrderGstDetails,
+  type GstDetails,
+} from '../api/gst';
 import { tintSvg } from '../assets/svg/tint';
 import APP_CONFIG from '../config/clients';
 import {
@@ -135,6 +140,8 @@ const CartScreen = () => {
   // GST number state
   const [gstInput, setGstInput] = useState('');
   const [savedGst, setSavedGst] = useState('');
+  const [verifiedGst, setVerifiedGst] = useState<GstDetails | null>(null);
+  const [isVerifyingGst, setIsVerifyingGst] = useState(false);
   const [gstError, setGstError] = useState('');
 
   // Address modals state
@@ -337,6 +344,7 @@ const CartScreen = () => {
           discount: appliedCoupon,
           total: finalTotal,
         },
+        gstDetails: toOrderGstDetails(verifiedGst),
         payment,
       });
 
@@ -535,7 +543,7 @@ const CartScreen = () => {
     dispatch(removeCartItem(cartId));
   };
 
-  const handleGstSubmit = () => {
+  const handleGstSubmit = async () => {
     const code = gstInput.trim().toUpperCase();
     Keyboard.dismiss();
     // GST number is optional; an empty field should never block checkout or
@@ -548,13 +556,32 @@ const CartScreen = () => {
       setGstError('Enter a valid 15-digit GST number');
       return;
     }
+
     setGstError('');
-    setSavedGst(code);
-    setGstInput(code);
+    setIsVerifyingGst(true);
+    try {
+      const response = await verifyGst(code);
+      if (!response?.success || !response?.data?.gstin) {
+        setGstError(response?.message || 'GST number could not be verified');
+        return;
+      }
+      setVerifiedGst(response.data);
+      setSavedGst(response.data.gstin);
+      setGstInput(response.data.gstin);
+    } catch (error) {
+      setGstError(
+        error instanceof Error
+          ? error.message
+          : 'GST number could not be verified',
+      );
+    } finally {
+      setIsVerifyingGst(false);
+    }
   };
 
   const handleGstRemove = () => {
     setSavedGst('');
+    setVerifiedGst(null);
     setGstInput('');
     setGstError('');
   };
@@ -733,7 +760,11 @@ const CartScreen = () => {
                 <View style={styles.gstSavedBadge}>
                   <Text style={styles.gstSavedText}>{savedGst}</Text>
                 </View>
-                <Text style={styles.gstSavedLabel}>GST added to invoice</Text>
+                <Text style={styles.gstSavedLabel} numberOfLines={2}>
+                  {verifiedGst?.businessName ||
+                    verifiedGst?.legalName ||
+                    'GST added to invoice'}
+                </Text>
               </View>
             ) : (
               <View style={styles.gstInputRow}>
@@ -758,12 +789,17 @@ const CartScreen = () => {
                 <TouchableOpacity
                   style={[
                     styles.gstSubmitBtn,
-                    gstInput.trim().length < 15 && styles.gstSubmitBtnDisabled,
+                    (gstInput.trim().length < 15 || isVerifyingGst) &&
+                      styles.gstSubmitBtnDisabled,
                   ]}
                   activeOpacity={0.8}
-                  disabled={gstInput.trim().length < 15}
+                  disabled={gstInput.trim().length < 15 || isVerifyingGst}
                   onPress={handleGstSubmit}>
-                  <Text style={styles.gstSubmitText}>Submit</Text>
+                  {isVerifyingGst ? (
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                  ) : (
+                    <Text style={styles.gstSubmitText}>Submit</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}

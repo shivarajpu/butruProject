@@ -529,7 +529,7 @@ const LoginScreen = ({ navigation }: Props) => {
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() =>
-                  navigation.replace('SignUp')
+                  navigation.navigate('SignUp')
                 }
               >
                 <Text style={styles.signUpLink}>

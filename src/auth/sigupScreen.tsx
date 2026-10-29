@@ -16,9 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
-import { login } from '../store/slices/authSlice';
 import type { RootStackParamList } from '../navigation/types';
 import { eyeIconSvg, eyeOffIconSvg, emailIcon, loginPagaImage } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
@@ -58,7 +56,6 @@ const isValidPhone = (value: string) =>
   /^[0-9]{10}$/.test(value.trim());
 
 const SignUpScreen = ({ navigation }: Props) => {
-  const dispatch = useDispatch();
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const { width, height } = useWindowDimensions();
@@ -173,17 +170,9 @@ const SignUpScreen = ({ navigation }: Props) => {
         return;
       }
 
-      // The register response carries a valid auth token. Persist the session
-      // right away so every protected surface (wishlist, orders, profile) has
-      // data immediately after signup — even before the email is verified.
-      dispatch(
-        login({
-          user: { name: name.trim(), email: email.trim().toLowerCase() },
-          token: response.token,
-        }),
-      );
-
-      // Then send the user to OTP verification; verifying refreshes the token.
+      // The session is only established once the email OTP is verified. Keeping
+      // the app logged out until then means a cold start after signup lands on
+      // Login, while a backgrounded app still resumes on the OTP screen.
       navigation.navigate('OtpVarify', {
         email: `${email.trim()}`,
         token: response.token,
@@ -198,6 +187,10 @@ const SignUpScreen = ({ navigation }: Props) => {
   };
 
   const handleSignIn = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
     navigation.replace('Login');
   };
 
