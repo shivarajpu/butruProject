@@ -116,15 +116,19 @@ interface ApiReview {
   productId?: string;
   orderId?: string;
   userName?: string;
+  reviewerName?: string;
   name?: string;
-  user?: { name?: string } | string;
+  user?: { name?: string; photo?: string } | string;
+  userId?: { _id?: string; name?: string; photo?: string };
   userPhoto?: string;
   rating?: number;
   stars?: number;
   title?: string;
   comment?: string;
   review?: string;
+  reviewText?: string;
   images?: string[];
+  isHidden?: boolean;
   createdAt?: string;
   date?: string;
 }
@@ -243,20 +247,22 @@ const formatReviewDate = (value: string): string => {
 };
 
 const mapApiReview = (item: ApiReview): ReviewItem => {
-  let name = '';
-  if (typeof item?.user === 'string') {
-    name = item.user;
-  } else {
-    name = item?.user?.name || item?.name || item?.userName || 'Customer';
-  }
+  const user = typeof item?.user === 'object' && item.user ? item.user : undefined;
+  const name =
+    (typeof item?.user === 'string' ? item.user : user?.name) ||
+    item?.userId?.name ||
+    item?.name ||
+    item?.userName ||
+    item?.reviewerName ||
+    'Customer';
   const rawRating = Number(item?.rating ?? item?.stars ?? 0);
   return {
     id: item?._id || '',
     name: name.trim() ? name.trim() : 'Customer',
-    photo: item?.userPhoto || '',
+    photo: item?.userPhoto || user?.photo || item?.userId?.photo || '',
     rating: Math.min(5, Math.max(1, Math.round(rawRating))),
     title: item?.title || '',
-    comment: item?.comment || item?.review || '',
+    comment: item?.reviewText || item?.comment || item?.review || '',
     images: Array.isArray(item?.images) ? item.images : [],
     date: item?.createdAt || item?.date || '',
   };
@@ -371,7 +377,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     setReviewsLoading(true);
     try {
       const response = await apiService.get<ProductReviewsResponse>(
-        `${REVIEWS_ENDPOINT}?productId=${encodeURIComponent(id)}`,
+        `${REVIEWS_ENDPOINT}/product/${encodeURIComponent(id)}`,
       );
       const list = response?.data ?? response?.reviews ?? [];
       if (response?.success && Array.isArray(list)) {

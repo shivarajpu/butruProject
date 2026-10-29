@@ -89,6 +89,8 @@ interface ApiProductListItem {
   skus: { size: string; sellingPrice: number; mrp: number }[];
   isNewArrival: boolean;
   isPopular: boolean;
+  websiteCategory?: string;
+  categoryPath?: string[];
 }
 
 interface ProductsListApiResponse {
@@ -120,6 +122,33 @@ interface WishlistResponse {
 
 /** How many cards to show before the "Show more" / "View all" affordance. */
 const PREVIEW_COUNT = 4;
+
+/**
+ * The categories endpoint reports only sellable products in `productCount`,
+ * while the category listing shows every visible product (out-of-stock ones
+ * included, with their status). Count from the same catalogue the listing uses
+ * so the card and the grid always agree.
+ */
+const countProductsByCategory = (
+  products: ApiProductListItem[],
+): Map<string, number> => {
+  const counts = new Map<string, number>();
+
+  products.forEach(product => {
+    // A category can be a product type (`websiteCategory`) or a collection
+    // title (`categoryPath`); count the product once per matching name.
+    const names = new Set<string>();
+    if (product.websiteCategory) {
+      names.add(product.websiteCategory.toLowerCase());
+    }
+    (product.categoryPath ?? []).forEach(path => {
+      if (path) names.add(path.toLowerCase());
+    });
+    names.forEach(name => counts.set(name, (counts.get(name) ?? 0) + 1));
+  });
+
+  return counts;
+};
 
 const mapApiProductToItem = (item: ApiProductListItem): NewArrivalProduct => {
   const sku = item.skus?.[0];
@@ -598,7 +627,27 @@ const CategoryTab = () => {
       try {
         const response = await apiService.get<CategoriesResponse>(CATEGORIES_ENDPOINT);
         if (response.success) {
-          setCategories(response.data ?? []);
+          let items = response.data ?? [];
+
+          // Recount from the catalogue so out-of-stock products are included,
+          // matching what the category grid actually renders.
+          try {
+            const productsResponse = await apiService.get<ProductsListApiResponse>(
+              `${PRODUCTS_ENDPOINT}?isVisible=true&limit=100&page=1`,
+            );
+            if (productsResponse.success && Array.isArray(productsResponse.data)) {
+              const counts = countProductsByCategory(productsResponse.data);
+              items = items.map(category => ({
+                ...category,
+                productCount:
+                  counts.get(category.name.toLowerCase()) ?? category.productCount,
+              }));
+            }
+          } catch {
+            // Keep the API's own counts when the catalogue cannot be loaded.
+          }
+
+          setCategories(items);
         }
       } finally {
         setLoading(false);

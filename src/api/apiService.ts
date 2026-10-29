@@ -63,6 +63,10 @@ export const getFullUrl = (endpoint: string): string => {
   return `${base}${path}`.replace(/([^:/])\/+/g, '$1/');
 };
 
+/** Tenant + auth headers for callers that need to fetch outside `request` (e.g. binary downloads). */
+export const getRequestHeaders = (token?: string, isFormData = false): RequestHeaders =>
+  getHeaders(token, isFormData);
+
 const getErrorMessage = (data: unknown, status: number): string => {
   if (typeof data === 'string' && data.trim()) {
     return data;

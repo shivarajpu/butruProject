@@ -388,6 +388,7 @@ export const ProductTile = ({
   );
 
   const handleAddToCart = () => {
+    if (product.isOutOfStock) return;
     if (product.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -488,6 +489,7 @@ export const ProductTile = ({
               return (
                 <TouchableOpacity
                   key={idx}
+                  disabled={product.isOutOfStock}
                   onPress={() => {
                     setSelectedSize(sz);
                     setSizeError(false);
@@ -498,6 +500,7 @@ export const ProductTile = ({
                       borderColor: colors.primary,
                       backgroundColor: colors.primaryLight,
                     },
+                    product.isOutOfStock && { opacity: 0.45 },
                   ]}>
                   <Text
                     style={[
@@ -522,15 +525,28 @@ export const ProductTile = ({
       <TouchableOpacity
         style={[
           stylesLocal.addToCartBtn,
-          { backgroundColor: added ? colors.success : colors.primary },
-          added && stylesLocal.addToCartBtnAdded,
+          {
+            backgroundColor: product.isOutOfStock
+              ? colors.surfaceVariant
+              : added
+                ? colors.success
+                : colors.primary,
+          },
+          added && !product.isOutOfStock && stylesLocal.addToCartBtnAdded,
         ]}
         activeOpacity={0.8}
+        disabled={product.isOutOfStock}
         onPress={handleAddToCart}>
         <BrandIcon icon={BRAND.cart} width={13} height={13} />
         <Text
-          style={[stylesLocal.addToCartText, { color: colors.textOnPrimary, fontFamily: FONTS.poppinsBold }]}>
-          {added ? 'Added' : 'Add to Cart'}
+          style={[
+            stylesLocal.addToCartText,
+            {
+              color: product.isOutOfStock ? colors.textMuted : colors.textOnPrimary,
+              fontFamily: FONTS.poppinsBold,
+            },
+          ]}>
+          {product.isOutOfStock ? 'Out of Stock' : added ? 'Added' : 'Add to Cart'}
         </Text>
       </TouchableOpacity>
     </View>

@@ -53,6 +53,8 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Please allow location access to fetch your current address.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Please allow photo library access to attach photos to your product review.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>

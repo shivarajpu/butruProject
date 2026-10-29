@@ -329,7 +329,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
           </View>
 
           {/* ── FOOTER ICONS ── */}
-          <View style={[styles.footer, { marginTop: vs(isSmall ? 18 : 32) }]}>
+          {/* <View style={[styles.footer, { marginTop: vs(isSmall ? 18 : 32) }]}>
             {[
               { icon: secureIcon,  label: 'SECURE'  },
               { icon: rewardIcon,  label: 'REWARDS' },
@@ -352,7 +352,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
                 <Text style={[styles.featureLabel, { fontSize: scale(10) }]}>{label}</Text>
               </View>
             ))}
-          </View>
+          </View> */}
 
           <View style={{ height: vs(20) }} />
 

@@ -86,6 +86,7 @@ interface Product {
   tag: string;
   sizes: string[];
   image: string;
+  isOutOfStock: boolean;
 }
 
 interface WishlishProduct {
@@ -208,6 +209,12 @@ const createStyles = (theme: AppTheme) => {
       marginTop: 4,
       marginBottom: 16,
     },
+    headerHidden: {
+      display: 'none',
+    },
+    searchSticky: {
+      backgroundColor: colors.surface,
+    },
     searchInput: {
       flex: 1,
       fontSize: 13,
@@ -327,6 +334,9 @@ const createStyles = (theme: AppTheme) => {
       paddingVertical: 3,
       borderRadius: 4,
     },
+    tagBadgeOutOfStock: {
+      backgroundColor: colors.error,
+    },
     tagText: {
       color: colors.surface,
       fontSize: 8,
@@ -411,6 +421,9 @@ const createStyles = (theme: AppTheme) => {
       borderColor: colors.primary,
       backgroundColor: colors.primaryLight,
     },
+    sizeChipDisabled: {
+      opacity: 0.45,
+    },
     sizeText: {
       fontSize: 9,
       color: colors.textSecondary,
@@ -419,6 +432,9 @@ const createStyles = (theme: AppTheme) => {
     sizeTextSelected: {
       color: colors.primary,
       fontWeight: '700',
+    },
+    sizeTextDisabled: {
+      color: colors.textMuted,
     },
     addToCartBtn: {
       backgroundColor: colors.primary,
@@ -436,6 +452,12 @@ const createStyles = (theme: AppTheme) => {
     },
     addToCartBtnAdded: {
       backgroundColor: colors.success,
+    },
+    addToCartBtnOutOfStock: {
+      backgroundColor: colors.surfaceVariant,
+    },
+    addToCartTextOutOfStock: {
+      color: colors.textMuted,
     },
     sizeErrorText: {
       color: colors.error,
@@ -552,6 +574,7 @@ const ProductCard = ({
   );
 
   const handleAddToCartPress = () => {
+    if (item.isOutOfStock) return;
     if (item.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -596,8 +619,14 @@ const ProductCard = ({
           source={{ uri: item.image }}
           style={[styles.productImgArea, { height: imgHeight }]}
           imageStyle={{ borderRadius: 12 }}>
-          <View style={styles.tagBadge}>
-            <Text style={styles.tagText}>{item.tag}</Text>
+          <View
+            style={[
+              styles.tagBadge,
+              item.isOutOfStock && styles.tagBadgeOutOfStock,
+            ]}>
+            <Text style={styles.tagText}>
+              {item.isOutOfStock ? 'Out of stock' : item.tag}
+            </Text>
           </View>
         </ImageBackground>
         <TouchableOpacity
@@ -630,35 +659,60 @@ const ProductCard = ({
         </View>
       </TouchableOpacity>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-        <View style={styles.sizeContainer}>
-          {item.sizes.map((sz, idx) => {
-            const isSelected = selectedSize === sz;
-            return (
-              <TouchableOpacity
-                key={idx}
-                onPress={() => {
-                  setSelectedSize(sz);
-                  setSizeError(false);
-                }}
-                style={[styles.sizeChip, isSelected && styles.sizeChipSelected]}>
-                <Text style={[styles.sizeText, isSelected && styles.sizeTextSelected]}>
-                  {sz}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
+      {item.sizes.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+          <View style={styles.sizeContainer}>
+            {item.sizes.map((sz, idx) => {
+              const isSelected = selectedSize === sz;
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  disabled={item.isOutOfStock}
+                  onPress={() => {
+                    setSelectedSize(sz);
+                    setSizeError(false);
+                  }}
+                  style={[
+                    styles.sizeChip,
+                    isSelected && styles.sizeChipSelected,
+                    item.isOutOfStock && styles.sizeChipDisabled,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.sizeText,
+                      isSelected && styles.sizeTextSelected,
+                      item.isOutOfStock && styles.sizeTextDisabled,
+                    ]}>
+                    {sz}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
 
-      {sizeError ? <Text style={styles.sizeErrorText}>Please select a size</Text> : null}
+      {!item.isOutOfStock && sizeError ? (
+        <Text style={styles.sizeErrorText}>Please select a size</Text>
+      ) : null}
 
       <TouchableOpacity
-        style={[styles.addToCartBtn, added && styles.addToCartBtnAdded]}
+        style={[
+          styles.addToCartBtn,
+          added && !item.isOutOfStock && styles.addToCartBtnAdded,
+          item.isOutOfStock && styles.addToCartBtnOutOfStock,
+        ]}
         activeOpacity={0.8}
+        disabled={item.isOutOfStock}
         onPress={handleAddToCartPress}>
         <BrandIcon icon={BRAND.cart} width={13} height={13} />
-        <Text style={styles.addToCartText}>{added ? 'Added' : 'Add to Cart'}</Text>
+        <Text
+          style={[
+            styles.addToCartText,
+            item.isOutOfStock && styles.addToCartTextOutOfStock,
+          ]}>
+          {item.isOutOfStock ? 'Out of Stock' : added ? 'Added' : 'Add to Cart'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -684,6 +738,7 @@ const HomeTab = () => {
   const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
+  const [suggestionsHidden, setSuggestionsHidden] = useState(false);
   const searchInputRef = useRef<React.ElementRef<typeof TextInput>>(null);
   const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -821,6 +876,13 @@ const HomeTab = () => {
     Keyboard.dismiss();
     setSearchQuery('');
     setSearchActive(false);
+    setSuggestionsHidden(false);
+  };
+
+  const handleSelectSuggestion = (name: string) => {
+    setSearchQuery(name);
+    setSuggestionsHidden(true);
+    Keyboard.dismiss();
   };
 
   const fetchProducts = useCallback(async (category: string) => {
@@ -865,6 +927,7 @@ const HomeTab = () => {
   const resetToHomeFeed = useCallback(() => {
     setSearchQuery('');
     setSearchActive(false);
+    setSuggestionsHidden(false);
     setActiveCategory('Home');
     setCatalogueRequested(false);
     setProducts([]);
@@ -938,6 +1001,7 @@ const HomeTab = () => {
     useCallback(() => {
       setSearchQuery('');
       setSearchActive(false);
+      setSuggestionsHidden(false);
       searchInputRef.current?.blur();
       Keyboard.dismiss();
       fetchWishlistItems();
@@ -1045,6 +1109,7 @@ const HomeTab = () => {
         ref={scrollRef}
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={searchActive ? [1] : undefined}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1059,9 +1124,14 @@ const HomeTab = () => {
           isTablet && { maxWidth: 600, alignSelf: 'center', width: '100%' },
         ]}>
 
-        {/* Header */}
-        {!searchActive && (
-          <View style={[styles.header, { paddingHorizontal: hPad }]}>
+        {/* Header — kept mounted so the sticky search bar below keeps a
+            stable child index while a search is active. */}
+        <View
+          style={[
+            styles.header,
+            { paddingHorizontal: hPad },
+            searchActive && styles.headerHidden,
+          ]}>
             <View style={styles.headerLeft}>
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -1105,11 +1175,11 @@ const HomeTab = () => {
               </TouchableOpacity>
               <BagIconButton />
             </View>
-          </View>
-        )}
+        </View>
 
         {/* Search Bar */}
-        <AppInput
+        <View style={searchActive ? styles.searchSticky : undefined}>
+          <AppInput
           ref={searchInputRef}
           containerStyle={{ marginHorizontal: hPad, marginBottom: 0 }}
           inputContainerStyle={[
@@ -1132,7 +1202,10 @@ const HomeTab = () => {
               <TouchableOpacity
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                onPress={() => setSearchQuery('')}>
+                onPress={() => {
+                  setSearchQuery('');
+                  setSuggestionsHidden(false);
+                }}>
                 <BrandIcon icon={BRAND.close} width={16} height={16} />
               </TouchableOpacity>
             ) : undefined
@@ -1140,24 +1213,31 @@ const HomeTab = () => {
           style={styles.searchInput}
           placeholder="Search by product name"
           value={searchQuery}
-          onChangeText={setSearchQuery}
-          onFocus={() => setSearchActive(true)}
+          onChangeText={text => {
+            setSearchQuery(text);
+            setSuggestionsHidden(false);
+          }}
+          onFocus={() => {
+            setSearchActive(true);
+            setSuggestionsHidden(false);
+          }}
           onBlur={() => {
             if (!searchQuery.trim()) {
               setSearchActive(false);
             }
           }}
         />
+        </View>
 
         {/* Search Suggestions */}
-        {searchActive && searchQuery.trim() && suggestions.length > 0 && (
+        {searchActive && !suggestionsHidden && searchQuery.trim() && suggestions.length > 0 && (
           <View style={[styles.suggestionsContainer, { marginHorizontal: hPad }]}>
             {suggestions.map(name => (
               <TouchableOpacity
                 key={name}
                 style={styles.suggestionRow}
                 activeOpacity={0.7}
-                onPress={() => setSearchQuery(name)}>
+                onPress={() => handleSelectSuggestion(name)}>
                 <BrandIcon icon={BRAND.search} width={15} height={15} />
                 <Text style={styles.suggestionText} numberOfLines={1}>
                   {name}

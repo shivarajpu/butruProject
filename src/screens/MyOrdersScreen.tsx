@@ -17,15 +17,15 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { generatePDF } from 'react-native-html-to-pdf';
 import BlobUtil from 'react-native-blob-util';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { launchImageLibrary } from 'react-native-image-picker';
 import type { RootStackParamList } from '../navigation/types';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import { FONTS } from '../constants/fonts';
 import { apiService } from '../api/apiService';
-import APP_CONFIG from '../config/clients';
+import { downloadOrderInvoice } from '../api/invoice';
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 
@@ -93,6 +93,7 @@ type ProductItem = {
 
 type OrderType = {
   id: string;
+  apiOrderId: string;
   orderId: string;
   orderNumber: string;
   date: string;
@@ -144,6 +145,7 @@ type OrderItemAsset = {
 type ApiOrder = {
   _id: string;
   id: string;
+  orderId?: string;
   orderNumber: string;
   idempotencyKey: string;
   placedAt?: string;
@@ -188,6 +190,51 @@ type OrdersResponse = {
   page: number;
   pages: number;
   data: ApiOrder[];
+};
+
+type ApiReview = {
+  _id?: string;
+  id?: string;
+  orderId?: string;
+  productId?: string;
+  rating?: number;
+  reviewText?: string;
+  comment?: string;
+  images?: string[];
+};
+
+type ProductReviewsResponse = {
+  success?: boolean;
+  data?: ApiReview[];
+};
+
+type ReviewMutationResponse = {
+  success?: boolean;
+  message?: string;
+  data?: ApiReview;
+};
+
+const MAX_REVIEW_IMAGES = 3;
+
+type SavedReview = {
+  id: string;
+  rating: number;
+  comment: string;
+  images: string[];
+};
+
+const toSavedReview = (review?: ApiReview | null): SavedReview | null => {
+  const id = review?._id || review?.id;
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    rating: Number(review?.rating) || 0,
+    comment: review?.reviewText || review?.comment || '',
+    images: Array.isArray(review?.images) ? review.images.filter(Boolean) : [],
+  };
 };
 
 type CancelOrderResponse = {
@@ -269,6 +316,7 @@ const mapApiOrder = (order: ApiOrder): OrderType => {
 
   return {
     id: order._id || order.id,
+    apiOrderId: order.orderId || order._id || order.id,
     orderNumber: order.orderNumber,
     orderId: order.orderNumber ? `#${order.orderNumber}` : order.id || order._id,
     date: formatOrderDate(order.placedAt || order.createdAt),
@@ -302,120 +350,6 @@ const getOrderBucket = (order: OrderType): string => {
     return 'Delivered';
   }
   return 'On the way';
-};
-
-const escapeHtml = (value: string): string =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-
-const money = (value: number): string => `Rs. ${(value || 0).toFixed(2)}`;
-
-const buildInvoiceHtml = (order: OrderType, appName: string): string => {
-  const items =
-    order.items
-      .map(
-        item => `<tr>
-        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;">${escapeHtml(item.name)}<br/><span style="font-size:10px;color:#888;">${escapeHtml(item.code || '')}</span></td>
-        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:center;">${escapeHtml(item.size || '-')}</td>
-        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:center;">${item.qty}</td>
-        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:right;">${money(item.price)}</td>
-        <td style="padding:8px 6px;border-bottom:1px solid #e6e6e6;text-align:right;">${money(item.price * item.qty)}</td>
-      </tr>`,
-      )
-      .join('') ||
-    '<tr><td colspan="5" style="padding:8px;text-align:center;color:#888;">No items</td></tr>';
-
-  const address = order.shippingAddress
-    ? [
-        order.shippingAddress.name,
-        order.shippingAddress.street,
-        [order.shippingAddress.city, order.shippingAddress.state]
-          .filter(Boolean)
-          .join(', '),
-        order.shippingAddress.pincode,
-        order.shippingAddress.country,
-        order.shippingAddress.phone,
-      ]
-        .filter((line): line is string => Boolean(line))
-        .map(line => `<div>${escapeHtml(line)}</div>`)
-        .join('')
-    : 'Not provided';
-
-  const statusText = `${order.status}${order.trackingStatus ? ` - ${order.trackingStatus}` : ''}`;
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif; color: #222; }
-    .page { padding: 24px 28px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #837BA2; padding-bottom: 14px; margin-bottom: 18px; }
-    .store { font-size: 24px; font-weight: bold; color: #837BA2; }
-    .doc-title { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
-    h3 { margin: 16px 0 8px; font-size: 14px; color: #555; text-transform: uppercase; }
-    .meta { font-size: 12px; color: #444; }
-    .meta td { padding: 2px 0; }
-    table.items { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
-    table.items th { background: #f3f0fa; color: #555; font-size: 11px; text-align: left; padding: 8px 6px; text-transform: uppercase; }
-    .totals { width: 260px; margin-left: auto; margin-top: 14px; font-size: 13px; }
-    .totals td { padding: 3px 0; }
-    .totals tr.total td { border-top: 2px solid #837BA2; font-weight: bold; font-size: 15px; padding-top: 8px; }
-    .address-box { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #333; }
-    .footer { margin-top: 26px; text-align: center; font-size: 10px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <div class="header">
-      <div>
-        <div class="store">${escapeHtml(appName || 'Store')}</div>
-        <div class="doc-title">Tax Invoice / Order Summary</div>
-      </div>
-      <table class="meta">
-        <tr><td>Order ID</td><td><b>${escapeHtml(order.orderId)}</b></td></tr>
-        <tr><td>Order Date</td><td><b>${escapeHtml(order.date)}</b></td></tr>
-        <tr><td>Status</td><td><b>${escapeHtml(statusText)}</b></td></tr>
-      </table>
-    </div>
-
-    <h3>Order Summary</h3>
-    <table class="items">
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th style="text-align:center;">Size</th>
-          <th style="text-align:center;">Qty</th>
-          <th style="text-align:right;">Price</th>
-          <th style="text-align:right;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>${items}</tbody>
-    </table>
-
-    <table class="totals">
-      <tr><td>Subtotal</td><td style="text-align:right;">${money(order.subtotal)}</td></tr>
-      <tr><td>Shipping</td><td style="text-align:right;">${money(order.shippingCharges)}</td></tr>
-      <tr><td>Discount</td><td style="text-align:right;">- ${money(order.discount)}</td></tr>
-      <tr><td>Tax (GST)</td><td style="text-align:right;">${money(order.tax)}</td></tr>
-      <tr class="total"><td>TOTAL</td><td style="text-align:right;">${money(order.totalAmount)}</td></tr>
-    </table>
-
-    <h3>Delivery Address</h3>
-    <div class="address-box">${address}</div>
-
-    <h3>Payment Method</h3>
-    <div style="font-size:13px;">${escapeHtml(order.paymentMethod || 'COD')}</div>
-
-    <div class="footer">Thank you for shopping with ${escapeHtml(appName)}</div>
-  </div>
-</body>
-</html>`;
 };
 
 // ─── StyleSheet Factory (Theme-aware) ─────────────────────────────────────────
@@ -1136,6 +1070,59 @@ reviewInput: {
 reviewTextArea: {
   minHeight: 96,
 },
+reviewImagesRow: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 10,
+},
+reviewImageWrap: {
+  width: 76,
+  height: 76,
+},
+reviewImageThumb: {
+  width: 76,
+  height: 76,
+  borderRadius: 10,
+  backgroundColor: '#F3F4F6',
+},
+reviewImageRemove: {
+  position: 'absolute',
+  top: -6,
+  right: -6,
+  width: 22,
+  height: 22,
+  borderRadius: 11,
+  backgroundColor: '#111827',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+reviewImageRemoveText: {
+  color: '#FFFFFF',
+  fontSize: 15,
+  lineHeight: 17,
+  fontWeight: '600',
+},
+reviewImageAdd: {
+  width: 76,
+  height: 76,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderStyle: 'dashed',
+  borderColor: '#D1D5DB',
+  backgroundColor: '#F9FAFB',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+reviewImageAddText: {
+  color: '#6B7280',
+  fontSize: 22,
+  lineHeight: 24,
+},
+reviewImageAddLabel: {
+  color: '#6B7280',
+  fontSize: 10,
+  marginTop: 2,
+},
 reviewSubmitBtn: {
   backgroundColor: colors.primary,
   borderRadius: 12,
@@ -1275,13 +1262,60 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   // Write-a-Review (delivered items only)
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
-  const [reviewTitle, setReviewTitle] = useState('');
   const [reviewComment, setReviewComment] = useState('');
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [reviewError, setReviewError] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [existingReview, setExistingReview] = useState<SavedReview | null>(null);
 
   const selectedOrder =
     orders.find(o => o.id === selectedOrderId) || orders[0] || null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadExistingReview = async () => {
+      setExistingReview(null);
+      if (!selectedOrder || !selectedProduct?.productId) {
+        return;
+      }
+
+      try {
+        const response = await apiService.get<ProductReviewsResponse>(
+          `${REVIEWS_ENDPOINT}/product/${encodeURIComponent(selectedProduct.productId)}`,
+        );
+        const list = Array.isArray(response?.data) ? response.data : [];
+        const orderIds = [selectedOrder.id, selectedOrder.apiOrderId];
+        const match = list.find(
+          review =>
+            !!review.orderId &&
+            orderIds.includes(review.orderId) &&
+            (!review.productId || review.productId === selectedProduct.productId),
+        );
+        if (!cancelled) {
+          setExistingReview(toSavedReview(match));
+        }
+      } catch {
+        // Non-fatal — the form simply starts as a new review.
+      }
+    };
+
+    loadExistingReview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrder, selectedProduct]);
+
+  useEffect(() => {
+    if (!reviewModalVisible || !existingReview) {
+      return;
+    }
+
+    setReviewRating(prev => prev || existingReview.rating);
+    setReviewComment(prev => prev || existingReview.comment);
+    setReviewImages(prev => (prev.length ? prev : existingReview.images));
+  }, [reviewModalVisible, existingReview]);
 
   /**
    * Notification taps pass the order they refer to. The list is filtered down
@@ -1460,26 +1494,16 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
     }
     setDownloadingInvoice(true);
     try {
-      const html = buildInvoiceHtml(selectedOrder, APP_CONFIG.appName);
-      const file = await generatePDF({
-        html,
-        fileName: `invoice-${selectedOrder.orderNumber || selectedOrder.id}`.replace(/[^a-zA-Z0-9_-]/g, ''),
-        base64: false,
-        padding: 16,
-        bgColor: '#FFFFFF',
-      });
+      const filePath = await downloadOrderInvoice(selectedOrder.apiOrderId);
       if (Platform.OS === 'android') {
-        await BlobUtil.android.actionViewIntent(
-          file.filePath,
-          'application/pdf',
-        );
+        await BlobUtil.android.actionViewIntent(filePath, 'application/pdf');
       } else {
-        await BlobUtil.ios.openDocument(file.filePath.replace(/^file:\/\//, ''));
+        await BlobUtil.ios.openDocument(filePath.replace(/^file:\/\//, ''));
       }
     } catch (err) {
       Alert.alert(
         'Invoice Failed',
-        err instanceof Error ? err.message : 'Unable to generate the invoice PDF. Please try again.',
+        err instanceof Error ? err.message : 'Unable to download the invoice PDF. Please try again.',
       );
     } finally {
       setDownloadingInvoice(false);
@@ -1560,15 +1584,58 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   };
 
   const openReviewForm = () => {
-    setReviewRating(0);
-    setReviewTitle('');
-    setReviewComment('');
+    setReviewRating(existingReview?.rating ?? 0);
+    setReviewComment(existingReview?.comment ?? '');
+    setReviewImages(existingReview?.images ?? []);
     setReviewError('');
     setReviewModalVisible(true);
   };
 
   const closeReviewForm = () => {
     setReviewModalVisible(false);
+  };
+
+  const pickReviewImages = () => {
+    if (reviewImages.length >= MAX_REVIEW_IMAGES) {
+      Alert.alert('Photo limit', `You can add up to ${MAX_REVIEW_IMAGES} photos.`);
+      return;
+    }
+
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        selectionLimit: MAX_REVIEW_IMAGES - reviewImages.length,
+        includeBase64: true,
+        maxWidth: 1000,
+        maxHeight: 1000,
+        quality: 0.6,
+      },
+      response => {
+        if (response.didCancel) {
+          return;
+        }
+        if (response.errorCode) {
+          Alert.alert('Photo', response.errorMessage || 'Unable to open your photo library.');
+          return;
+        }
+
+        const picked = (response.assets ?? [])
+          .map(asset =>
+            asset.base64
+              ? `data:${asset.type || 'image/jpeg'};base64,${asset.base64}`
+              : null,
+          )
+          .filter((image): image is string => Boolean(image));
+
+        if (picked.length) {
+          setReviewImages(prev => [...prev, ...picked].slice(0, MAX_REVIEW_IMAGES));
+        }
+      },
+    );
+  };
+
+  const removeReviewImage = (index: number) => {
+    setReviewImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const submitProductReview = async () => {
@@ -1579,10 +1646,6 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
       setReviewError('Please select a star rating');
       return;
     }
-    if (!reviewTitle.trim()) {
-      setReviewError('Please add a title to your review');
-      return;
-    }
     if (!reviewComment.trim()) {
       setReviewError('Please write a few words about the product');
       return;
@@ -1590,21 +1653,40 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
     setReviewError('');
     setSubmittingReview(true);
     try {
-      const response = await apiService.post<{ success: boolean; message?: string }>(
-        REVIEWS_ENDPOINT,
-        {
-          productId: selectedProduct.productId,
-          orderId: selectedOrder.id,
-          rating: reviewRating,
-          title: reviewTitle.trim(),
-          comment: reviewComment.trim(),
-          images: [],
-        },
-      );
+      const payload = {
+        rating: reviewRating,
+        reviewText: reviewComment.trim(),
+        images: reviewImages,
+      };
+      const response = existingReview
+        ? await apiService.update<ReviewMutationResponse>(
+            `${REVIEWS_ENDPOINT}/${existingReview.id}`,
+            payload,
+            undefined,
+            'PATCH',
+          )
+        : await apiService.post<ReviewMutationResponse>(REVIEWS_ENDPOINT, {
+            ...payload,
+            productId: selectedProduct.productId,
+            orderId: selectedOrder.id,
+          });
       if (response?.success) {
+        const saved = toSavedReview(response.data);
+        const nextReview: SavedReview = saved ?? {
+          id: existingReview?.id ?? '',
+          rating: reviewRating,
+          comment: reviewComment.trim(),
+          images: reviewImages,
+        };
+        if (nextReview.id) {
+          setExistingReview(nextReview);
+        }
         Alert.alert(
-          'Thank you!',
-          response.message || 'Your review has been submitted and will appear shortly.',
+          existingReview ? 'Review Updated' : 'Thank you!',
+          response.message ||
+            (existingReview
+              ? 'Your review has been updated.'
+              : 'Your review has been submitted and will appear shortly.'),
         );
         setReviewModalVisible(false);
       } else {
@@ -2044,7 +2126,9 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
               style={styles.writeReviewBtn}
               activeOpacity={0.8}
               onPress={openReviewForm}>
-              <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+              <Text style={styles.writeReviewBtnText}>
+                {existingReview ? 'Edit Review' : 'Write a Review'}
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -2327,7 +2411,9 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
             <View style={styles.cancelModalHeader}>
               <View>
-                <Text style={styles.cancelModalTitle}>Write a Review</Text>
+                <Text style={styles.cancelModalTitle}>
+                  {existingReview ? 'Edit Review' : 'Write a Review'}
+                </Text>
                 <Text style={styles.cancelModalSubtitle} numberOfLines={1}>
                   {selectedProduct?.name || 'Rate this product'}
                 </Text>
@@ -2356,16 +2442,6 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
 
               {!!reviewError && <Text style={styles.reviewErrorText}>{reviewError}</Text>}
 
-              <Text style={styles.reviewFieldLabel}>Title</Text>
-              <TextInput
-                style={styles.reviewInput}
-                placeholder="e.g. Super soft fabric!"
-                placeholderTextColor={colors.textMuted}
-                value={reviewTitle}
-                onChangeText={setReviewTitle}
-                maxLength={80}
-              />
-
               <Text style={styles.reviewFieldLabel}>Your Review</Text>
               <TextInput
                 style={[styles.reviewInput, styles.reviewTextArea]}
@@ -2378,6 +2454,30 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
                 textAlignVertical="top"
               />
 
+              <Text style={styles.reviewFieldLabel}>Photos (optional)</Text>
+              <View style={styles.reviewImagesRow}>
+                {reviewImages.map((uri, index) => (
+                  <View key={`${index}-${uri.slice(0, 24)}`} style={styles.reviewImageWrap}>
+                    <Image source={{ uri }} style={styles.reviewImageThumb} />
+                    <TouchableOpacity
+                      style={styles.reviewImageRemove}
+                      activeOpacity={0.8}
+                      onPress={() => removeReviewImage(index)}>
+                      <Text style={styles.reviewImageRemoveText}>×</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {reviewImages.length < MAX_REVIEW_IMAGES && (
+                  <TouchableOpacity
+                    style={styles.reviewImageAdd}
+                    activeOpacity={0.7}
+                    onPress={pickReviewImages}>
+                    <Text style={styles.reviewImageAddText}>+</Text>
+                    <Text style={styles.reviewImageAddLabel}>Add photo</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity
                 style={[styles.reviewSubmitBtn, submittingReview && { opacity: 0.6 }]}
                 activeOpacity={0.8}
@@ -2386,7 +2486,9 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
                 {submittingReview ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.reviewSubmitBtnText}>Submit Review</Text>
+                  <Text style={styles.reviewSubmitBtnText}>
+                    {existingReview ? 'Update Review' : 'Submit Review'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </ScrollView>

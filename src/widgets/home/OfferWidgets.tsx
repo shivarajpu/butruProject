@@ -28,7 +28,7 @@ import type { RootStackParamList } from '../../navigation/types';
 import { fetchProductsForSource, formatPrice, type StoreProduct } from '../../storefront/catalog';
 import { useStoreConfig } from '../../storefront/useStorefront';
 import type { StoreWidget, WidgetConfig } from '../../storefront/types';
-import { useWidgetActions, useWidgetData, useWidgetLayout, GRID_GAP } from '../common';
+import { useWidgetActions, useWidgetData, useWidgetLayout, GRID_GAP, ProductTile } from '../common';
 import { useWishlist } from '../../hooks/useWishlist';
 import { SvgXml } from 'react-native-svg';
 import { heartFilledSvg, heartOutlineSvg } from '../../assets/svg';
@@ -184,6 +184,30 @@ const DealOfTheDayWidget = ({ widget }: Props) => {
     );
   }
   if (!products.length) return null;
+
+  // "Deal Of The Day" falls back to the new-arrivals feed when nothing is
+  // flagged as a deal. Those are ordinary product tiles, so render them with
+  // the shared tile (size chips + Add to Cart) instead of the deal-only card.
+  if (usingFallback) {
+    return (
+      <View style={[styles.section, { paddingHorizontal: gutter }]}>
+        {config.showTitle !== false && !!heading && <Text style={styles.title}>{heading}</Text>}
+
+        <View style={styles.dealRow}>
+          {products.map(product => (
+            <ProductTile
+              key={product.id}
+              product={product}
+              width={tileWidth}
+              wished={wishlist.isWishlisted(product.id)}
+              onToggleWishlist={() => wishlist.toggle(product.id)}
+              onPress={() => navigation.navigate('ProductDetails', { product })}
+            />
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.section, { paddingHorizontal: gutter }]}>

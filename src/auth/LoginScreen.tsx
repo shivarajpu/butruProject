@@ -540,7 +540,7 @@ const LoginScreen = ({ navigation }: Props) => {
           </View>
 
           {/* Footer Features */}
-          <View
+          {/* <View
             style={[
               styles.footerContainer,
               isSmallDevice
@@ -589,7 +589,7 @@ const LoginScreen = ({ navigation }: Props) => {
                 SUPPORT
               </Text>
             </View>
-          </View>
+          </View> */}
         </ScrollView>
       </KeyboardAvoidingView>
 
