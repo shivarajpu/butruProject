@@ -14,12 +14,12 @@ import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import type { Address } from '../hooks/useProfile';
 import { tintSvg } from '../assets/svg/tint';
+import { BRAND } from '../assets/svg/brand';
+import BrandIcon from './BrandIcon';
 
 const EDIT_PENCIL_SVG = tintSvg(`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#B12B5B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`);
 export const TRASH_SVG = (color: string) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
 
-// Same bug as the add-address modal: this accepted a colour and then baked in
-// `#BE185D`, so the badge stayed pink whatever the tenant's primary was.
 export const getHomeIconSvg = (color: string) => `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M2 5.99992L8 1.33325L14 5.99992V13.3333C14 14.0691 13.4026 14.6666 12.6667 14.6666H3.33333C2.59745 14.6666 2 14.0691 2 13.3333V5.99992" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
 <rect x="6" y="8" width="4" height="6.66667" stroke="${color}" stroke-width="1.33333" stroke-linecap="round" stroke-linejoin="round"/>
@@ -34,6 +34,7 @@ type Props = {
   selectedAddressId?: string | null;
   onSelect: (address: Address) => void;
   onClose: () => void;
+  onDismiss?: () => void;
   onAddAddress: () => void;
   onEditAddress?: (address: Address) => void;
   onDeleteAddress?: (address: Address) => void;
@@ -52,6 +53,7 @@ const AddressSelectionModal = ({
   selectedAddressId,
   onSelect,
   onClose,
+  onDismiss,
   onAddAddress,
   onEditAddress,
   onDeleteAddress,
@@ -70,10 +72,11 @@ const AddressSelectionModal = ({
       visible={visible}
       transparent
       animationType="slide"
-      onRequestClose={onClose}>
+      onRequestClose={onClose}
+      onDismiss={onDismiss}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
             <View
               style={[
                 styles.modalContent,
@@ -340,8 +343,8 @@ const createStyles = (theme: AppTheme) => {
       paddingHorizontal: 12,
       alignItems: 'center',
       borderRadius: 10,
-      borderWidth: 1,
       borderStyle: 'dashed',
+      borderWidth: 1,
       borderColor: colors.border,
       marginBottom: 12,
     },
@@ -368,5 +371,4 @@ const createStyles = (theme: AppTheme) => {
   });
 };
 
-export default AddressSelectionModal;import { BRAND } from '../assets/svg/brand';
-import BrandIcon from './BrandIcon';
+export default AddressSelectionModal;

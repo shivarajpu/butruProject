@@ -14,6 +14,7 @@ import {
   Keyboard,
   useWindowDimensions,
   Share,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -116,6 +117,7 @@ const CartScreen = () => {
   const buyNowItem = useSelector((state: RootState) => state.cart.buyNowItem);
   const route = useRoute<any>();
   const isBuyNow = route.params?.mode === 'buyNow';
+  const PLATFORM_FEE = 2;
 
   // Buy Now checkout renders only the reserved item; bag/Add To Cart shows the full saved cart.
   const checkoutItems = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
@@ -150,6 +152,7 @@ const CartScreen = () => {
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [justSavedAddress, setJustSavedAddress] = useState<Address | null>(null);
+  const [pendingNextModal, setPendingNextModal] = useState<'add' | 'edit' | null>(null);
 
   const { profile, addresses, refresh } = useProfile();
 
@@ -197,21 +200,33 @@ const CartScreen = () => {
   };
 
   const handleOpenAddAddress = () => {
-    setEditingAddress(null);
+  setEditingAddress(null);
+  if (Platform.OS === 'ios') {
+    setPendingNextModal('add');
+    setIsAddressModalVisible(false); // Modal dismiss hone ke baad handleAddressModalDismiss trigger hoga
+  } else {
     setIsAddressModalVisible(false);
-    setTimeout(() => {
-      setIsAddAddressModalVisible(true);
-    }, 250);
-  };
+    setTimeout(() => setIsAddAddressModalVisible(true), 300);
+  }
+};
 
-  const handleEditAddress = (address: Address) => {
-    setEditingAddress(address);
+const handleEditAddress = (address: Address) => {
+  setEditingAddress(address);
+  if (Platform.OS === 'ios') {
+    setPendingNextModal('edit');
     setIsAddressModalVisible(false);
-    setTimeout(() => {
-      setIsAddAddressModalVisible(true);
-    }, 250);
-  };
+  } else {
+    setIsAddressModalVisible(false);
+    setTimeout(() => setIsAddAddressModalVisible(true), 300);
+  }
+};
 
+const handleAddressModalDismiss = () => {
+  if (pendingNextModal === 'add' || pendingNextModal === 'edit') {
+    setPendingNextModal(null);
+    setIsAddAddressModalVisible(true);
+  }
+};
   const handleDeleteAddress = (address: Address) => {
     if (!address._id) {
       return;
@@ -266,7 +281,6 @@ const CartScreen = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isPaymentSuccess, setIsPaymentSuccess] = useState(false);
   const [deliveryAddressInput, setDeliveryAddressInput] = useState('');
-
   useEffect(() => {
     if (selectedAddress) {
       setDeliveryAddressInput(addressToText(selectedAddress));
@@ -341,6 +355,7 @@ const CartScreen = () => {
           subtotal: subTotal,
           shippingCharges: 0,
           tax: 0,
+          platformFee: PLATFORM_FEE,
           discount: appliedCoupon,
           total: finalTotal,
         },
@@ -509,7 +524,11 @@ const CartScreen = () => {
   
   // Total Save = MRP Discount + Coupon Discount
   const totalSave = discountRs + appliedCoupon;
-  const finalTotal = Math.max(0, subTotal - appliedCoupon);
+
+const finalTotal = Math.max(
+  0,
+  subTotal - appliedCoupon
+) + PLATFORM_FEE;
 
   // A percentage coupon reports its own rate; a flat/capped one reports the
   // effective percentage the rupee discount represents against the subtotal.
@@ -627,6 +646,28 @@ const CartScreen = () => {
     }
   };
 
+  const renderAddressModals = (active: boolean) => (
+  <>
+    <AddressSelectionModal
+      visible={active && isAddressModalVisible}
+      addresses={addresses}
+      selectedAddressId={selectedAddressId}
+      onSelect={handleSelectAddress}
+      onClose={() => setIsAddressModalVisible(false)}
+      onDismiss={handleAddressModalDismiss}
+      onAddAddress={handleOpenAddAddress}
+      onEditAddress={handleEditAddress}
+      onDeleteAddress={handleDeleteAddress}
+    />
+    <AddAddressModal
+      visible={active && isAddAddressModalVisible}
+      editingAddress={editingAddress}
+      onClose={() => setIsAddAddressModalVisible(false)}
+      onSaved={handleAddressSaved}
+    />
+  </>
+);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <View style={styles.container}>
@@ -739,7 +780,7 @@ const CartScreen = () => {
           </View>
 
           {/* GST Number Card */}
-          <View style={styles.gstCard}>
+          {/* <View style={styles.gstCard}>
             <View style={styles.gstHeader}>
               <View style={styles.gstTitleRow}>
                 <SvgXml xml={INFO_ICON_SVG} width={16} height={16} />
@@ -805,7 +846,7 @@ const CartScreen = () => {
             )}
 
             {gstError.length > 0 && <Text style={styles.gstErrorText}>{gstError}</Text>}
-          </View>
+          </View> */}
 
           {/* Dynamic Price Summary */}
           <View style={styles.summaryContainer}>
@@ -848,6 +889,13 @@ const CartScreen = () => {
                 </TouchableOpacity>
               )}
             </View>
+
+            <View style={styles.summaryRow}>
+  <Text style={styles.summaryLabel}>Platform Fee :</Text>
+  <Text style={styles.summaryValueBold}>
+    Rs. {PLATFORM_FEE.toLocaleString('en-IN')}
+  </Text>
+</View>
 
             <View style={[styles.summaryRow, { marginTop: 12 }]}>
               <Text style={styles.totalLabel}>Total Payable :</Text>
@@ -898,24 +946,7 @@ const CartScreen = () => {
         />
 
         {/* Address Selection Modal */}
-        <AddressSelectionModal
-          visible={isAddressModalVisible}
-          addresses={addresses}
-          selectedAddressId={selectedAddressId}
-          onSelect={handleSelectAddress}
-          onClose={() => setIsAddressModalVisible(false)}
-          onAddAddress={handleOpenAddAddress}
-          onEditAddress={handleEditAddress}
-          onDeleteAddress={handleDeleteAddress}
-        />
-
-        {/* Add New Address Modal */}
-        <AddAddressModal
-          visible={isAddAddressModalVisible}
-          editingAddress={editingAddress}
-          onClose={() => setIsAddAddressModalVisible(false)}
-          onSaved={handleAddressSaved}
-        />
+       {renderAddressModals(!isPaymentModalVisible)}
 
         {/* Payment Modal */}
         <Modal
@@ -1107,6 +1138,7 @@ const CartScreen = () => {
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
+            {renderAddressModals(isPaymentModalVisible)}
         </Modal>
       </View>
     </SafeAreaView>
@@ -1230,7 +1262,7 @@ const createStyles = (theme: AppTheme) => {
   itemPrice: {
     fontSize: 15,
     fontWeight: '800',
-    color: colors.primary,
+    color: "#000000",
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -1436,7 +1468,7 @@ const createStyles = (theme: AppTheme) => {
   greenValueText: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.success,
+    color: "black",
   },
   applyCouponLinkText: {
     fontSize: 12,
@@ -1451,7 +1483,7 @@ const createStyles = (theme: AppTheme) => {
   totalValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.primary,
+    color: "black",
   },
   bottomBar: {
     position: 'absolute',
@@ -1476,17 +1508,17 @@ const createStyles = (theme: AppTheme) => {
   bottomTotalValue: {
     fontSize: 15,
     fontWeight: '800',
-    color: colors.primary,
+    color: "#0000",
   },
   bottomDiscountLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.success,
+    color: colors.textSecondary,
   },
   bottomDiscountValue: {
     fontSize: 13,
     fontWeight: '800',
-    color: colors.success,
+    color: "black",
   },
   paymentBtn: {
     backgroundColor: colors.primary,
@@ -1778,7 +1810,7 @@ const createStyles = (theme: AppTheme) => {
   amountBoxValue: {
     fontSize: 17,
     fontWeight: '800',
-    color: colors.primary,
+    color: "#00000",
   },
   paymentMethodsList: {
     gap: 10,

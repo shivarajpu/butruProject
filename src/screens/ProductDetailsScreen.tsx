@@ -525,7 +525,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   };
 
   const handleAddToCart = () => {
-    if (!productData) return;
+    if (!productData || productData.isOutOfStock) return;
     if (sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -546,7 +546,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   };
 
   const handleBuyNow = () => {
-    if (!productData) return;
+    if (!productData || productData.isOutOfStock) return;
     if (sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -693,6 +693,8 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     );
   }
 
+  const isOutOfStock = product.isOutOfStock === true;
+
   const handleShare = async () => {
     const code = product?.productCode || '';
     const path = code ? `${code}-${productId}` : productId;
@@ -752,11 +754,24 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Main Content */}
-          <Image
-            source={{ uri: selectedImg || thumbnails[0] }}
-            style={[styles.heroImage, { height: heroHeight }]}
-            resizeMode={mediaWidget?.config.zoomEnabled ? 'contain' : 'cover'}
-          />
+          <View>
+  <Image
+    source={{ uri: selectedImg || thumbnails[0] }}
+    style={[styles.heroImage, { height: heroHeight }]}
+    resizeMode={mediaWidget?.config.zoomEnabled ? 'contain' : 'cover'}
+    blurRadius={isOutOfStock ? 12 : 0}
+  />
+  {isOutOfStock && (
+    <View style={styles.oosOverlay} pointerEvents="none">
+      <View style={styles.oosBadge}>
+        <Text style={styles.oosBadgeText}>OUT OF STOCK</Text>
+      </View>
+      <Text style={styles.oosSoldOutText}>
+        This product is currently sold out
+      </Text>
+    </View>
+  )}
+</View>
 
           {thumbnails.length > 1 && (
             <ScrollView
@@ -884,21 +899,29 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
               )}
             </View>
             <Text style={styles.taxText}>MRP inclusive of all taxes</Text>
+            {isOutOfStock && (
+  <Text style={styles.oosInlineText}>This product is currently out of stock</Text>
+)}
+           <View style={styles.actionBtnRow}>
+  <TouchableOpacity
+    style={[styles.buyNowBtn, isOutOfStock && styles.buyNowBtnDisabled]}
+    activeOpacity={0.8}
+    disabled={isOutOfStock}
+    onPress={handleBuyNow}>
+    <Text style={[styles.buyNowBtnText, isOutOfStock && styles.btnTextDisabled]}>
+      Buy Now
+    </Text>
+  </TouchableOpacity>
 
-            <View style={styles.actionBtnRow}>
-              <TouchableOpacity
-                style={styles.buyNowBtn}
-                activeOpacity={0.8}
-                onPress={handleBuyNow}>
-                <Text style={styles.buyNowBtnText}>Buy Now</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.addCartBtn} activeOpacity={0.8}
-                onPress={handleAddToCart}>
-                <BrandIcon icon={BRAND.cart} width={14} height={14} />
-                <Text style={styles.addCartBtnText}>Add To Cart</Text>
-              </TouchableOpacity>
-            </View>
+  <TouchableOpacity
+    style={[styles.addCartBtn, isOutOfStock && styles.addCartBtnDisabled]}
+    activeOpacity={0.8}
+    disabled={isOutOfStock}
+    onPress={handleAddToCart}>
+    <BrandIcon icon={BRAND.cart} width={14} height={14} />
+    <Text style={styles.addCartBtnText}>Add To Cart</Text>
+  </TouchableOpacity>
+</View>
           </View>
 
           {/* Delivery Card */}
@@ -2110,6 +2133,73 @@ const createStyles = (theme: AppTheme) => {
     borderRadius: 10,
     backgroundColor: colors.surfaceVariant,
   },
+  /* Out of stock */
+oosDim: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(255,255,255,0.45)',
+},
+
+
+oosInlineText: {
+  color: '#D32F2F',
+  fontSize: 12,
+  fontWeight: '700',
+  marginTop: 8,
+},
+buyNowBtnDisabled: {
+  borderColor: '#BDBDBD',
+  backgroundColor: '#F5F5F5',
+},
+addCartBtnDisabled: {
+  backgroundColor: '#BDBDBD',
+},
+btnTextDisabled: {
+  color: '#9E9E9E',
+},
+oosBadgeSubText:{
+  color: '#FFFFFF',
+  fontSize: 11,
+  fontWeight: '600',
+  marginTop: 2,
+},
+/* Out of stock */
+oosOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: 'rgba(255,255,255,0.35)',
+},
+oosBadge: {
+  backgroundColor: '#D32F2F',
+  borderRadius: 20,
+  paddingHorizontal: 22,
+  paddingVertical: 8,
+},
+oosBadgeText: {
+  color: '#FFFFFF',
+  fontSize: 15,
+  fontWeight: '800',
+  letterSpacing: 1,
+},
+oosSoldOutText: {
+  marginTop: 10,
+  color: '#D32F2F',
+  fontSize: 13,
+  fontWeight: '700',
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+  borderRadius: 12,
+  overflow: 'hidden',
+},
   });
 };
 

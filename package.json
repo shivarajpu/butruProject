@@ -18,7 +18,9 @@
     "lint": "eslint .",
     "test": "jest",
     "pretest": "node scripts/sync-clients.js --quiet",
-    "tsc": "tsc --noEmit"
+    "tsc": "tsc --noEmit",
+    "postinstall": "patch-package"
+
   },
   "dependencies": {
     "@notifee/react-native": "^9.1.8",
