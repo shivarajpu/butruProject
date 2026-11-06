@@ -1348,7 +1348,21 @@ const HomeTab = () => {
             </View>
           ))}
 
+          {!searchActive && activeCategory === 'Home' && (
+  <Text 
+    style={{
+      textAlign: 'center', 
+      marginTop: 20, 
+      fontSize: 15, 
+      fontFamily: FONTS.poppinsRegular, 
+      color: "#655c5c"
+    }}>
+    Powered by mobileshop
+  </Text>
+)}
+
         <View style={{ height: 100 + insets.bottom }} />
+
       </ScrollView>
 
       <AddressSelectionModal

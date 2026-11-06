@@ -148,6 +148,23 @@ export const hasNotificationPermission = async (): Promise<boolean> => {
   }
 };
 
+// ── user preference ────────────────────────────────────────────────────────
+
+const PUSH_PREFERENCE_KEY = '@butru/push-enabled';
+
+/**
+ * Whether the user has push notifications turned on in account settings.
+ * Defaults to on, so a fresh install behaves as before.
+ */
+export const isPushNotificationsEnabled = async (): Promise<boolean> => {
+  try {
+    const raw = await AsyncStorage.getItem(PUSH_PREFERENCE_KEY);
+    return raw !== 'false';
+  } catch {
+    return true;
+  }
+};
+
 // ── messaging instance ─────────────────────────────────────────────────────
 
 /**
@@ -451,6 +468,10 @@ export const handleForegroundMessage = async (
   message: RemoteMessage | undefined,
 ): Promise<void> => {
   console.log('[push] foreground message received', JSON.stringify(message?.data ?? {}));
+  if (!(await isPushNotificationsEnabled())) {
+    console.log('[push] ignoring foreground message — notifications turned off');
+    return;
+  }
   const notification = buildNotification(message);
   if (!notification) {
     console.warn('[push] foreground message produced no notification');
@@ -474,6 +495,10 @@ export const handleBackgroundMessage = async (
   message: RemoteMessage | undefined,
 ): Promise<void> => {
   console.log('[push] background message received', JSON.stringify(message?.data ?? {}));
+  if (!(await isPushNotificationsEnabled())) {
+    console.log('[push] ignoring background message — notifications turned off');
+    return;
+  }
   // On Android, a message that carries an FCM `notification` block is
   // displayed by the Firebase SDK itself while the app is in the background —
   // displaying it again here would put two copies in the tray. iOS never
@@ -961,6 +986,10 @@ let pushGeneration = 0;
  */
 export const initPushNotifications = async (): Promise<void> => {
   if (initialised) return;
+  if (!(await isPushNotificationsEnabled())) {
+    console.log('[push] notifications are turned off in settings — skipping init');
+    return;
+  }
   initialised = true;
   const generation = pushGeneration;
   const isStale = () => generation !== pushGeneration;
@@ -1082,6 +1111,40 @@ export const disablePushNotifications = async (): Promise<void> => {
     await notifee.cancelAllNotifications();
   } catch (error) {
     console.warn('[push] could not clear displayed notifications', error);
+  }
+};
+
+/**
+ * Turns push on or off from the account-settings toggle.
+ *
+ * Disabling has to do more than flip local state: the backend keeps targeting
+ * the device token until it is unregistered, and the Firebase token has to be
+ * deleted so a push already in flight cannot reach this device. Enabling
+ * re-checks the OS permission before re-registering, and returns `false` when
+ * the user has blocked notifications at the system level.
+ */
+export const setPushNotificationsEnabled = async (
+  enabled: boolean,
+): Promise<boolean> => {
+  try {
+    if (!enabled) {
+      await AsyncStorage.setItem(PUSH_PREFERENCE_KEY, 'false');
+      await disablePushNotifications();
+      return true;
+    }
+
+    const allowed =
+      (await hasNotificationPermission()) || (await requestNotificationPermission());
+    if (!allowed) {
+      return false;
+    }
+
+    await AsyncStorage.setItem(PUSH_PREFERENCE_KEY, 'true');
+    await initPushNotifications();
+    return true;
+  } catch (error) {
+    console.warn('[push] could not update the notification preference', error);
+    return false;
   }
 };
 

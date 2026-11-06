@@ -6,6 +6,26 @@ import FirebaseCore
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+  private func configureFirebaseIfAvailable() {
+    guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") else {
+      NSLog("[Firebase] GoogleService-Info.plist not found, skipping FirebaseApp.configure()")
+      return
+    }
+    guard let options = NSDictionary(contentsOfFile: path) else {
+      NSLog("[Firebase] GoogleService-Info.plist could not be parsed, skipping FirebaseApp.configure()")
+      return
+    }
+    if let bundleId = options["BUNDLE_ID"] as? String, bundleId == "com.example.placeholder" {
+      NSLog("[Firebase] placeholder GoogleService-Info.plist detected, skipping FirebaseApp.configure()")
+      return
+    }
+    if let projectId = options["PROJECT_ID"] as? String, projectId == "placeholder-not-configured" {
+      NSLog("[Firebase] placeholder GoogleService-Info.plist detected, skipping FirebaseApp.configure()")
+      return
+    }
+    FirebaseApp.configure()
+  }
+
   var window: UIWindow?
 
   var reactNativeDelegate: ReactNativeDelegate?
@@ -15,7 +35,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    FirebaseApp.configure()
+    configureFirebaseIfAvailable()
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

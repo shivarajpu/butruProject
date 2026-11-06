@@ -11,17 +11,14 @@ import {
   Platform,
   KeyboardAvoidingView,
   Alert,
+  AppState,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import {
-  secureIcon,
-  supporIcon,
-  rewardIcon,
-  loginPagaImage,
-} from '../assets/svg';
+import { loginPagaImage } from '../assets/svg';
 import { editPencilIcon, lockGreenIcon } from '../assets/svg/authIcons';
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
@@ -35,11 +32,18 @@ type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 45;
 const VERIFY_OTP_ENDPOINT = '/api/auth/otp/email/verify';
+const SEND_EMAIL_OTP_ENDPOINT = '/api/auth/otp/email/send';
+const SEND_PHONE_OTP_ENDPOINT = '/api/auth/otp/send';
 
 interface OtpVerifyResponse {
   success: boolean;
   message?: string;
   token?: string;
+}
+
+interface OtpSendResponse {
+  success: boolean;
+  message?: string;
 }
 
 const OtpVarify = ({ navigation, route }: Props) => {
@@ -85,22 +89,95 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const [otp, setOtp]           = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [timer, setTimer]       = useState(RESEND_SECONDS);
   const [canResend, setCanResend] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showSignupSuccess, setShowSignupSuccess] = useState(false);
   const inputRefs = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null));
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Countdown
+  const isSignupFlow = Boolean(route?.params?.isSignup);
+
+  // Absolute timestamp (ms) when resend becomes available. Using a deadline
+  // instead of decrementing a counter keeps the countdown accurate even while
+  // the app is backgrounded or the JS timers are throttled by the OS.
+  const resendDeadlineRef = useRef<number>(Date.now() + RESEND_SECONDS * 1000);
+
+  // Cleanup the auto-dismiss timer if the screen unmounts first.
+  useEffect(
+    () => () => {
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    },
+    [],
+  );
+
+  // Countdown — always derived from the deadline so backgrounding the app
+  // (even for hours) never freezes or rewinds the timer.
   useEffect(() => {
-    if (timer <= 0) { setCanResend(true); return; }
-    const id = setInterval(() => setTimer(p => p - 1), 1000);
-    return () => clearInterval(id);
-  }, [timer]);
+    const syncTimer = () => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((resendDeadlineRef.current - Date.now()) / 1000),
+      );
+      setTimer(prev => (prev === remaining ? prev : remaining));
+      const ready = remaining <= 0;
+      setCanResend(prev => (prev === ready ? prev : ready));
+    };
+
+    syncTimer();
+    const id = setInterval(syncTimer, 500);
+
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') syncTimer();
+    });
+
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
+  }, []);
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
-  const handleResend = () => {
-    if (!canResend) return;
-    setOtp(Array(OTP_LENGTH).fill(''));
-    setTimer(RESEND_SECONDS);
-    setCanResend(false);
-    setTimeout(() => inputRefs.current[0]?.focus(), 50);
+  const handleResend = async () => {
+    if (!canResend || isResending) return;
+
+    const isEmailFlow = Boolean(route?.params?.email);
+    const endpoint = isEmailFlow ? SEND_EMAIL_OTP_ENDPOINT : SEND_PHONE_OTP_ENDPOINT;
+    const payload = isEmailFlow
+      ? { email: emailAddress }
+      : { phone: emailAddress };
+
+    setIsResending(true);
+    try {
+      const response = await apiService.post<OtpSendResponse>(
+        endpoint,
+        payload,
+        registerToken,
+      );
+
+      if (!response.success) {
+        Alert.alert(
+          'Unable to Resend OTP',
+          response.message || 'Something went wrong. Please try again.',
+        );
+        return;
+      }
+
+      setOtp(Array(OTP_LENGTH).fill(''));
+      resendDeadlineRef.current = Date.now() + RESEND_SECONDS * 1000;
+      setTimer(RESEND_SECONDS);
+      setCanResend(false);
+      setTimeout(() => inputRefs.current[0]?.focus(), 50);
+      Alert.alert('OTP Sent', `A new code has been sent to ${emailAddress}.`);
+    } catch (error) {
+      Alert.alert(
+        'Unable to Resend OTP',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const handleOtpChange = (value: string, idx: number) => {
@@ -128,7 +205,9 @@ const OtpVarify = ({ navigation, route }: Props) => {
       Alert.alert('Incomplete OTP', 'Please enter the complete 6-digit code.');
       return;
     }
+    if (isVerifying || showSignupSuccess) return;
 
+    setIsVerifying(true);
     try {
       const response = await apiService.post<OtpVerifyResponse>(
         VERIFY_OTP_ENDPOINT,
@@ -152,12 +231,25 @@ const OtpVarify = ({ navigation, route }: Props) => {
           token: response.token || registerToken,
         }),
       );
-      navigation.replace('Home');
+
+      if (isSignupFlow) {
+        // New sign-ups get a friendly confirmation that dismisses itself
+        // before we land on Home.
+        setShowSignupSuccess(true);
+        successTimeoutRef.current = setTimeout(() => {
+          setShowSignupSuccess(false);
+          navigation.replace('Home');
+        }, 2200);
+      } else {
+        navigation.replace('Home');
+      }
     } catch (error) {
       Alert.alert(
         'Verification Failed',
         error instanceof Error ? error.message : 'Something went wrong. Please try again.',
       );
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -274,7 +366,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
           <View style={[styles.resendRow, { marginTop: vs(12), marginBottom: vs(22) }]}>
             <TouchableOpacity
               onPress={handleResend}
-              disabled={!canResend}
+              disabled={!canResend || isResending}
               activeOpacity={0.7}
             >
               <Text style={[styles.resendLeft, { fontSize: scale(12) }, !canResend && styles.resendLeftDisabled]}>
@@ -285,8 +377,14 @@ const OtpVarify = ({ navigation, route }: Props) => {
              
 
             {canResend ? (
-              <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
-                <Text style={[styles.resendBtn, { fontSize: scale(12.5) }]}>Resend</Text>
+              <TouchableOpacity
+                onPress={handleResend}
+                disabled={isResending}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.resendBtn, { fontSize: scale(12.5) }]}>
+                  {isResending ? 'Sending…' : 'Resend'}
+                </Text>
               </TouchableOpacity>
             ) : (
               <Text style={[styles.timerLabel, { fontSize: scale(12) }]}>
@@ -313,10 +411,11 @@ const OtpVarify = ({ navigation, route }: Props) => {
               },
             ]}
             onPress={handleVerify}
+            disabled={isVerifying || showSignupSuccess}
             activeOpacity={0.85}
           >
             <Text style={[styles.verifyBtnText, { fontSize: scale(16) }]}>
-              Verify &amp; Continue
+              {isVerifying ? 'Verifying…' : 'Verify & Continue'}
             </Text>
           </TouchableOpacity>
 
@@ -358,6 +457,29 @@ const OtpVarify = ({ navigation, route }: Props) => {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── SIGN-UP SUCCESS (auto-dismiss) ── */}
+      <Modal
+        visible={showSignupSuccess}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {}}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successCard}>
+            <View style={styles.successBadge}>
+              <Text style={styles.successBadgeText}>✓</Text>
+            </View>
+            <Text style={[styles.successTitle, { fontSize: scale(19) }]}>
+              Sign-up successful!
+            </Text>
+            <Text style={[styles.successMessage, { fontSize: scale(13.5) }]}>
+              Your account is ready. Taking you home…
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -501,6 +623,56 @@ const createStyles = (theme: AppTheme) => {
     color:       colors.textMuted,
     fontWeight:  'bold',
     letterSpacing: 0.5,
+  },
+
+  // Sign-up success overlay
+  successOverlay: {
+    flex:            1,
+    backgroundColor: colors.overlay,
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingHorizontal: 24,
+  },
+  successCard: {
+    width:           '100%',
+    maxWidth:        320,
+    backgroundColor: colors.surface,
+    borderRadius:    20,
+    paddingVertical: 26,
+    paddingHorizontal: 22,
+    alignItems:      'center',
+    shadowColor:     colors.text,
+    shadowOpacity:   0.15,
+    shadowRadius:    12,
+    shadowOffset:    { width: 0, height: 6 },
+    elevation:       6,
+  },
+  successBadge: {
+    width:           64,
+    height:          64,
+    borderRadius:    32,
+    backgroundColor: colors.success,
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginBottom:    16,
+  },
+  successBadgeText: {
+    color:      colors.textOnPrimary,
+    fontSize:   32,
+    fontWeight: 'bold',
+    lineHeight: 36,
+  },
+  successTitle: {
+    color:      colors.text,
+    fontWeight: '800',
+    fontFamily: fontFamily.heading,
+    textAlign:  'center',
+  },
+  successMessage: {
+    color:     colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 19,
   },
   });
 };

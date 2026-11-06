@@ -6,7 +6,9 @@ export type RootStackParamList = {
   Splash: undefined;
   Login: undefined;
   Otp: undefined;
-  OtpVarify: { phoneNumber?: string; email?: string; token?: string } | undefined;
+  OtpVarify:
+    | { phoneNumber?: string; email?: string; token?: string; isSignup?: boolean }
+    | undefined;
   SignUp: undefined;
   ForgotPassword: undefined;
   Home: NavigatorScreenParams<TabParamList> | undefined;

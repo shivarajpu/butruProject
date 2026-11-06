@@ -49,6 +49,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const http = require('http');
+const crypto = require('crypto');
 const { spawn, spawnSync } = require('child_process');
 const { loadRegistry, resolveClient, metroPort, ROOT } = require('./lib/clientRegistry');
 
@@ -164,11 +165,17 @@ function metroMarkerPath(port) {
   return path.join(os.tmpdir(), `metro-client-${port}.json`);
 }
 
-function writeMetroMarker(port, clientId) {
+function writeMetroMarker(port, clientId, envHash) {
   try {
     fs.writeFileSync(
       metroMarkerPath(port),
-      JSON.stringify({ client: clientId, port, pid: process.pid, at: Date.now() }),
+      JSON.stringify({
+        client: clientId,
+        envHash: envHash || null,
+        port,
+        pid: process.pid,
+        at: Date.now(),
+      }),
       'utf8',
     );
   } catch {
@@ -176,11 +183,22 @@ function writeMetroMarker(port, clientId) {
   }
 }
 
-/** The client id recorded for a port, or null when unknown/stale. */
+/** Hash of a client's generated env file. Null when it cannot be read. */
+function envFileHash(envFile) {
+  if (!envFile) return null;
+  try {
+    const contents = fs.readFileSync(path.resolve(ROOT, envFile));
+    return crypto.createHash('sha1').update(contents).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
+/** The marker recorded for a port, or null when unknown/stale. */
 function readMetroMarker(port) {
   try {
     const parsed = JSON.parse(fs.readFileSync(metroMarkerPath(port), 'utf8'));
-    return parsed && typeof parsed.client === 'string' ? parsed.client : null;
+    return parsed && typeof parsed.client === 'string' ? parsed : null;
   } catch {
     return null;
   }
@@ -219,12 +237,16 @@ function pidsOnPort(port) {
  * Killing is restricted to a server we can attribute to a *different* client,
  * or to one we own but can no longer confirm is healthy.
  */
-async function freePortFor(port, clientId) {
-  const owner = readMetroMarker(port);
+async function freePortFor(port, clientId, force = false) {
+  const marker = readMetroMarker(port);
+  const owner = marker?.client;
   const ours = owner === clientId;
 
-  // Ours and healthy: leave it alone, the caller reuses it.
-  if (ours && (await metroReady(port))) return;
+  // Ours and healthy: leave it alone, the caller reuses it. `force` is set when
+  // the env file changed under an otherwise-correct Metro — it is inlined at
+  // bundle time, so that server must be restarted or the app keeps calling the
+  // previous API URL.
+  if (!force && ours && (await metroReady(port))) return;
 
   const listening = pidsOnPort(port);
   if (listening.length === 0) {
@@ -310,9 +332,26 @@ function firstLine(text) {
  * client's port is ever touched.
  */
 async function ensureMetro(clientEnv, port, label) {
-  if (await metroReady(port) && readMetroMarker(port) === label) {
-    console.log(`  metro ${port} already serving "${label}" — reusing it`);
-    return;
+  const envFile = clientEnv.CLIENT_ENV_FILE;
+  const hash = envFileHash(envFile);
+  const marker = readMetroMarker(port);
+
+  // The env file is inlined by Babel at bundle time, so a Metro bound to an
+  // older copy of it keeps serving the old API/base URL — even though the file
+  // on disk is correct. When the hash differs the server is not merely stale,
+  // it is wrong, and the transform cache has to go with it.
+  let needReset = !marker || marker.client !== label || marker.envHash !== hash;
+
+  if (await metroReady(port) && marker?.client === label) {
+    if (hash && marker?.envHash !== hash) {
+      console.log(
+        `  metro ${port} is serving "${label}" but ${envFile} changed — restarting to pick up the new API/base URL`,
+      );
+      await freePortFor(port, label, true);
+    } else {
+      console.log(`  metro ${port} already serving "${label}" — reusing it`);
+      return;
+    }
   }
 
   // Reclaims the port when another client owns it, and throws when something
@@ -321,13 +360,16 @@ async function ensureMetro(clientEnv, port, label) {
 
   console.log(`  metro ${port} not running — starting one for "${label}"`);
 
+  const startArgs = [RN, 'start', '--port', String(port)];
+  if (needReset) startArgs.push('--reset-cache');
+
   const child = spawn(
     process.execPath,
-    [RN, 'start', '--port', String(port)],
+    startArgs,
     { cwd: ROOT, env: clientEnv, detached: true, stdio: 'ignore' },
   );
   child.unref();
-  writeMetroMarker(port, label);
+  writeMetroMarker(port, label, hash);
 
   const deadline = Date.now() + 90_000;
   while (Date.now() < deadline) {
@@ -760,7 +802,11 @@ async function main() {
       // `npm run android` has already auto-started one, so this is the normal
       // path, not an edge case: attach when it is ours, reclaim it when it is
       // another client's, and only then start fresh.
-      if ((await metroReady(port)) && readMetroMarker(port) === resolved.id) {
+      const hash = envFileHash(envFile);
+      const marker = readMetroMarker(port);
+      const running = await metroReady(port);
+
+      if (running && marker?.client === resolved.id && marker?.envHash === hash) {
         await reportDevices(port, resolved, registry);
         console.log(
           `\n  metro ${port} is already running for "${resolved.id}" — attached to it.\n` +
@@ -770,18 +816,31 @@ async function main() {
         process.exit(0);
       }
 
-      await freePortFor(port, resolved.id);
+      const needReset = !marker || marker.client !== resolved.id || marker.envHash !== hash;
+
+      if (running && marker?.client === resolved.id) {
+        console.log(
+          `  metro ${port} is running for "${resolved.id}" but ${envFile} changed — restarting to pick up the new API/base URL`,
+        );
+      }
+
+      await freePortFor(port, resolved.id, running && marker?.client === resolved.id);
 
       // Supervised rather than a blocking exec: we need to keep running after
       // Metro boots so the device report can be printed.
+      const startArgs = [RN, 'start', '--port', String(port), ...passthrough];
+      if (needReset && !startArgs.includes('--reset-cache')) {
+        startArgs.push('--reset-cache');
+      }
+
       const child = spawn(
         process.execPath,
-        [RN, 'start', '--port', String(port), ...passthrough],
+        startArgs,
         { cwd: ROOT, stdio: 'inherit', env: childEnv },
       );
       child.on('exit', code => process.exit(code === null ? 1 : code));
 
-      writeMetroMarker(port, resolved.id);
+      writeMetroMarker(port, resolved.id, hash);
 
       const deadline = Date.now() + 90_000;
       while (Date.now() < deadline) {

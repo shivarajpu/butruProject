@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -36,7 +36,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
 import { addItem as addCartItem, setBuyNowItem } from '../store/slices/cartSlice';
-import type { AppDispatch } from '../store';
+import type { AppDispatch, RootState } from '../store';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import { publishWishlistChange } from '../hooks/useWishlist';
 import AddressSelectionModal from '../components/AddressSelectionModal';
@@ -306,6 +306,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   // Server-driven switches: size / colour pickers, COD, delivery window.
   const features = useSelector(selectFeatures);
+  const cartItems = useSelector((state: RootState) => state.cart.items);
   const storeConfig = useStoreConfig();
 
   /** Product-page widgets, resolved so a section can be rendered or skipped. */
@@ -415,6 +416,21 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
 
   const [selectedImg, setSelectedImg] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+  const [justAdded, setJustAdded] = useState(false);
+  const addedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    },
+    [],
+  );
+
+  // Whether this product is already in the bag. Size changes do not switch the
+  // button back to "Add To Cart" — once a product is in the bag, this stays a
+  // shortcut to the cart.
+  const isInCart =
+    Boolean(productData) && cartItems.some(item => item.productId === productData?.id);
 
   /** Shape the out-of-stock widgets read. */
   const oosProductContext = product
@@ -525,7 +541,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   };
 
   const handleAddToCart = () => {
-    if (!productData || productData.isOutOfStock) return;
+    if (!productData || productData.isOutOfStock || justAdded) return;
+    // Already in the bag — the button acts as "Go to Cart".
+    if (isInCart) {
+      Navigation.navigate('CartScreen' as never);
+      return;
+    }
     if (sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
@@ -542,7 +563,11 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         productCode: (productData as { productCode?: string }).productCode || '',
       }),
     );
-    Navigation.navigate('CartScreen' as never);
+
+    // Brief green "Added" confirmation, then the button settles on "Go to Cart".
+    setJustAdded(true);
+    if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    addedTimerRef.current = setTimeout(() => setJustAdded(false), 1500);
   };
 
   const handleBuyNow = () => {
@@ -914,12 +939,18 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   </TouchableOpacity>
 
   <TouchableOpacity
-    style={[styles.addCartBtn, isOutOfStock && styles.addCartBtnDisabled]}
+    style={[
+      styles.addCartBtn,
+      justAdded && styles.addCartBtnAdded,
+      isOutOfStock && styles.addCartBtnDisabled,
+    ]}
     activeOpacity={0.8}
     disabled={isOutOfStock}
     onPress={handleAddToCart}>
     <BrandIcon icon={BRAND.cart} width={14} height={14} />
-    <Text style={styles.addCartBtnText}>Add To Cart</Text>
+    <Text style={styles.addCartBtnText}>
+      {justAdded ? 'Added' : isInCart ? 'Go to Cart' : 'Add To Cart'}
+    </Text>
   </TouchableOpacity>
 </View>
           </View>
@@ -1472,6 +1503,9 @@ const createStyles = (theme: AppTheme) => {
     justifyContent: 'center',
     gap: 8,
   },
+  addCartBtnAdded: {
+    backgroundColor: colors.success,
+  },
   addCartBtnText: {
     fontSize: 14,
     fontWeight: '700',
@@ -1599,8 +1633,10 @@ const createStyles = (theme: AppTheme) => {
   },
   loveScriptText: {
     fontSize: 12,
+        fontWeight: '600',
+
     color: colors.primary,
-    fontStyle: 'italic',
+    fontStyle: "normal",
   },
   loveBrandText: {
     fontSize: 18,

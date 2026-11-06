@@ -176,6 +176,7 @@ const SignUpScreen = ({ navigation }: Props) => {
       navigation.navigate('OtpVarify', {
         email: `${email.trim()}`,
         token: response.token,
+        isSignup: true,
       });
     } catch (error) {
       const message =

@@ -110,7 +110,7 @@ if (clientsActiveFile.exists()) {
     // default client. Run `npm run clients:sync` to build anything else.
     clientsActive = [
         id           : "butru",
-        baseUrl      : "https://api.butru.in",
+        baseUrl      : "https://parenting-funda.shopmobi.in/api-proxy",
         displayName  : "Butru",
         applicationId: "com.butruproject",
         bundleId     : "com.butruproject",

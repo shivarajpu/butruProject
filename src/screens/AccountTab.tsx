@@ -13,6 +13,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
@@ -26,7 +27,11 @@ import AppIconButton from '../components/AppIconButton';
 import { useDispatch } from 'react-redux';
 import { logout } from '../store/slices/authSlice';
 import { apiService } from '../api/apiService';
-import { disablePushNotifications } from '../services/push';
+import {
+  disablePushNotifications,
+  isPushNotificationsEnabled,
+  setPushNotificationsEnabled,
+} from '../services/push';
 import { useProfile, type Address, type ProfileData, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
@@ -73,6 +78,20 @@ const AccountTab = () => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  // Reflect the saved preference (the server token was already released when
+  // the user turned this off, so the switch must not reset to "on").
+  useEffect(() => {
+    let mounted = true;
+    isPushNotificationsEnabled()
+      .then(enabled => {
+        if (mounted) setNotificationsEnabled(enabled);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Address modals state
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
@@ -296,6 +315,25 @@ const AccountTab = () => {
     refresh();
   };
 
+  const handleNotificationsToggle = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    const applied = await setPushNotificationsEnabled(value);
+
+    if (value && !applied) {
+      // The OS has notifications blocked for this app, so re-registering the
+      // device would silently keep failing. Point the user at device settings.
+      setNotificationsEnabled(false);
+      Alert.alert(
+        'Notifications blocked',
+        'Allow notifications for this app in your device settings, then turn this on again.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+  };
+
   const handleLogout = async () => {
     setLogoutStatus('loading');
 
@@ -482,7 +520,7 @@ const AccountTab = () => {
             </View>
             <Switch
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={handleNotificationsToggle}
               trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
               thumbColor={theme.colors.textOnPrimary}
             />

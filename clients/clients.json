@@ -20,7 +20,7 @@
         "storeSlug": "butru-store",
         "storeDomain": "butru.in",
         "storeId": "6a20248bf77d663ca797ce90",
-        "baseUrl": "https://api.butru.in"
+        "baseUrl": "https://parenting-funda.shopmobi.in/api-proxy"
       },
       "payments": {
         "razorpayKeyId": "rzp_test_TqxMYmlk1zxzU4"
@@ -73,7 +73,7 @@
           "storeSlug": "butru-store",
           "storeDomain": "butru.in",
           "storeId": "6ac4a42b2128c79004b23610",
-          "baseUrl": "https://api.butru.in"
+          "baseUrl": "https://parenting-funda.shopmobi.in/api-proxy"
         },
       "support": {
         "phone": "9000000000",

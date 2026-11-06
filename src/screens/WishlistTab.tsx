@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { FONTS } from '../constants/fonts';
 import {
   View,
@@ -35,8 +35,18 @@ import { BRAND } from '../assets/svg/brand';
 import { SvgXml } from 'react-native-svg';
 import { heartFilledSvg } from '../assets/svg';
 import BrandIcon from '../components/BrandIcon';
+import { useDispatch } from 'react-redux';
+import { addItem as addCartItem } from '../store/slices/cartSlice';
+import type { AppDispatch } from '../store';
 
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
+const PRODUCT_ENDPOINT = '/api/storefront/products';
+
+interface WishlistSku {
+  size?: string;
+  sellingPrice?: number;
+  mrp?: number;
+}
 
 interface WishlistProduct {
   _id: string;
@@ -49,6 +59,16 @@ interface WishlistProduct {
   price?: number;
   totalInventory?: number;
   id: string;
+  skus?: WishlistSku[];
+}
+
+interface ProductDetailForSizes {
+  skus?: WishlistSku[];
+}
+
+interface ProductDetailForSizesResponse {
+  success: boolean;
+  data?: ProductDetailForSizes;
 }
 
 interface WishlistItem {
@@ -78,19 +98,30 @@ interface WishlistCardItem {
   image: string;
   sizes: string[];
   tag?: string;
+  productCode?: string;
+  isOutOfStock?: boolean;
 }
 
 const mapWishlistItem = (item: WishlistItem): WishlistCardItem => {
   const product = item.product ?? ({} as WishlistProduct);
   const price = product.price ?? 0;
+  const sizes = [
+    ...new Set(
+      (product.skus ?? [])
+        .map(sku => sku.size)
+        .filter((size): size is string => Boolean(size)),
+    ),
+  ];
 
   return {
-    id: product.id ?? item.productId,
+    id: product.id ?? product._id ?? item.productId,
     name: product.name ?? 'Product',
     price,
     originalPrice: price,
     image: product.images?.[0] ?? '',
-    sizes: [],
+    sizes,
+    productCode: product.productCode,
+    isOutOfStock: product.isOutOfStock,
   };
 };
 
@@ -100,15 +131,27 @@ const WishlistScreen = () => {
   const { width } = useWindowDimensions();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<TabParamList, 'WishlistTab'>>();
+  const dispatch = useDispatch<AppDispatch>();
   const { addresses, refresh } = useProfile();
 
   const [items, setItems] = useState<WishlistCardItem[]>([]);
+  const [addedId, setAddedId] = useState<string | null>(null);
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  const [sizeErrors, setSizeErrors] = useState<Record<string, boolean>>({});
+  const addedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  useEffect(
+    () => () => {
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!selectedAddressId && addresses.length) {
@@ -203,7 +246,36 @@ const WishlistScreen = () => {
         return;
       }
 
-      setItems((response.data?.items ?? []).map(mapWishlistItem));
+      const rawItems = response.data?.items ?? [];
+      const mapped = rawItems.map(mapWishlistItem);
+
+      // The wishlist payload does not always carry SKUs, so pull the product
+      // detail for cards without sizes to expose a size picker like the
+      // home/product screens.
+      const withSizes = await Promise.all(
+        mapped.map(async (card, index) => {
+          if (card.sizes.length > 0) return card;
+          const productId = card.id || rawItems[index]?.productId;
+          if (!productId) return card;
+          try {
+            const detail = await apiService.get<ProductDetailForSizesResponse>(
+              `${PRODUCT_ENDPOINT}/${productId}`,
+            );
+            const sizes = [
+              ...new Set(
+                (detail.data?.skus ?? [])
+                  .map(sku => sku.size)
+                  .filter((size): size is string => Boolean(size)),
+              ),
+            ];
+            return sizes.length > 0 ? { ...card, sizes } : card;
+          } catch {
+            return card;
+          }
+        }),
+      );
+
+      setItems(withSizes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -233,8 +305,44 @@ const WishlistScreen = () => {
     }
   };
 
-  const handleAddToCart = (product: WishlistCardItem) => {
+  const goToProduct = (product: WishlistCardItem) => {
     navigation.navigate('ProductDetails', { product });
+  };
+
+  const handleSelectSize = (productId: string, size: string) => {
+    setSelectedSizes(prev => ({ ...prev, [productId]: size }));
+    setSizeErrors(prev => {
+      if (!prev[productId]) return prev;
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  };
+
+  const handleAddToCart = (product: WishlistCardItem) => {
+    if (product.isOutOfStock) return;
+    const size = selectedSizes[product.id] ?? '';
+    if (product.sizes.length > 0 && !size) {
+      setSizeErrors(prev => ({ ...prev, [product.id]: true }));
+      return;
+    }
+    dispatch(
+      addCartItem({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice ?? product.price,
+        image: product.image,
+        size,
+        color: '',
+        productCode: product.productCode,
+      }),
+    );
+
+    // Show a green "Added" on this card for a moment, then offer it again.
+    setAddedId(product.id);
+    if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    addedTimerRef.current = setTimeout(() => setAddedId(null), 1500);
   };
 
   return (
@@ -304,6 +412,7 @@ const WishlistScreen = () => {
               const imgH = cardW * 1.05;
               const hasOriginalPrice =
                 item.originalPrice != null && item.originalPrice > item.price;
+              const isAdded = addedId === item.id;
 
               return (
                 <AppCard
@@ -316,7 +425,7 @@ const WishlistScreen = () => {
                   <TouchableOpacity
                     style={{ position: 'relative', zIndex: 1 }}
                     activeOpacity={0.8}
-                    onPress={() => handleAddToCart(item)}>
+                    onPress={() => goToProduct(item)}>
                     <Image
                       source={{ uri: item.image }}
                       style={{ width: '100%', height: imgH, borderRadius: 10 }}
@@ -337,8 +446,8 @@ const WishlistScreen = () => {
                     <SvgXml xml={heartFilledSvg(theme.colors.primary)} width={16} height={16} />
                   </TouchableOpacity>
 
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => handleAddToCart(item)}>
-                    <View style={styles.cardDetails}>
+                  <View style={styles.cardDetails}>
+                    <TouchableOpacity activeOpacity={0.8} onPress={() => goToProduct(item)}>
                     <Text style={styles.itemName} numberOfLines={1}>
                       {item.name}
                     </Text>
@@ -359,30 +468,64 @@ const WishlistScreen = () => {
                         <Text style={styles.reviewCount}>({item.reviews})</Text>
                       </View>
                     ) : null}
+                    </TouchableOpacity>
 
                     {item.sizes.length > 0 ? (
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.sizeContainer}>
-                        {item.sizes.map((size, idx) => (
-                          <View key={idx} style={styles.sizeChip}>
-                            <Text style={styles.sizeText}>{size}</Text>
-                          </View>
-                        ))}
+                        {item.sizes.map((size, idx) => {
+                          const isSelected = selectedSizes[item.id] === size;
+                          return (
+                            <TouchableOpacity
+                              key={`${size}-${idx}`}
+                              activeOpacity={0.8}
+                              style={[
+                                styles.sizeChip,
+                                isSelected && styles.sizeChipSelected,
+                              ]}
+                              onPress={() => handleSelectSize(item.id, size)}>
+                              <Text
+                                style={[
+                                  styles.sizeText,
+                                  isSelected && styles.sizeTextSelected,
+                                ]}>
+                                {size}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
                       </ScrollView>
                     ) : null}
 
-                    {/* Add to cart goes through ProductDetails so a size must be selected */}
+                    {sizeErrors[item.id] ? (
+                      <Text style={styles.sizeErrorText}>Please select a size</Text>
+                    ) : null}
+
+                    {/* Wishlist always adds; the Go to Cart shortcut lives on ProductDetails */}
                     <AppButton
-                      style={styles.addToCartBtn}
-                      textStyle={styles.addToCartText}
+                      style={[
+                        styles.addToCartBtn,
+                        isAdded && styles.addToCartBtnAdded,
+                        item.isOutOfStock && styles.addToCartBtnOutOfStock,
+                      ]}
+                      textStyle={[
+                        styles.addToCartText,
+                        item.isOutOfStock && styles.addToCartTextOutOfStock,
+                      ]}
                       size="sm"
-                      label="Add to Cart"
+                      label={
+                        item.isOutOfStock
+                          ? 'Out of Stock'
+                          : isAdded
+                            ? 'Added'
+                            : 'Add to Cart'
+                      }
+                      disabled={item.isOutOfStock}
                       onPress={() => handleAddToCart(item)}
                     />
-                    </View>
-                  </TouchableOpacity>
+                  </View>
                 </AppCard>
               );
             })}
@@ -562,13 +705,7 @@ const createStyles = (theme: AppTheme) => {
     gap: 4,
     marginBottom: 10,
   },
-  sizeChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
+  
   sizeText: {
     fontSize: 9,
     color: colors.textSecondary,
@@ -586,6 +723,15 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textOnPrimary,
     fontSize: 12,
     fontFamily: FONTS.poppinsBold,
+  },
+  addToCartBtnOutOfStock: {
+    backgroundColor: colors.surfaceVariant,
+  },
+  addToCartBtnAdded: {
+    backgroundColor: colors.success,
+  },
+  addToCartTextOutOfStock: {
+    color: colors.textMuted,
   },
   centerBox: {
     alignItems: 'center',
@@ -619,6 +765,29 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 13,
     fontWeight: '700',
   },
+  sizeChip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 4,
+      paddingHorizontal: 5,
+      paddingVertical: 3,
+      backgroundColor: colors.surface,
+    },
+    sizeChipSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primaryLight,
+    },
+    sizeChipDisabled: {
+      opacity: 0.45,
+    },
+   
+    sizeTextSelected: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    sizeTextDisabled: {
+      color: colors.textMuted,
+    },
   });
 };
 
