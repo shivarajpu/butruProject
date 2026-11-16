@@ -1756,7 +1756,7 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll}>
-            {['All', 'On the way', 'Delivered', 'Cancelled', 'Returned'].map(tab => (
+            {['All', 'On the way', 'Delivered', 'Cancelled'].map(tab => (
               <TouchableOpacity
                 key={tab}
                 style={[styles.tabChip, activeTab === tab && styles.tabChipActive]}
@@ -2247,7 +2247,7 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
             </View>
 
             <Text style={styles.filterSectionTitle}>Status</Text>
-            {['All statuses', 'On the way', 'Delivered', 'Cancelled', 'Returned'].map(status => (
+            {['All statuses', 'On the way', 'Delivered', 'Cancelled'].map(status => (
               <TouchableOpacity
                 key={status}
                 style={styles.radioRow}
