@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -26,16 +26,17 @@ import type { AppTheme } from '../theme/types';
 import AppInput from '../components/AppInput';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
-import { apiService } from '../api/apiService';
+import { otpApi } from '../api/otp';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Otp'>;
 
-const SEND_OTP_ENDPOINT = '/api/auth/otp/send';
+const isValidPhone = (value: string) => /^[0-9]{10}$/.test(value.trim());
 
-interface OtpSendResponse {
-  success: boolean;
-  message?: string;
-}
+const getPhoneError = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return 'Mobile number is required.';
+  return isValidPhone(trimmed) ? '' : 'Invalid number';
+};
 
 const OtpScreen = ({ navigation }: Props) => {
   const theme = useAppTheme();
@@ -44,9 +45,20 @@ const OtpScreen = ({ navigation }: Props) => {
   const { width, height } = useWindowDimensions();
 
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [sendSuccessMessage, setSendSuccessMessage] = useState('');
+  const navigateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (navigateTimeoutRef.current) clearTimeout(navigateTimeoutRef.current);
+    },
+    [],
+  );
 
   // Screen size categories for responsive layout
   const isTablet = width >= 768;
@@ -63,10 +75,21 @@ const OtpScreen = ({ navigation }: Props) => {
   const dynamicTopPadding =
     height * 0.05 + (Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0);
 
+  const handlePhoneChange = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    setPhoneNumber(digits);
+    if (phoneError && isValidPhone(digits)) setPhoneError('');
+  };
+
+  const handlePhoneBlur = () => {
+    setPhoneError(getPhoneError(phoneNumber));
+  };
+
   const handleSendOtp = async () => {
     const trimmed = phoneNumber.trim();
-    if (!trimmed) {
-      Alert.alert('Mobile Number Required', 'Please enter your mobile number.');
+    const validationError = getPhoneError(trimmed);
+    if (validationError) {
+      setPhoneError(validationError);
       return;
     }
 
@@ -74,18 +97,18 @@ const OtpScreen = ({ navigation }: Props) => {
     setIsSendingOtp(true);
 
     try {
-      const response = await apiService.post<OtpSendResponse>(
-        SEND_OTP_ENDPOINT,
-        { phone: trimmed },
-      );
+      const response = await otpApi.sendPhoneOtp(trimmed);
 
       if (!response.success) {
         Alert.alert('Unable to Send OTP', response.message || 'Something went wrong.');
         return;
       }
 
-      setIsOtpSent(true);
-      navigation.navigate('OtpVarify', { phoneNumber: trimmed });
+      setSendSuccessMessage(response.message || 'OTP sent successfully.');
+      navigateTimeoutRef.current = setTimeout(() => {
+        setSendSuccessMessage('');
+        navigation.navigate('OtpVarify', { phoneNumber: trimmed });
+      }, 1000);
     } catch (error) {
       Alert.alert(
         'Unable to Send OTP',
@@ -96,13 +119,42 @@ const OtpScreen = ({ navigation }: Props) => {
     }
   };
 
-  const handleVerifyOtp = () => {
-    if (!otpCode.trim()) {
+  const handleVerifyOtp = async () => {
+    const code = otpCode.trim();
+    if (!code) {
       Alert.alert('OTP Required', 'Please enter the verification code.');
       return;
     }
-    dispatch(login({ user: { phone: phoneNumber.trim() } }));
-    navigation.replace('Home');
+    if (isVerifyingOtp) return;
+    setIsVerifyingOtp(true);
+
+    try {
+      const response = await otpApi.verifyPhoneOtp(phoneNumber, code);
+
+      if (!response.success) {
+        Alert.alert('Verification Failed', response.message || 'Invalid OTP.');
+        return;
+      }
+      if (!response.token) {
+        Alert.alert('Verification Failed', 'Session token missing. Please try again.');
+        return;
+      }
+
+      dispatch(
+        login({
+          user: response.user ?? response.data ?? { phone: phoneNumber.trim() },
+          token: response.token,
+        }),
+      );
+      navigation.replace('Home');
+    } catch (error) {
+      Alert.alert(
+        'Verification Failed',
+        error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleEmailTabPress = () => {
@@ -188,26 +240,32 @@ const OtpScreen = ({ navigation }: Props) => {
                     containerStyle={styles.inputContainer}
                     inputContainerStyle={styles.inputWrapper}
                     leftIcon={<SvgXml xml={Callicon(theme.colors.primary)} width={23} height={25} />}
-                    placeholder="+91 9876543210"
+                    placeholder="9876543210"
                     value={phoneNumber}
-                    onChangeText={setPhoneNumber}
+                    onChangeText={handlePhoneChange}
+                    onBlur={handlePhoneBlur}
+                    error={phoneError}
                     keyboardType="phone-pad"
                     autoCapitalize="none"
-                    maxLength={15}
+                    maxLength={10}
                   />
                 </View>
 
                 {/* Send OTP Button */}
                 <TouchableOpacity
-                  style={[styles.submitButton, isSendingOtp && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, (isSendingOtp || Boolean(sendSuccessMessage)) && styles.submitButtonDisabled]}
                   onPress={handleSendOtp}
                   activeOpacity={0.8}
-                  disabled={isSendingOtp}
+                  disabled={isSendingOtp || Boolean(sendSuccessMessage)}
                 >
                   <Text style={styles.submitButtonText}>
                     {isSendingOtp ? 'Sending OTP...' : 'Send OTP'}
                   </Text>
                 </TouchableOpacity>
+
+                {sendSuccessMessage ? (
+                  <Text style={styles.sendSuccessText}>{sendSuccessMessage}</Text>
+                ) : null}
               </>
             ) : (
               <>
@@ -233,11 +291,14 @@ const OtpScreen = ({ navigation }: Props) => {
 
                 {/* Verify Button */}
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, isVerifyingOtp && styles.submitButtonDisabled]}
                   onPress={handleVerifyOtp}
                   activeOpacity={0.8}
+                  disabled={isVerifyingOtp}
                 >
-                  <Text style={styles.submitButtonText}>Verify & Sign In</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isVerifyingOtp ? 'Verifying...' : 'Verify & Sign In'}
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
@@ -460,6 +521,14 @@ const createStyles = (theme: AppTheme) => {
     color: colors.textOnPrimary,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  sendSuccessText: {
+    color: colors.success,
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: -8,
+    marginBottom: 12,
   },
   signUpRow: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { LOCATION_PIN_SVG } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
@@ -29,12 +29,13 @@ import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import type { RootState, AppDispatch } from '../store';
 import {
-  increment,
-  decrement,
-  removeItem as removeCartItem,
+  fetchCart,
+  updateCartItem,
+  removeCartItem,
   clearCart,
   updateBuyNowQty,
   clearBuyNowItem,
+  type CartItem,
 } from '../store/slices/cartSlice';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
@@ -115,9 +116,20 @@ const CartScreen = () => {
   const dispatch = useDispatch<AppDispatch>();
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const buyNowItem = useSelector((state: RootState) => state.cart.buyNowItem);
+  const cartLoading = useSelector((state: RootState) => state.cart.loading);
   const route = useRoute<any>();
   const isBuyNow = route.params?.mode === 'buyNow';
   const PLATFORM_FEE = 2;
+
+  // The server owns the bag. Refresh it whenever the cart screen is opened so
+  // the rows here (and the header badge everywhere else) agree with the API.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isBuyNow) {
+        dispatch(fetchCart());
+      }
+    }, [dispatch, isBuyNow]),
+  );
 
   // Buy Now checkout renders only the reserved item; bag/Add To Cart shows the full saved cart.
   const checkoutItems = isBuyNow && buyNowItem ? [buyNowItem] : cartItems;
@@ -542,24 +554,37 @@ const finalTotal = Math.max(
           : 0;
 
   // --- Handlers ---
-  const updateQuantity = (cartId: string, delta: number) => {
+  const updateQuantity = (item: CartItem, delta: number) => {
     if (isBuyNow && buyNowItem) {
       dispatch(updateBuyNowQty({ delta }));
       return;
     }
-    if (delta < 0) {
-      dispatch(decrement(cartId));
-    } else {
-      dispatch(increment(cartId));
+    const quantity = Math.max(1, item.quantity + delta);
+    if (quantity === item.quantity) {
+      return;
     }
+    dispatch(
+      updateCartItem({
+        productId: item.productId,
+        quantity,
+        size: item.size,
+        color: item.color,
+      }),
+    );
   };
 
-  const removeItem = (cartId: string) => {
+  const removeItem = (item: CartItem) => {
     if (isBuyNow && buyNowItem) {
       dispatch(clearBuyNowItem());
       return;
     }
-    dispatch(removeCartItem(cartId));
+    dispatch(
+      removeCartItem({
+        productId: item.productId,
+        size: item.size,
+        color: item.color,
+      }),
+    );
   };
 
   const handleGstSubmit = async () => {
@@ -711,6 +736,11 @@ const finalTotal = Math.max(
             styles.scrollContent,
             visibleItems.length === 0 && styles.scrollContentEmpty,
           ]}>
+          {cartLoading && !isBuyNow && (
+            <View style={styles.cartLoadingRow}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          )}
           {/* Dynamic Cart Items List */}
           {visibleItems.map(item => (
             <View key={item.cartId} style={styles.cartItemCard}>
@@ -721,7 +751,7 @@ const finalTotal = Math.max(
                   <Text style={styles.itemName} numberOfLines={2}>
                     {item.name}
                   </Text>
-                  <TouchableOpacity onPress={() => removeItem(item.cartId)}>
+                  <TouchableOpacity onPress={() => removeItem(item)}>
                     <Text style={styles.removeText}>Remove</Text>
                   </TouchableOpacity>
                 </View>
@@ -735,13 +765,13 @@ const finalTotal = Math.max(
                   <View style={styles.quantityContainer}>
                     <TouchableOpacity
                       style={styles.qtyBtn}
-                      onPress={() => updateQuantity(item.cartId, -1)}>
+                      onPress={() => updateQuantity(item, -1)}>
                       <Text style={styles.qtyBtnText}>-</Text>
                     </TouchableOpacity>
                     <Text style={styles.qtyValueText}>{item.quantity}</Text>
                     <TouchableOpacity
                       style={styles.qtyBtn}
-                      onPress={() => updateQuantity(item.cartId, 1)}>
+                      onPress={() => updateQuantity(item, 1)}>
                       <Text style={styles.qtyBtnText}>+</Text>
                     </TouchableOpacity>
                   </View>
@@ -1215,6 +1245,11 @@ const createStyles = (theme: AppTheme) => {
   },
   scrollContentEmpty: {
     flexGrow: 1,
+  },
+  cartLoadingRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
   cartItemCard: {
     flexDirection: 'row',

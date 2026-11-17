@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { useDispatch } from 'react-redux';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
+import { addToCart as addCartItemAsync } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
 import { heartFilledSvg, heartOutlineSvg, STAR_FILLED_SVG } from '../assets/svg';
 import { BRAND } from '../assets/svg/brand';
@@ -387,25 +387,31 @@ export const ProductTile = ({
     [],
   );
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (product.isOutOfStock) return;
     if (product.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
     }
-    dispatch(
-      addCartItem({
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
-        image: product.image,
-        size: selectedSize ?? '',
-        color: product.color ?? '',
-        productCode: product.productCode,
-      }),
-    );
     setAdded(true);
+    try {
+      await dispatch(
+        addCartItemAsync({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          image: product.image,
+          size: selectedSize ?? '',
+          color: product.color ?? '',
+          productCode: product.productCode,
+          sku: product.productCode ?? '',
+        }),
+      ).unwrap();
+    } catch {
+      setAdded(false);
+      return;
+    }
     if (addTimer.current) clearTimeout(addTimer.current);
     addTimer.current = setTimeout(() => setAdded(false), 1200);
   };

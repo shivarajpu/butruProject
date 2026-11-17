@@ -25,25 +25,35 @@ import type { AppTheme } from '../theme/types';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
 import { apiService } from '../api/apiService';
+import { otpApi } from '../api/otp';
 import StoreLogo from '../components/StoreLogo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OtpVarify'>;
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 45;
-const VERIFY_OTP_ENDPOINT = '/api/auth/otp/email/verify';
+const VERIFY_EMAIL_OTP_ENDPOINT = '/api/auth/otp/email/verify';
 const SEND_EMAIL_OTP_ENDPOINT = '/api/auth/otp/email/send';
-const SEND_PHONE_OTP_ENDPOINT = '/api/auth/otp/send';
+
+interface OtpUserLite {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
 
 interface OtpVerifyResponse {
   success: boolean;
   message?: string;
   token?: string;
+  isNewUser?: boolean;
+  data?: OtpUserLite;
+  user?: OtpUserLite;
 }
 
 interface OtpSendResponse {
   success: boolean;
   message?: string;
+  isNewUser?: boolean;
 }
 
 const OtpVarify = ({ navigation, route }: Props) => {
@@ -96,6 +106,8 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSignupFlow = Boolean(route?.params?.isSignup);
+  const isEmailFlow = Boolean(route?.params?.email);
+  const isPhoneFlow = Boolean(route?.params?.phoneNumber);
 
   // Absolute timestamp (ms) when resend becomes available. Using a deadline
   // instead of decrementing a counter keeps the countdown accurate even while
@@ -140,19 +152,15 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const handleResend = async () => {
     if (!canResend || isResending) return;
 
-    const isEmailFlow = Boolean(route?.params?.email);
-    const endpoint = isEmailFlow ? SEND_EMAIL_OTP_ENDPOINT : SEND_PHONE_OTP_ENDPOINT;
-    const payload = isEmailFlow
-      ? { email: emailAddress }
-      : { phone: emailAddress };
-
     setIsResending(true);
     try {
-      const response = await apiService.post<OtpSendResponse>(
-        endpoint,
-        payload,
-        registerToken,
-      );
+      const response: OtpSendResponse = isEmailFlow
+        ? await apiService.post<OtpSendResponse>(
+            SEND_EMAIL_OTP_ENDPOINT,
+            { email: emailAddress },
+            registerToken,
+          )
+        : await otpApi.sendPhoneOtp(emailAddress);
 
       if (!response.success) {
         Alert.alert(
@@ -167,7 +175,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
       setTimer(RESEND_SECONDS);
       setCanResend(false);
       setTimeout(() => inputRefs.current[0]?.focus(), 50);
-      Alert.alert('OTP Sent', `A new code has been sent to ${emailAddress}.`);
+      Alert.alert('OTP Sent', response.message || 'OTP sent successfully.');
     } catch (error) {
       Alert.alert(
         'Unable to Resend OTP',
@@ -209,32 +217,40 @@ const OtpVarify = ({ navigation, route }: Props) => {
 
     setIsVerifying(true);
     try {
-      const response = await apiService.post<OtpVerifyResponse>(
-        VERIFY_OTP_ENDPOINT,
-        {
-          email: emailAddress,
-          otp: code,
-        },
-        // Signup no longer marks the session as logged in before verification,
-        // so carry the register token explicitly on the verify request.
-        registerToken,
-      );
+      // Phone login (started on the OTP screen) and email signup use different
+      // verify endpoints; both return the same session-shaped response.
+      const response: OtpVerifyResponse = isPhoneFlow
+        ? await otpApi.verifyPhoneOtp(emailAddress, code)
+        : await apiService.post<OtpVerifyResponse>(
+            VERIFY_EMAIL_OTP_ENDPOINT,
+            {
+              email: emailAddress,
+              otp: code,
+            },
+            // Signup no longer marks the session as logged in before verification,
+            // so carry the register token explicitly on the verify request.
+            registerToken,
+          );
 
       if (!response.success) {
         Alert.alert('Verification Failed', response.message || 'Invalid OTP.');
         return;
       }
 
+      const verifiedUser = isPhoneFlow
+        ? (response.user ?? response.data ?? { phone: emailAddress })
+        : { email: emailAddress };
+
       dispatch(
         login({
-          user: { email: emailAddress },
+          user: verifiedUser,
           token: response.token || registerToken,
         }),
       );
 
-      if (isSignupFlow) {
-        // New sign-ups get a friendly confirmation that dismisses itself
-        // before we land on Home.
+      if (isSignupFlow || isPhoneFlow) {
+        // Sign-ups and phone logins both get the friendly confirmation that
+        // dismisses itself before we land on Home.
         setShowSignupSuccess(true);
         successTimeoutRef.current = setTimeout(() => {
           setShowSignupSuccess(false);
@@ -322,7 +338,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
              
 
               <Text style={[styles.subtitle, { fontSize: scale(13), marginTop: vs(4) }]}>
-                Enter the 6-digit code sent to your email
+                {`Enter the 6-digit code sent to your ${isPhoneFlow ? 'mobile number' : 'email'}`}
               </Text>
 
               {/* Email Row with Edit Pencil */}

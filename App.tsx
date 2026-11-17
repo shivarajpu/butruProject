@@ -16,7 +16,11 @@ import { getMessaging, getInitialNotification } from '@react-native-firebase/mes
 
 import { store, type RootState, type AppDispatch } from './src/store';
 import { loadAuthState, hydrate as hydrateAuth } from './src/store/slices/authSlice';
-import { loadCartState, hydrate as hydrateCart } from './src/store/slices/cartSlice';
+import {
+  loadCartState,
+  hydrate as hydrateCart,
+  fetchCart,
+} from './src/store/slices/cartSlice';
 import {
   clearNotifications,
   loadNotificationState,
@@ -108,11 +112,21 @@ function AppNavigator() {
     if (!isLoggedIn) return;
 
     const appStateSubscription = AppState.addEventListener('change', state => {
-      if (state === 'active') dispatch(loadUnreadCount());
+      if (state === 'active') {
+        dispatch(loadUnreadCount());
+        dispatch(fetchCart());
+      }
     });
 
     return () => appStateSubscription.remove();
   }, [dispatch, isLoggedIn]);
+
+  // The bag badge lives in the header of every tab. Seed it from the server
+  // cart once the session is ready so it reflects the API, not just local adds.
+  useEffect(() => {
+    if (!isHydrated || !isLoggedIn) return;
+    dispatch(fetchCart());
+  }, [dispatch, isHydrated, isLoggedIn]);
 
   // A notification tap can open the app from a cold start, before the
   // navigator exists. The pending navigation is replayed once the container

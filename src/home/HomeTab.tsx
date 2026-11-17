@@ -25,7 +25,7 @@ import AnnouncementBar from '../widgets/AnnouncementBar';
 import { useWidgetActions } from '../widgets/common';
 import { selectCollections } from '../storefront/selectors';
 import { useDispatch, useSelector } from 'react-redux';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
+import { addToCart as addCartItemAsync } from '../store/slices/cartSlice';
 import { selectUnreadCount } from '../store/slices/notificationSlice';
 import type { AppDispatch, RootState } from '../store';
 import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
@@ -87,6 +87,7 @@ interface Product {
   sizes: string[];
   image: string;
   isOutOfStock: boolean;
+  productCode?: string;
 }
 
 interface WishlishProduct {
@@ -573,24 +574,31 @@ const ProductCard = ({
     [],
   );
 
-  const handleAddToCartPress = () => {
+  const handleAddToCartPress = async () => {
     if (item.isOutOfStock) return;
     if (item.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return;
     }
-    dispatch(
-      addCartItem({
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        originalPrice: item.originalPrice,
-        image: item.image,
-        size: selectedSize ?? '',
-        color: '',
-      }),
-    );
     setAdded(true);
+    try {
+      await dispatch(
+        addCartItemAsync({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          image: item.image,
+          size: selectedSize ?? '',
+          color: '',
+          productCode: item.productCode,
+          sku: item.productCode ?? '',
+        }),
+      ).unwrap();
+    } catch {
+      setAdded(false);
+      return;
+    }
     if (addTimer.current) {
       clearTimeout(addTimer.current);
     }

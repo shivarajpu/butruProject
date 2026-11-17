@@ -36,7 +36,7 @@ import { SvgXml } from 'react-native-svg';
 import { heartFilledSvg } from '../assets/svg';
 import BrandIcon from '../components/BrandIcon';
 import { useDispatch } from 'react-redux';
-import { addItem as addCartItem } from '../store/slices/cartSlice';
+import { addToCart as addCartItemAsync } from '../store/slices/cartSlice';
 import type { AppDispatch } from '../store';
 
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
@@ -319,28 +319,34 @@ const WishlistScreen = () => {
     });
   };
 
-  const handleAddToCart = (product: WishlistCardItem) => {
+  const handleAddToCart = async (product: WishlistCardItem) => {
     if (product.isOutOfStock) return;
     const size = selectedSizes[product.id] ?? '';
     if (product.sizes.length > 0 && !size) {
       setSizeErrors(prev => ({ ...prev, [product.id]: true }));
       return;
     }
-    dispatch(
-      addCartItem({
-        productId: product.id,
-        name: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice ?? product.price,
-        image: product.image,
-        size,
-        color: '',
-        productCode: product.productCode,
-      }),
-    );
 
     // Show a green "Added" on this card for a moment, then offer it again.
     setAddedId(product.id);
+    try {
+      await dispatch(
+        addCartItemAsync({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice ?? product.price,
+          image: product.image,
+          size,
+          color: '',
+          productCode: product.productCode,
+          sku: product.productCode ?? '',
+        }),
+      ).unwrap();
+    } catch {
+      setAddedId(null);
+      return;
+    }
     if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
     addedTimerRef.current = setTimeout(() => setAddedId(null), 1500);
   };
@@ -709,6 +715,12 @@ const createStyles = (theme: AppTheme) => {
   sizeText: {
     fontSize: 9,
     color: colors.textSecondary,
+  },
+  sizeErrorText: {
+    color: colors.error,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 8,
   },
   addToCartBtn: {
     backgroundColor: colors.primary,

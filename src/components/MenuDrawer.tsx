@@ -64,14 +64,21 @@ export const buildDrawerItems = (
     .filter(item => !item.children?.length)
     .map((item, index) => {
       const action = resolveLink(item.link, { config });
+      const isHome = item.title.trim().toLowerCase() === 'home';
       return {
         id: item.id || `nav-${index}`,
         name: item.title,
         icon: categoryIcon(item.title),
         action,
-        category: action.type === 'category' ? action.category : item.title,
+        category: action.type === 'category' ? action.category : isHome ? 'Home' : item.title,
       };
     });
+
+  const hasHome = configCategories.some(
+    item => item.name.trim().toLowerCase() === 'home',
+  );
+
+  if (hasHome) return configCategories;
 
   return [
     { id: 'home', name: 'Home', icon: BRAND.home, action: { type: 'none' }, category: 'Home' },

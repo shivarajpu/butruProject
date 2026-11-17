@@ -35,7 +35,7 @@ import StoreLogo from '../components/StoreLogo';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
-import { addItem as addCartItem, setBuyNowItem } from '../store/slices/cartSlice';
+import { addToCart as addCartItemAsync, setBuyNowItem } from '../store/slices/cartSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import { publishWishlistChange } from '../hooks/useWishlist';
@@ -540,7 +540,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     }
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!productData || productData.isOutOfStock || justAdded) return;
     // Already in the bag — the button acts as "Go to Cart".
     if (isInCart) {
@@ -551,21 +551,32 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       setSizeError(true);
       return;
     }
-    dispatch(
-      addCartItem({
-        productId: productData.id,
-        name: productData.name,
-        price: selectedVariant ? selectedVariant.price : productData.price,
-        originalPrice: productData.originalPrice,
-        image: selectedImg || productData.images?.[0] || '',
-        size: selectedSize,
-        color: selectedVariant?.color ?? productData.color ?? '',
-        productCode: (productData as { productCode?: string }).productCode || '',
-      }),
-    );
 
+    const productCode = (productData as { productCode?: string }).productCode || '';
     // Brief green "Added" confirmation, then the button settles on "Go to Cart".
     setJustAdded(true);
+    try {
+      await dispatch(
+        addCartItemAsync({
+          productId: productData.id,
+          name: productData.name,
+          price: selectedVariant ? selectedVariant.price : productData.price,
+          originalPrice: productData.originalPrice,
+          image: selectedImg || productData.images?.[0] || '',
+          size: selectedSize,
+          color: selectedVariant?.color ?? productData.color ?? '',
+          productCode,
+          sku: productCode,
+        }),
+      ).unwrap();
+    } catch (addError) {
+      setJustAdded(false);
+      Alert.alert(
+        'Could not add to cart',
+        addError instanceof Error ? addError.message : 'Please try again.',
+      );
+      return;
+    }
     if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
     addedTimerRef.current = setTimeout(() => setJustAdded(false), 1500);
   };
