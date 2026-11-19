@@ -2,7 +2,7 @@
  * Storefront OTP authentication API.
  *
  *   POST /api/auth/otp/send    { phone, storeName }  → send a login code
- *   POST /api/auth/otp/verify  { phone, otp, storeName } → verify + get session
+ *   POST /api/auth/otp/verify  { phone, otp } → verify + get session
  *
  * `storeName` is the tenant slug resolved from EXPO_PUBLIC_STORE_SLUG (or the
  * value baked into the binary), so one app build always talks to its own store.
@@ -55,6 +55,5 @@ export const otpApi = {
     apiService.post<OtpVerifyResponse>(`${OTP_ENDPOINT}/verify`, {
       phone: normalizePhone(phone),
       otp,
-      storeName: STORE_SLUG,
     }),
 };

@@ -112,7 +112,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
 
   const isSignupFlow = Boolean(route?.params?.isSignup);
   const isEmailFlow = Boolean(route?.params?.email);
-  const isPhoneFlow = Boolean(route?.params?.phoneNumber);
+  const isPhoneFlow = Boolean(route?.params?.phoneNumber) && !isEmailFlow;
 
   // Absolute timestamp (ms) when resend becomes available. Using a deadline
   // instead of decrementing a counter keeps the countdown accurate even while

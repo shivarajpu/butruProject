@@ -248,8 +248,7 @@ const SignUpScreen = ({ navigation }: Props) => {
       phone: mobile.trim(),
       password: password,
       storeId: STORE_ID,
-      storeSlug: STORE_SLUG,
-      fcmToken,
+      fcmToken:fcmToken || undefined,
     };
 
     if (__DEV__) {
