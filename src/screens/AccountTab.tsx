@@ -24,8 +24,9 @@ import { useNavigation } from '@react-navigation/native'; // 1. Hook import kare
 import { useAppTheme } from '../theme/useAppTheme';
 import type { AppTheme } from '../theme/types';
 import AppIconButton from '../components/AppIconButton';
-import { useDispatch } from 'react-redux';
-import { logout } from '../store/slices/authSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { logout, setUser } from '../store/slices/authSlice';
+import type { RootState } from '../store';
 import { apiService } from '../api/apiService';
 import {
   disablePushNotifications,
@@ -286,6 +287,7 @@ const AccountTab = () => {
   const avatarSize = Math.min(width * 0.16, 68);
   const navigation = useNavigation<any>(); 
   const dispatch = useDispatch();
+  const authUser = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     if (logoutStatus === 'success') {
@@ -821,6 +823,7 @@ const AccountTab = () => {
         onRequestClose={() => setIsEmailVerifyModalVisible(false)}
         onVerified={async () => {
           await refresh();
+          dispatch(setUser({ ...(authUser || {}), isEmailVerified: true }));
           setIsEmailVerifyModalVisible(false);
         }}
       />
