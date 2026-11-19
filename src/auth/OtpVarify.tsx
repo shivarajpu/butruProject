@@ -36,9 +36,14 @@ const VERIFY_EMAIL_OTP_ENDPOINT = '/api/auth/otp/email/verify';
 const SEND_EMAIL_OTP_ENDPOINT = '/api/auth/otp/email/send';
 
 interface OtpUserLite {
+  id?: string;
   name?: string;
   email?: string;
   phone?: string;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  isVerified?: boolean;
+  [key: string]: unknown;
 }
 
 interface OtpVerifyResponse {
@@ -239,7 +244,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
 
       const verifiedUser = isPhoneFlow
         ? (response.user ?? response.data ?? { phone: emailAddress })
-        : { email: emailAddress };
+        : (response.user ?? response.data ?? { email: emailAddress });
 
       dispatch(
         login({

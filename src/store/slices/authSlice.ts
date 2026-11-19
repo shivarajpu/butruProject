@@ -11,10 +11,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = '@butru_auth_session';
 
-interface AuthUser {
+export interface AuthUser {
+  id?: string;
   name?: string;
   email?: string;
   phone?: string;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  isVerified?: boolean;
+  [key: string]: unknown;
 }
 
 interface LoginPayload {
@@ -86,8 +91,14 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.isHydrated = true;
     },
+    setUser(state, action: PayloadAction<AuthUser | null>) {
+      state.user = action.payload;
+      if (state.isLoggedIn) {
+        persistAuthState(state);
+      }
+    },
   },
 });
 
-export const { login, logout, hydrate } = authSlice.actions;
+export const { login, logout, hydrate, setUser } = authSlice.actions;
 export default authSlice.reducer;

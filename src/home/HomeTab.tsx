@@ -27,6 +27,7 @@ import { selectCollections } from '../storefront/selectors';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart as addCartItemAsync } from '../store/slices/cartSlice';
 import { selectUnreadCount } from '../store/slices/notificationSlice';
+import { setUser } from '../store/slices/authSlice';
 import type { AppDispatch, RootState } from '../store';
 import { SHOP_ALL_CATEGORY, type WidgetAction } from '../storefront/links';
 import { fetchProductsByCategoryName, fetchProductsForSource } from '../storefront/catalog';
@@ -35,6 +36,7 @@ import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfi
 import { publishWishlistChange } from '../hooks/useWishlist';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 import { apiService } from '../api/apiService';
 import type { AppTheme } from '../theme/types';
 import {
@@ -768,6 +770,34 @@ const HomeTab = () => {
   const [error, setError] = useState('');
   const [activeCategory, setActiveCategory] = useState('Home');
   const { addresses, refresh } = useProfile();
+  const dispatch = useDispatch<AppDispatch>();
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
+  const [showEmailVerifyModal, setShowEmailVerifyModal] = useState(false);
+  const [emailVerifyDismissed, setEmailVerifyDismissed] = useState(false);
+
+  const needsEmailVerification = Boolean(isLoggedIn && authUser?.isEmailVerified === false);
+
+  useEffect(() => {
+    if (needsEmailVerification && !emailVerifyDismissed) {
+      setShowEmailVerifyModal(true);
+    } else if (!needsEmailVerification) {
+      setShowEmailVerifyModal(false);
+      setEmailVerifyDismissed(false);
+    }
+  }, [needsEmailVerification, emailVerifyDismissed]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setEmailVerifyDismissed(false);
+      setShowEmailVerifyModal(false);
+    }
+  }, [isLoggedIn]);
+
+  const handleSkipEmailVerify = () => {
+    setEmailVerifyDismissed(true);
+    setShowEmailVerifyModal(false);
+  };
 
   // The hardware-back handler is registered once on focus, so it reads the
   // live view state through refs rather than a stale closure.
@@ -1389,6 +1419,20 @@ const HomeTab = () => {
         editingAddress={editingAddress}
         onClose={() => setIsAddAddressModalVisible(false)}
         onSaved={handleAddressSaved}
+      />
+
+      <EmailVerificationModal
+        visible={showEmailVerifyModal}
+        initialEmail={authUser?.email || ''}
+        phone={authUser?.phone || ''}
+        title="Verify your email"
+        message="Please verify your email address to complete your account setup and place orders."
+        onSkip={handleSkipEmailVerify}
+        onRequestClose={handleSkipEmailVerify}
+        onVerified={() => {
+          dispatch(setUser({ ...(authUser || {}), isEmailVerified: true }));
+          setShowEmailVerifyModal(false);
+        }}
       />
 
       {/* Side Menu Drawer Component */}

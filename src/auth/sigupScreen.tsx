@@ -78,6 +78,15 @@ const SignUpScreen = ({ navigation }: Props) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
+  // Phone OTP verification states
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [otpMessage, setOtpMessage] = useState('');
+  const [otpError, setOtpError] = useState('');
+
   // Responsive layout
   const isTablet = width >= 768;
   const isSmallDevice = height < 700;
@@ -108,6 +117,8 @@ const SignUpScreen = ({ navigation }: Props) => {
       errors.mobile = 'Mobile number is required.';
     } else if (!isValidPhone(mobile.trim())) {
       errors.mobile = 'Enter a valid 10-digit mobile number.';
+    } else if (!isPhoneVerified) {
+      errors.mobile = 'Please verify your mobile number.';
     }
 
     if (!password.trim()) {
@@ -133,6 +144,89 @@ const SignUpScreen = ({ navigation }: Props) => {
   const showErrorModal = (message: string) => {
     setModalMessage(message);
     setModalVisible(true);
+  };
+
+  const handleSendOtp = async () => {
+    const trimmed = mobile.trim();
+    if (!isValidPhone(trimmed)) {
+      setFieldErrors(prev => ({
+        ...prev,
+        mobile: 'Enter a valid 10-digit mobile number.',
+      }));
+      return;
+    }
+
+    if (isSendingOtp) return;
+    setIsSendingOtp(true);
+    setOtpError('');
+    setOtpMessage('');
+
+    try {
+      const response = await apiService.post<{
+        success: boolean;
+        message?: string;
+        isNewUser?: boolean;
+      }>('/api/auth/otp/send', {
+        phone: trimmed,
+        storeName: '',
+      });
+
+      if (!response.success) {
+        setOtpError(response.message || 'Unable to send OTP. Please try again.');
+        return;
+      }
+
+      setIsOtpSent(true);
+      setIsPhoneVerified(false);
+      setOtpCode('');
+      setOtpMessage(response.message || 'OTP sent successfully.');
+    } catch (error) {
+      setOtpError(
+        error instanceof Error ? error.message : 'Unable to send OTP. Please try again.',
+      );
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const code = otpCode.trim();
+    if (code.length < 6) {
+      setOtpError('Please enter the 6-digit OTP.');
+      return;
+    }
+
+    if (isVerifyingOtp) return;
+    setIsVerifyingOtp(true);
+    setOtpError('');
+
+    try {
+      const response = await apiService.post<{
+        success: boolean;
+        message?: string;
+        isNewUser?: boolean;
+        token?: string;
+        data?: unknown;
+        user?: unknown;
+      }>('/api/auth/otp/verify', {
+        phone: mobile.trim(),
+        otp: code,
+      });
+
+      if (!response.success) {
+        setOtpError(response.message || 'Invalid OTP. Please try again.');
+        return;
+      }
+
+      setIsPhoneVerified(true);
+      setOtpMessage(response.message || 'Mobile number verified successfully.');
+    } catch (error) {
+      setOtpError(
+        error instanceof Error ? error.message : 'Verification failed. Please try again.',
+      );
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleCreateAccount = async () => {
@@ -170,13 +264,13 @@ const SignUpScreen = ({ navigation }: Props) => {
         return;
       }
 
-      // The session is only established once the email OTP is verified. Keeping
-      // the app logged out until then means a cold start after signup lands on
-      // Login, while a backgrounded app still resumes on the OTP screen.
+      // Phone OTP is verified on this screen. Continue to email OTP verification
+      // as before for account activation/login session.
       navigation.navigate('OtpVarify', {
         email: `${email.trim()}`,
         token: response.token,
         isSignup: true,
+        phoneNumber: mobile.trim(),
       });
     } catch (error) {
       const message =
@@ -318,14 +412,74 @@ const SignUpScreen = ({ navigation }: Props) => {
                   placeholderTextColor={theme.colors.textMuted}
                   value={mobile}
                   onChangeText={(val) => {
-                    setMobile(val);
+                    setMobile(val.replace(/\D/g, '').slice(0, 10));
+                    setIsOtpSent(false);
+                    setIsPhoneVerified(false);
+                    setOtpCode('');
+                    setOtpMessage('');
+                    setOtpError('');
                     if (fieldErrors.mobile) setFieldErrors((prev) => ({ ...prev, mobile: undefined }));
                   }}
                   keyboardType="phone-pad"
                   maxLength={10}
+                  editable={!isPhoneVerified}
                 />
+                <TouchableOpacity
+                  style={[
+                    styles.otpInlineButton,
+                    (isSendingOtp || isPhoneVerified) && styles.otpInlineButtonDisabled,
+                  ]}
+                  onPress={handleSendOtp}
+                  activeOpacity={0.8}
+                  disabled={isSendingOtp || isPhoneVerified}
+                >
+                  {isSendingOtp ? (
+                    <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+                  ) : (
+                    <Text style={styles.otpInlineButtonText}>
+                      {isPhoneVerified ? 'Verified' : isOtpSent ? 'Resend OTP' : 'Send OTP'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
               {fieldErrors.mobile && <Text style={styles.errorText}>{fieldErrors.mobile}</Text>}
+
+              {isOtpSent && !isPhoneVerified ? (
+                <View style={styles.otpVerifyRow}>
+                  <View style={[styles.inputWrapper, styles.otpInputWrapper]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter 6-digit OTP"
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={otpCode}
+                      onChangeText={(val) => {
+                        setOtpCode(val.replace(/\D/g, '').slice(0, 6));
+                        if (otpError) setOtpError('');
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.verifyOtpButton,
+                      isVerifyingOtp && styles.otpInlineButtonDisabled,
+                    ]}
+                    onPress={handleVerifyOtp}
+                    activeOpacity={0.8}
+                    disabled={isVerifyingOtp}
+                  >
+                    {isVerifyingOtp ? (
+                      <ActivityIndicator size="small" color={theme.colors.textOnPrimary} />
+                    ) : (
+                      <Text style={styles.otpInlineButtonText}>Verify</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {otpMessage ? <Text style={styles.otpSuccessText}>{otpMessage}</Text> : null}
+              {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
             </View>
 
             {/* Password */}
@@ -444,10 +598,13 @@ const SignUpScreen = ({ navigation }: Props) => {
 
             {/* Create Account Button */}
             <TouchableOpacity
-              style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                (isSubmitting || !isPhoneVerified) && styles.submitButtonDisabled,
+              ]}
               onPress={handleCreateAccount}
               activeOpacity={0.8}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isPhoneVerified}
             >
               {isSubmitting ? (
                 <ActivityIndicator color={theme.colors.textOnPrimary} />
@@ -627,6 +784,7 @@ const createStyles = (theme: AppTheme) => {
     flex: 1,
     fontSize: 14,
     color: colors.text,
+    minWidth: 0,
   },
   errorText: {
     color: colors.error,
@@ -709,6 +867,49 @@ const createStyles = (theme: AppTheme) => {
     fontSize: 13,
     color: colors.primary,
     fontWeight: 'bold',
+  },
+  otpInlineButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 8,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyOtpButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 48,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpInlineButtonDisabled: {
+    opacity: 0.7,
+  },
+  otpInlineButtonText: {
+    color: colors.textOnPrimary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  otpVerifyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 8,
+  },
+  otpInputWrapper: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  otpSuccessText: {
+    color: colors.success,
+    fontSize: 11,
+    marginTop: 6,
+    marginLeft: 4,
   },
   // Footer
   footerContainer: {

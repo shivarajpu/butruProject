@@ -35,6 +35,7 @@ import {
 import { useProfile, type Address, type ProfileData, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 import {
   getPolicy,
   policyHasContent,
@@ -101,6 +102,7 @@ const AccountTab = () => {
 // New Modals State
   const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
   const [isLogoutModalVisible, setIsLogoutModalVisible] = useState(false);
+  const [isEmailVerifyModalVisible, setIsEmailVerifyModalVisible] = useState(false);
 
   // Profile Form States
   const [firstName, setFirstName] = useState('');
@@ -745,12 +747,27 @@ const AccountTab = () => {
                       placeholderTextColor="#9CA3AF"
                       keyboardType="email-address"
                     />
-                    <View style={styles.verifiedBadge}>
-                      <Text style={styles.verifiedText}>
-                        {isEmailVerified ? 'Verified' : 'Not Verified'}
-                      </Text>
-                    </View>
+                    {isEmailVerified ? (
+                      <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedText}>Verified</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.verifyNowBadge}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setIsProfileModalVisible(false);
+                          setTimeout(() => setIsEmailVerifyModalVisible(true), 300);
+                        }}>
+                        <Text style={styles.verifyNowText}>Verify Now</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
+                  {!isEmailVerified ? (
+                    <Text style={styles.emailVerifyHint}>
+                      Your email is not verified. Tap “Verify Now” to verify it.
+                    </Text>
+                  ) : null}
 
                   <Text style={[styles.fieldLabel1, { marginTop: 14 }]}>Mobile Number</Text>
                   <View style={styles.phoneInputWrapper}>
@@ -792,6 +809,21 @@ const AccountTab = () => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      <EmailVerificationModal
+        visible={isEmailVerifyModalVisible}
+        initialEmail={email || profile?.email || ''}
+        phone={profile?.phone || mobileNumber || ''}
+        title="Verify your email"
+        message="Please verify your email address to complete your account setup and place orders."
+        showSkip
+        onSkip={() => setIsEmailVerifyModalVisible(false)}
+        onRequestClose={() => setIsEmailVerifyModalVisible(false)}
+        onVerified={async () => {
+          await refresh();
+          setIsEmailVerifyModalVisible(false);
+        }}
+      />
 
       {/* 4. LOGOUT CONFIRMATION MODAL */}
       <Modal
@@ -1495,6 +1527,24 @@ const createStyles = (theme: AppTheme) => {
       fontSize: 10,
       color: '#059669',
       fontWeight: '600',
+    },
+    verifyNowBadge: {
+      backgroundColor: colors.primaryLight,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    verifyNowText: {
+      fontSize: 10,
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    emailVerifyHint: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 6,
     },
     phoneInputWrapper: {
       flexDirection: 'row',
