@@ -10,6 +10,7 @@
 
 import { apiService } from './apiService';
 import { STORE_SLUG } from '../config/storeIdentity';
+import { getAuthFcmToken } from '../services/push';
 
 const OTP_ENDPOINT = '/api/auth/otp';
 
@@ -51,9 +52,10 @@ export const otpApi = {
       storeName: STORE_SLUG,
     }),
 
-  verifyPhoneOtp: (phone: string, otp: string): Promise<OtpVerifyResponse> =>
+  verifyPhoneOtp: async (phone: string, otp: string): Promise<OtpVerifyResponse> =>
     apiService.post<OtpVerifyResponse>(`${OTP_ENDPOINT}/verify`, {
       phone: normalizePhone(phone),
       otp,
+      fcmToken: await getAuthFcmToken(),
     }),
 };
