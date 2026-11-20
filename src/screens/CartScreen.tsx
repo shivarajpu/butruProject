@@ -37,9 +37,11 @@ import {
   clearBuyNowItem,
   type CartItem,
 } from '../store/slices/cartSlice';
+import { setUser } from '../store/slices/authSlice';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
+import EmailVerificationModal from '../components/EmailVerificationModal';
 import ApplyCouponModal, { type ApplyCouponResult } from '../components/ApplyCouponModal';
 import { apiService } from '../api/apiService';
 import {
@@ -117,6 +119,8 @@ const CartScreen = () => {
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const buyNowItem = useSelector((state: RootState) => state.cart.buyNowItem);
   const cartLoading = useSelector((state: RootState) => state.cart.loading);
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const route = useRoute<any>();
   const isBuyNow = route.params?.mode === 'buyNow';
   const PLATFORM_FEE = 2;
@@ -162,6 +166,7 @@ const CartScreen = () => {
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showEmailVerifyModal, setShowEmailVerifyModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [justSavedAddress, setJustSavedAddress] = useState<Address | null>(null);
   const [pendingNextModal, setPendingNextModal] = useState<'add' | 'edit' | null>(null);
@@ -630,6 +635,14 @@ const finalTotal = Math.max(
     setGstError('');
   };
 
+  const handleContinueToPayment = () => {
+    if (isLoggedIn && authUser?.isEmailVerified === false) {
+      setShowEmailVerifyModal(true);
+      return;
+    }
+    setIsPaymentModalVisible(true);
+  };
+
   const handleApplyCoupon = async (code: string): Promise<ApplyCouponResult> => {
     const trimmed = code.trim();
     if (!trimmed) {
@@ -961,7 +974,7 @@ const finalTotal = Math.max(
             <TouchableOpacity
               style={styles.paymentBtn}
               activeOpacity={0.85}
-              onPress={() => setIsPaymentModalVisible(true)}>
+              onPress={handleContinueToPayment}>
               <SvgXml xml={ARROW_RIGHT_SVG} width={16} height={16} />
               <Text style={styles.paymentBtnText}>Continue to Payment</Text>
             </TouchableOpacity>
@@ -977,6 +990,21 @@ const finalTotal = Math.max(
 
         {/* Address Selection Modal */}
        {renderAddressModals(!isPaymentModalVisible)}
+
+        <EmailVerificationModal
+          visible={showEmailVerifyModal}
+          initialEmail={profile?.email || authUser?.email || ''}
+          phone={profile?.phone || authUser?.phone || ''}
+          title="Verify your email to continue"
+          message="Please verify your email address before continuing to payment."
+          showSkip
+          onSkip={() => setShowEmailVerifyModal(false)}
+          onRequestClose={() => setShowEmailVerifyModal(false)}
+          onVerified={() => {
+            dispatch(setUser({ ...(authUser || {}), isEmailVerified: true }));
+            setShowEmailVerifyModal(false);
+          }}
+        />
 
         {/* Payment Modal */}
         <Modal

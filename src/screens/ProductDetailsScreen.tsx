@@ -36,13 +36,11 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch } from 'react-redux';
 import { apiService } from '../api/apiService';
 import { addToCart as addCartItemAsync, setBuyNowItem } from '../store/slices/cartSlice';
-import { setUser } from '../store/slices/authSlice';
 import type { AppDispatch, RootState } from '../store';
 import { useProfile, type Address, formatDeliveryLabel } from '../hooks/useProfile';
 import { publishWishlistChange } from '../hooks/useWishlist';
 import AddressSelectionModal from '../components/AddressSelectionModal';
 import AddAddressModal from '../components/AddAddressModal';
-import EmailVerificationModal from '../components/EmailVerificationModal';
 import APP_CONFIG from '../config/clients';
 
 // Custom SVGs
@@ -309,8 +307,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   // Server-driven switches: size / colour pickers, COD, delivery window.
   const features = useSelector(selectFeatures);
   const cartItems = useSelector((state: RootState) => state.cart.items);
-  const authUser = useSelector((state: RootState) => state.auth.user);
-  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const storeConfig = useStoreConfig();
 
   /** Product-page widgets, resolved so a section can be rendered or skipped. */
@@ -613,22 +609,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       setSizeError(true);
       return;
     }
-    if (isLoggedIn && authUser?.isEmailVerified === false) {
-      setShowEmailVerifyModal(true);
-      return;
-    }
-    proceedToBuyNow();
-  };
-
-  const handleSkipEmailVerifyForBuyNow = () => {
-    setShowEmailVerifyModal(false);
     proceedToBuyNow();
   };
 
   // Modals state
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [isAddAddressModalVisible, setIsAddAddressModalVisible] = useState(false);
-  const [showEmailVerifyModal, setShowEmailVerifyModal] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
@@ -1257,21 +1243,6 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
           editingAddress={editingAddress}
           onClose={() => setIsAddAddressModalVisible(false)}
           onSaved={handleAddressSaved}
-        />
-
-        <EmailVerificationModal
-          visible={showEmailVerifyModal}
-          initialEmail={authUser?.email || ''}
-          phone={authUser?.phone || ''}
-          title="Verify your email to continue"
-          message="Please verify your email address to complete your account setup and place orders."
-          showSkip
-          onSkip={handleSkipEmailVerifyForBuyNow}
-          onRequestClose={handleSkipEmailVerifyForBuyNow}
-          onVerified={() => {
-            dispatch(setUser({ ...(authUser || {}), isEmailVerified: true }));
-            setShowEmailVerifyModal(false);
-          }}
         />
       </View>
     </SafeAreaView>
