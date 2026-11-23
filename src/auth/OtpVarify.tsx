@@ -106,7 +106,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
   const [canResend, setCanResend] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [showSignupSuccess, setShowSignupSuccess] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const inputRefs = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null));
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -218,7 +218,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
       Alert.alert('Incomplete OTP', 'Please enter the complete 6-digit code.');
       return;
     }
-    if (isVerifying || showSignupSuccess) return;
+    if (isVerifying || showSuccess) return;
 
     setIsVerifying(true);
     try {
@@ -256,9 +256,9 @@ const OtpVarify = ({ navigation, route }: Props) => {
       if (isSignupFlow || isPhoneFlow) {
         // Sign-ups and phone logins both get the friendly confirmation that
         // dismisses itself before we land on Home.
-        setShowSignupSuccess(true);
+        setShowSuccess(true);
         successTimeoutRef.current = setTimeout(() => {
-          setShowSignupSuccess(false);
+          setShowSuccess(false);
           navigation.replace('Home');
         }, 2200);
       } else {
@@ -432,7 +432,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
               },
             ]}
             onPress={handleVerify}
-            disabled={isVerifying || showSignupSuccess}
+            disabled={isVerifying || showSuccess}
             activeOpacity={0.85}
           >
             <Text style={[styles.verifyBtnText, { fontSize: scale(16) }]}>
@@ -481,7 +481,7 @@ const OtpVarify = ({ navigation, route }: Props) => {
 
       {/* ── SIGN-UP SUCCESS (auto-dismiss) ── */}
       <Modal
-        visible={showSignupSuccess}
+        visible={showSuccess}
         transparent
         animationType="fade"
         statusBarTranslucent
@@ -493,10 +493,12 @@ const OtpVarify = ({ navigation, route }: Props) => {
               <Text style={styles.successBadgeText}>✓</Text>
             </View>
             <Text style={[styles.successTitle, { fontSize: scale(19) }]}>
-              Sign-up successful!
+              {isPhoneFlow ? 'Login successful!' : 'Sign-up successful!'}
             </Text>
             <Text style={[styles.successMessage, { fontSize: scale(13.5) }]}>
-              Your account is ready. Taking you home…
+              {isPhoneFlow
+                ? 'Welcome back! Taking you home…'
+                : 'Your account is ready. Taking you home…'}
             </Text>
           </View>
         </View>
