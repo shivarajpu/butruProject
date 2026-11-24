@@ -673,6 +673,7 @@ const AccountTab = () => {
         onSelect={handleSelectAddress}
         onClose={() => setIsAddressModalVisible(false)}
         onAddAddress={handleOpenAddAddress}
+        onRefresh={refresh}
         onEditAddress={handleEditAddress}
         onDeleteAddress={handleDeleteAddress}
       />

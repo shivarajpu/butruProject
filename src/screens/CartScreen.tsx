@@ -694,6 +694,7 @@ const finalTotal = Math.max(
       onClose={() => setIsAddressModalVisible(false)}
       onDismiss={handleAddressModalDismiss}
       onAddAddress={handleOpenAddAddress}
+      onRefresh={refresh}
       onEditAddress={handleEditAddress}
       onDeleteAddress={handleDeleteAddress}
     />

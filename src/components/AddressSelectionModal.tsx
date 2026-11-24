@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ type Props = {
   onClose: () => void;
   onDismiss?: () => void;
   onAddAddress: () => void;
+  onRefresh?: () => void | Promise<void>;
   onEditAddress?: (address: Address) => void;
   onDeleteAddress?: (address: Address) => void;
 };
@@ -55,12 +56,19 @@ const AddressSelectionModal = ({
   onClose,
   onDismiss,
   onAddAddress,
+  onRefresh,
   onEditAddress,
   onDeleteAddress,
 }: Props) => {
   const theme = useAppTheme();
   const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (visible) {
+      onRefresh?.();
+    }
+  }, [visible, onRefresh]);
 
   const handleSelect = (address: Address) => {
     onSelect(address);
