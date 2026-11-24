@@ -23,7 +23,7 @@
         "baseUrl": "https://parenting-funda.shopmobi.in/api-proxy"
       },
       "payments": {
-        "razorpayKeyId": "rzp_test_TqxMYmlk1zxzU4"
+        "razorpayKeyId": "rzp_live_U3bZjVvTq0x09P"
       },
       "support": {
         "phone": "8128013130",
