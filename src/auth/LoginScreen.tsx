@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { apiService } from '../api/apiService';
+import { getFullUrl, getRequestHeaders } from '../api/apiService';
 import type { RootStackParamList } from '../navigation/types';
 import { useDispatch } from 'react-redux';
 import { login } from '../store/slices/authSlice';
@@ -57,6 +57,74 @@ type FieldErrors = {
 };
 
 const LOGIN_ENDPOINT = '/api/auth/login';
+
+type LoginPayload = {
+  email: string;
+  password: string;
+  storeId: string;
+  storeSlug: string;
+  fcmToken?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const firstMessage = (value: unknown, depth = 0): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  if (depth >= 3 || !isRecord(value)) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = firstMessage(item, depth + 1);
+      if (message) return message;
+    }
+    return undefined;
+  }
+
+  for (const key of ['message', 'error', 'errorMessage', 'errors', 'detail', 'details', 'data']) {
+    const message = firstMessage(value[key], depth + 1);
+    if (message) return message;
+  }
+
+  return undefined;
+};
+
+const readLoginError = (data: unknown, status: number): string =>
+  firstMessage(data) ??
+  (status === 400 || status === 401
+    ? 'Invalid email or password.'
+    : 'Unable to sign in. Please try again.');
+
+const postLogin = async (payload: LoginPayload): Promise<LoginResponse> => {
+  const response = await fetch(getFullUrl(LOGIN_ENDPOINT), {
+    method: 'POST',
+    headers: getRequestHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  const text = await response.text();
+  let data: unknown = text;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(readLoginError(data, response.status));
+  }
+
+  return data as LoginResponse;
+};
 
 const isValidEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -170,30 +238,28 @@ const LoginScreen = ({ navigation }: Props) => {
 
     setIsSubmitting(true);
 
-    // The FCM token of this device, read fresh on every submit so the backend
-    // can bind the account to it. It is optional — when push is unavailable the
-    // key is simply left out of the payload.
-    const fcmToken = await getAuthFcmToken();
-
-    const payload = {
-      email: email.trim().toLowerCase(),
-      password: password,
-      storeId: STORE_ID,
-      storeSlug: STORE_SLUG,
-      fcmToken,
-    };
-
-    if (__DEV__) {
-      console.log('[auth] login payload', JSON.stringify(payload, null, 2));
-    }
-
     try {
-      const response = await apiService.post<LoginResponse>(LOGIN_ENDPOINT, payload);
+      // The FCM token of this device, read fresh on every submit so the backend
+      // can bind the account to it. It is optional — when push is unavailable the
+      // key is simply left out of the payload.
+      const fcmToken = await getAuthFcmToken();
+
+      const payload: LoginPayload = {
+        email: email.trim().toLowerCase(),
+        password: password,
+        storeId: STORE_ID,
+        storeSlug: STORE_SLUG,
+        fcmToken,
+      };
+
+      if (__DEV__) {
+        console.log('[auth] login attempt', payload.email);
+      }
+
+      const response = await postLogin(payload);
 
       if (!response.success) {
-        showErrorModal(
-          response.message || 'Invalid email or password.',
-        );
+        showErrorModal(readLoginError(response, 200));
         return;
       }
 
@@ -206,12 +272,11 @@ const LoginScreen = ({ navigation }: Props) => {
       );
       navigation.replace('Home');
     } catch (error) {
-      const message =
+      showErrorModal(
         error instanceof Error
           ? error.message
-          : 'Invalid credentials. Please try again.';
-
-      showErrorModal(message);
+          : 'Invalid email or password. Please try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }
