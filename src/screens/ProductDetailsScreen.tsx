@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
+import Video, { ResizeMode } from 'react-native-video';
 import { useAppTheme } from '../theme/useAppTheme';
 import { FONTS } from '../constants/fonts';
 import { useSelector } from 'react-redux';
@@ -50,6 +51,7 @@ const getReviewAvatarSvg = (color: string, initial: string) => `<svg width="34" 
 const getDetailCheckSvg = (color: string) => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="${color}" opacity="0.14"/><path d="M8 12l3 3 5-6" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHECK_GREEN_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17L4 12" stroke="#2E7D32" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const CHEVRON_UP_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 15L12 9L6 15" stroke="#666666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const PLAY_SVG = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" fill="#000000" fill-opacity="0.55"/><path d="M10 8L16 12L10 16V8Z" fill="#FFFFFF"/></svg>`;
 
 const PRODUCT_ENDPOINT = '/api/storefront/products';
 const WISHLIST_ENDPOINT = '/api/storefront/wishlist';
@@ -398,7 +400,12 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   }, [productId, loadProduct, fetchVariants, fetchReviews]);
 
   const product = productData;
-  const thumbnails = product?.images?.length ? product.images : [];
+  const thumbnails = product?.images?.filter(Boolean) ?? [];
+  const videos = product?.videos?.filter(Boolean) ?? [];
+  const galleryItems = [
+    ...thumbnails.map(uri => ({ type: 'image' as const, uri })),
+    ...videos.map(uri => ({ type: 'video' as const, uri })),
+  ];
   const sizes = product?.sizes?.length ? product.sizes : [];
 
   // A product_details notification can pin the price shown for this product.
@@ -415,6 +422,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
       : 0;
 
   const [selectedImg, setSelectedImg] = useState('');
+  const [selectedVideo, setSelectedVideo] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [justAdded, setJustAdded] = useState(false);
   const addedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -461,9 +469,13 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   const [showAllReviews, setShowAllReviews] = useState(false);
 
   useEffect(() => {
-    const firstImage = productData?.images?.[0];
+    setSelectedVideo('');
+    const firstImage = productData?.images?.filter(Boolean)?.[0];
     if (firstImage) {
       setSelectedImg(firstImage);
+    } else {
+      setSelectedImg('');
+      setSelectedVideo(productData?.videos?.filter(Boolean)?.[0] ?? '');
     }
   }, [productData]);
 
@@ -533,6 +545,7 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
     }
     setSelectedVariant(variant);
     if (variant.image) {
+      setSelectedVideo('');
       setSelectedImg(variant.image);
     }
     if (variant.id !== productData?.id) {
@@ -800,12 +813,23 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Main Content */}
           <View>
-  <Image
-    source={{ uri: selectedImg || thumbnails[0] }}
-    style={[styles.heroImage, { height: heroHeight }]}
-    resizeMode={mediaWidget?.config.zoomEnabled ? 'contain' : 'cover'}
-    blurRadius={isOutOfStock ? 12 : 0}
-  />
+  {selectedVideo ? (
+    <Video
+      key={selectedVideo}
+      source={{ uri: selectedVideo }}
+      style={[styles.heroVideo, { height: heroHeight }]}
+      resizeMode={ResizeMode.CONTAIN}
+      controls
+      onError={() => setSelectedVideo('')}
+    />
+  ) : (
+    <Image
+      source={{ uri: selectedImg || thumbnails[0] }}
+      style={[styles.heroImage, { height: heroHeight }]}
+      resizeMode={mediaWidget?.config.zoomEnabled ? 'contain' : 'cover'}
+      blurRadius={isOutOfStock ? 12 : 0}
+    />
+  )}
   {isOutOfStock && (
     <View style={styles.oosOverlay} pointerEvents="none">
       <View style={styles.oosBadge}>
@@ -818,19 +842,39 @@ const ProductDetailsScreen = ({ route, navigation }: ProductDetailsProps) => {
   )}
 </View>
 
-          {thumbnails.length > 1 && (
+          {galleryItems.length > 1 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.thumbContainer}>
-              {thumbnails.map((imgUrl, idx) => {
-                const isSelected = selectedImg === imgUrl;
+              {galleryItems.map((item, idx) => {
+                const isSelected =
+                  item.type === 'video'
+                    ? selectedVideo === item.uri
+                    : !selectedVideo && selectedImg === item.uri;
                 return (
                   <TouchableOpacity
-                    key={idx}
-                    onPress={() => setSelectedImg(imgUrl)}
+                    key={`${item.type}-${idx}`}
+                    onPress={() => {
+                      if (item.type === 'video') {
+                        setSelectedImg('');
+                        setSelectedVideo(item.uri);
+                      } else {
+                        setSelectedVideo('');
+                        setSelectedImg(item.uri);
+                      }
+                    }}
                     style={[styles.thumbBox, isSelected && styles.thumbBoxSelected]}>
-                    <Image source={{ uri: imgUrl }} style={styles.thumbImage} />
+                    {item.type === 'video' ? (
+                      <View style={styles.thumbVideoBox}>
+                        {thumbnails[0] ? (
+                          <Image source={{ uri: thumbnails[0] }} style={styles.thumbImage} />
+                        ) : null}
+                        <SvgXml xml={PLAY_SVG} width={20} height={20} style={styles.thumbPlayIcon} />
+                      </View>
+                    ) : (
+                      <Image source={{ uri: item.uri }} style={styles.thumbImage} />
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -1322,6 +1366,10 @@ const createStyles = (theme: AppTheme) => {
     width: '100%',
     resizeMode: 'cover',
   },
+  heroVideo: {
+    width: '100%',
+    backgroundColor: '#000000',
+  },
   thumbContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -1343,6 +1391,16 @@ const createStyles = (theme: AppTheme) => {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  thumbVideoBox: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+  },
+  thumbPlayIcon: {
+    position: 'absolute',
+    left: 18,
+    top: 18,
   },
 
   /* Section Styles */

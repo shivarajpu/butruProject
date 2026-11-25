@@ -44,6 +44,7 @@
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.27.0",
     "react-native-svg": "^15.15.5",
+    "react-native-video": "^6.19.3",
     "react-redux": "^9.3.0"
   },
   "devDependencies": {
