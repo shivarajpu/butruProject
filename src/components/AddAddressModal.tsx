@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   Modal,
+  KeyboardAvoidingView,
   TextInput,
   ActivityIndicator,
   Alert,
@@ -568,8 +569,11 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback>
             <View
               style={[
@@ -597,7 +601,9 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled">
                 <Text style={styles.fieldLabel}>Address Type</Text>
                 <View style={styles.typeSelectorRow}>
                   {[
@@ -836,7 +842,8 @@ const AddAddressModal = ({ visible, editingAddress, onClose, onSaved }: Props) =
             </View>
           </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -845,6 +852,9 @@ const createStyles = (theme: AppTheme) => {
   const { colors, fontFamily } = theme;
 
   return StyleSheet.create({
+    keyboardAvoidingView: {
+      flex: 1,
+    },
     modalOverlay: {
       flex: 1,
       justifyContent: 'flex-end',
