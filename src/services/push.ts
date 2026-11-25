@@ -52,6 +52,7 @@ import { navigationRef } from '../navigation/rootNavigation';
 import { parseDeepLink } from '../navigation/deepLink';
 import { isExternalLink, resolveLink, type WidgetAction } from '../storefront/links';
 import { store } from '../store';
+import { loadAuthState } from '../store/slices/authSlice';
 import { receivePushNotification } from '../store/slices/notificationSlice';
 import {
   normalizeNotification,
@@ -162,6 +163,21 @@ export const isPushNotificationsEnabled = async (): Promise<boolean> => {
     return raw !== 'false';
   } catch {
     return true;
+  }
+};
+
+/**
+ * The background handler is registered at boot and cannot be torn down on
+ * logout, and a push can already be in flight when the user signs out. The
+ * persisted session is the authority on whether a message belongs to a user,
+ * so it is checked before anything is drawn.
+ */
+const hasActiveSession = async (): Promise<boolean> => {
+  try {
+    const session = await loadAuthState();
+    return session.isLoggedIn === true;
+  } catch {
+    return false;
   }
 };
 
@@ -472,6 +488,10 @@ export const handleForegroundMessage = async (
     console.log('[push] ignoring foreground message — notifications turned off');
     return;
   }
+  if (!(await hasActiveSession())) {
+    console.log('[push] ignoring foreground message — no active session');
+    return;
+  }
   const notification = buildNotification(message);
   if (!notification) {
     console.warn('[push] foreground message produced no notification');
@@ -497,6 +517,10 @@ export const handleBackgroundMessage = async (
   console.log('[push] background message received', JSON.stringify(message?.data ?? {}));
   if (!(await isPushNotificationsEnabled())) {
     console.log('[push] ignoring background message — notifications turned off');
+    return;
+  }
+  if (!(await hasActiveSession())) {
+    console.log('[push] ignoring background message — no active session');
     return;
   }
   // On Android, a message that carries an FCM `notification` block is

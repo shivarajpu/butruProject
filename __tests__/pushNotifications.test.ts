@@ -14,6 +14,23 @@
  *     than crashing the app on launch.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const mockStorage = new Map<string, string>();
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(async (key: string) => mockStorage.get(key) ?? null),
+    setItem: jest.fn(async (key: string, value: string) => {
+      mockStorage.set(key, value);
+    }),
+    removeItem: jest.fn(async (key: string) => {
+      mockStorage.delete(key);
+    }),
+  },
+}));
+
 const mockGet = jest.fn<Promise<unknown>, [string]>();
 const mockPost = jest.fn<Promise<unknown>, [string, unknown]>();
 const mockDispatch = jest.fn();
@@ -56,6 +73,7 @@ function loadPush() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockStorage.clear();
   mockGet.mockReset();
   mockPost.mockReset();
   mockNavigationReady = true;
@@ -386,6 +404,13 @@ describe('registerBackgroundMessageHandler', () => {
 });
 
 describe('handleBackgroundMessage', () => {
+  beforeEach(async () => {
+    await AsyncStorage.setItem(
+      '@butru_auth_session',
+      JSON.stringify({ isLoggedIn: true, isHydrated: true, user: null, token: 'test-token' }),
+    );
+  });
+
   it('shows the notification through Notifee', async () => {
     const { push, notifee } = loadPush();
 
@@ -424,5 +449,16 @@ describe('handleBackgroundMessage', () => {
     expect(notifee.default.displayNotification).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'From the console' }),
     );
+  });
+
+  it('ignores a late push after logout', async () => {
+    const { push, notifee } = loadPush();
+    await AsyncStorage.removeItem('@butru_auth_session');
+
+    await push.handleBackgroundMessage({
+      data: { title: 'Old account', body: 'A push that arrived after logout' },
+    });
+
+    expect(notifee.default.displayNotification).not.toHaveBeenCalled();
   });
 });
