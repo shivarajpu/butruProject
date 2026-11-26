@@ -26,6 +26,13 @@ import type { AppTheme } from '../theme/types';
 import { FONTS } from '../constants/fonts';
 import { apiService } from '../api/apiService';
 import { downloadOrderInvoice } from '../api/invoice';
+import { fetchNotifications, type AppNotification } from '../api/notifications';
+import {
+  getTrackingProgress,
+  type TrackingEvent,
+  type TrackingProgress,
+  type TrackingStepKey,
+} from '../utils/orderTracking';
 
 // ─── Icon Builders (Theme-aware) ──────────────────────────────────────────────
 
@@ -105,6 +112,7 @@ type OrderType = {
   shippingCharges: number;
   status: string;
   trackingStatus: string;
+  trackingHistory: { status: string; timestamp?: string }[];
   trackingNumber?: string;
   items: ProductItem[];
   shippingAddress?: {
@@ -328,6 +336,7 @@ const mapApiOrder = (order: ApiOrder): OrderType => {
     shippingCharges: order.pricing?.shippingCharges ?? 0,
     status: order.status || 'Pending',
     trackingStatus: currentStatus,
+    trackingHistory: order.tracking?.statusHistory || [],
     trackingNumber:
       order.tracking?.trackingNumber ||
       order.tracking?.tracking_number ||
@@ -350,6 +359,55 @@ const getOrderBucket = (order: OrderType): string => {
     return 'Delivered';
   }
   return 'On the way';
+};
+
+const TRACKING_STEP_DEFS: {
+  key: TrackingStepKey;
+  title: string;
+  icon: (color: string) => string;
+}[] = [
+  { key: 'placed', title: 'Order Placed', icon: checkIcon },
+  { key: 'confirmed', title: 'Order Confirmed', icon: gearIcon },
+  { key: 'inTransit', title: 'In Transit', icon: boxIcon },
+  { key: 'outForDelivery', title: 'Out For Delivery', icon: truckIcon },
+  { key: 'delivered', title: 'Delivered', icon: boxIcon },
+];
+
+const normalizeOrderKey = (value?: string): string =>
+  typeof value === 'string'
+    ? value.trim().toLowerCase().replace(/^#/, '')
+    : '';
+
+const eventsForOrder = (
+  order: OrderType,
+  notifications: AppNotification[],
+): TrackingEvent[] => {
+  const orderKeys = [order.id, order.apiOrderId].map(normalizeOrderKey).filter(Boolean);
+  const orderNumbers = [order.orderNumber].map(normalizeOrderKey).filter(Boolean);
+
+  const notificationEvents: TrackingEvent[] = notifications
+    .filter(notification => {
+      const meta = notification.metadata || {};
+      const id = normalizeOrderKey(meta.orderId);
+      const number = normalizeOrderKey(meta.orderNumber);
+      return (
+        (!!id && orderKeys.includes(id)) ||
+        (!!number && orderNumbers.includes(number))
+      );
+    })
+    .map(notification => ({
+      status: notification.metadata?.notificationType || notification.screen,
+      timestamp: notification.createdAt,
+    }));
+
+  return [
+    { status: order.trackingStatus },
+    ...order.trackingHistory.map(entry => ({
+      status: entry.status,
+      timestamp: entry.timestamp,
+    })),
+    ...notificationEvents,
+  ];
 };
 
 // ─── StyleSheet Factory (Theme-aware) ─────────────────────────────────────────
@@ -1241,6 +1299,7 @@ const MyOrdersScreen = ({ navigation, route }: Props) => {
   // Navigation Flow States: 'LIST' | 'TRACK' | 'DETAILS'
   const [currentScreen, setCurrentScreen] = useState<'LIST' | 'TRACK' | 'DETAILS'>('LIST');
   const [orders, setOrders] = useState<OrderType[]>([]);
+  const [orderNotifications, setOrderNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -1342,6 +1401,11 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
     ? getOrderBucket(selectedOrder) === 'Delivered'
     : false;
 
+  const trackingProgress: TrackingProgress | null = useMemo(
+    () => (selectedOrder ? getTrackingProgress(eventsForOrder(selectedOrder, orderNotifications)) : null),
+    [selectedOrder, orderNotifications],
+  );
+
   const filteredOrders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const matchesStatus = (order: OrderType) =>
@@ -1402,6 +1466,18 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchNotifications({ limit: 200 })
+      .then(page => {
+        if (!cancelled) setOrderNotifications(page.notifications);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedOrderId && orders.length) {
@@ -2000,33 +2076,50 @@ const [downloadingInvoice, setDownloadingInvoice] = useState(false);
                 </Text>
               </View>
             ) : (
-              [
-                { title: 'Order Placed', time: selectedOrder?.date || '', status: 'Completed', active: true, icon: checkIcon(colors.textOnPrimary) },
-                { title: 'Processing', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: gearIcon(colors.textMuted) },
-                { title: 'Shipped', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
-                { title: 'Out For Delivery', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: truckIcon(colors.textMuted) },
-                { title: 'Delivered', time: selectedOrder?.date || '', status: 'Pending', active: false, icon: boxIcon(colors.textMuted) },
-              ].map((step, idx, arr) => (
-                <View key={idx} style={styles.timelineRow}>
-                  <View style={styles.timelineNodeCol}>
-                    <View
-                      style={[
-                        styles.timelineNode,
-                        step.active && { backgroundColor: colors.success },
-                      ]}>
-                      <SvgXml xml={step.icon} />
+              TRACKING_STEP_DEFS.map((step, idx, arr) => {
+                const completed = idx <= (trackingProgress?.currentIndex ?? 0);
+                const rawDate = completed
+                  ? trackingProgress?.dates[step.key] ||
+                    (step.key === 'placed' ? selectedOrder?.rawDate : undefined)
+                  : undefined;
+                return (
+                  <View key={step.key} style={styles.timelineRow}>
+                    <View style={styles.timelineNodeCol}>
+                      <View
+                        style={[
+                          styles.timelineNode,
+                          completed && { backgroundColor: colors.success },
+                        ]}>
+                        <SvgXml
+                          xml={
+                            completed
+                              ? checkIcon(colors.textOnPrimary)
+                              : step.icon(colors.textMuted)
+                          }
+                        />
+                      </View>
+                      {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
                     </View>
-                    {idx !== arr.length - 1 && <View style={styles.timelineLine} />}
-                  </View>
 
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>{step.title}</Text>
-                    <Text style={styles.timelineTime}>{step.time}</Text>
-                  </View>
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineTitle}>{step.title}</Text>
+                      <Text style={styles.timelineTime}>{formatOrderDate(rawDate)}</Text>
+                    </View>
 
-                  <Text style={[styles.statusTag, step.active && styles.statusTagActive, step.active && { color: colors.success, backgroundColor: colors.success + '1A', fontFamily: FONTS.poppinsBold }]}>{step.status}</Text>
-                </View>
-              ))
+                    <Text
+                      style={[
+                        styles.statusTag,
+                        completed && {
+                          color: colors.success,
+                          backgroundColor: colors.success + '1A',
+                          fontFamily: FONTS.poppinsBold,
+                        },
+                      ]}>
+                      {completed ? 'Completed' : 'Pending'}
+                    </Text>
+                  </View>
+                );
+              })
             )}
           </View>
 
